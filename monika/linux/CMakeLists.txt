@@ -32,6 +32,7 @@ set(monika_sources
     stubs.cpp
     sysinfo.cpp
     threading.cpp
+    time.cpp
     userid.cpp)
 
 add_library(monika STATIC ${monika_sources})
