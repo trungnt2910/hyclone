@@ -821,6 +821,30 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char *path)
     return B_OK;
 }
 
+status_t MONIKA_EXPORT _kern_create_dir(int fd, const char *path, int perms)
+{
+    char hostPath[PATH_MAX];
+    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
+
+    if (status < 0)
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+    else if (status > sizeof(hostPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
+    }
+    
+    status = LINUX_SYSCALL2(__NR_mkdir, hostPath, ModeBToLinux(perms));
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 }
 
 int ModeBToLinux(int mode)
