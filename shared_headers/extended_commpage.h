@@ -54,6 +54,10 @@ struct hostcalls
     void (*closedir)(int fd);
     int (*readdir)(int fd, void* buffer, size_t bufferSize, int maxCount);
 
+    // Time
+    int64_t (*system_time)();
+    int64_t (*system_time_nsecs)();
+
     // Vchroot
     size_t (*vchroot_expand)(const char* path, char* hostPath, size_t size);
     size_t (*vchroot_unexpand)(const char* hostPath, char* path, size_t size);

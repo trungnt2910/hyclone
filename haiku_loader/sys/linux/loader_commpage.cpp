@@ -16,8 +16,10 @@
 #include "loader_reservedrange.h"
 #include "loader_servercalls.h"
 #include "loader_sysinfo.h"
+#include "loader_systemtime.h"
 #include "loader_tls.h"
 #include "loader_vchroot.h"
+#include "real_time_data.h"
 
 #include "loader_commpage.h"
 
@@ -27,9 +29,21 @@ void* loader_allocate_commpage()
     if (commpage == MAP_FAILED)
         return NULL;
 
+    char* commpageStorage = (char*)((uintptr_t)commpage + sizeof(uint64_t) * COMMPAGE_TABLE_ENTRIES);
+    real_time_data* realTimeData = (real_time_data*)commpageStorage;
+    commpageStorage += sizeof(real_time_data);
+
     ((uint64_t*)commpage)[COMMPAGE_ENTRY_MAGIC] = COMMPAGE_SIGNATURE;
 	((uint64_t*)commpage)[COMMPAGE_ENTRY_VERSION] = COMMPAGE_VERSION;
-	((uint64_t*)commpage)[COMMPAGE_ENTRY_REAL_TIME_DATA] = 0;
+    ((uint64_t*)commpage)[COMMPAGE_ENTRY_REAL_TIME_DATA] = 
+        (uint64_t)((uintptr_t)realTimeData - (uintptr_t)commpage);
+#ifdef __x86_64__
+    // Stubbed.
+    realTimeData->arch_data.system_time_conversion_factor = 0;
+    realTimeData->arch_data.system_time_offset = 0;
+#else
+#warning commpage time data not set up for this architecture.
+#endif
 
     hostcalls* hostcalls_ptr = (hostcalls*)((uint8_t*)commpage + EXTENDED_COMMPAGE_HOSTCALLS_OFFSET);
     hostcalls_ptr->tls_allocate = tls_allocate;
@@ -68,6 +82,9 @@ void* loader_allocate_commpage()
     hostcalls_ptr->opendir = loader_opendir;
     hostcalls_ptr->closedir = loader_closedir;
     hostcalls_ptr->readdir = loader_readdir;
+
+    hostcalls_ptr->system_time = loader_system_time;
+    hostcalls_ptr->system_time_nsecs = loader_system_time_nsecs;
 
     hostcalls_ptr->vchroot_expand = loader_vchroot_expand;
     hostcalls_ptr->vchroot_unexpand = loader_vchroot_unexpand;

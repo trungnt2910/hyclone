@@ -1,5 +1,6 @@
 #include <sys/sysinfo.h>
 #include <string.h>
+#include <time.h>
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
@@ -69,7 +70,16 @@ status_t MONIKA_EXPORT _kern_get_system_info(haiku_system_info *info)
 
     int page_size = (int)GET_HOSTCALLS()->get_page_size();
 
-    info->boot_time = linux_sysinfo.uptime;
+    struct timespec tp;
+    result = LINUX_SYSCALL2(__NR_clock_gettime, CLOCK_REALTIME, &tp);
+
+    if (result < 0)
+    {
+        return LinuxToB(-result);
+    } 
+
+    // Boot time = current time - uptime.
+    info->boot_time = (tp.tv_sec * 1000000LL + tp.tv_nsec / 1000) - (linux_sysinfo.uptime * 1000000LL);
     info->cpu_count = GET_HOSTCALLS()->get_cpu_count();
     info->max_pages = linux_sysinfo.totalram * linux_sysinfo.mem_unit / page_size;
     info->used_pages = (linux_sysinfo.totalram - linux_sysinfo.freeram) * linux_sysinfo.mem_unit / page_size;
