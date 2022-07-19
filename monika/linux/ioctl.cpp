@@ -55,6 +55,34 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
             }
             return B_OK;
         }
+        case HAIKU_TCXONC:
+        {
+            int arg = *(int*)buffer;
+            int linuxArg;
+            switch (arg)
+            {
+                case HAIKU_TCOOFF:
+                    linuxArg = TCIOFF;
+                    break;
+                case HAIKU_TCOON:
+                    linuxArg = TCOON;
+                    break;
+                case HAIKU_TCIOFF:
+                    linuxArg = TCIOFF;
+                    break;
+                case HAIKU_TCION:
+                    linuxArg = TCION;
+                    break;
+                default:
+                    return B_BAD_VALUE;
+            }
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCXONC, linuxArg);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            return B_OK;
+        }
         case HAIKU_TIOCGWINSZ:
         {
             struct winsize linux_winsize;
@@ -96,22 +124,22 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
         STUB_IOCTL(FIONREAD);
         STUB_IOCTL(FIOSEEKDATA);
         STUB_IOCTL(FIOSEEKHOLE);
-        // STUB_IOCTL(TCGETA);
+        //STUB_IOCTL(TCGETA);
         STUB_IOCTL(TCSETA);
         STUB_IOCTL(TCSETAF);
         //STUB_IOCTL(TCSETAW);
         STUB_IOCTL(TCWAITEVENT);
         STUB_IOCTL(TCSBRK);
         STUB_IOCTL(TCFLSH);
-        STUB_IOCTL(TCXONC);
+        //STUB_IOCTL(TCXONC);
         STUB_IOCTL(TCQUERYCONNECTED);
         STUB_IOCTL(TCGETBITS);
         STUB_IOCTL(TCSETDTR);
         STUB_IOCTL(TCSETRTS);
-        // STUB_IOCTL(TIOCGWINSZ);
+        //STUB_IOCTL(TIOCGWINSZ);
         STUB_IOCTL(TIOCSWINSZ);
         STUB_IOCTL(TCVTIME);
-        // STUB_IOCTL(TIOCGPGRP);
+        //STUB_IOCTL(TIOCGPGRP);
         //STUB_IOCTL(TIOCSPGRP);
         STUB_IOCTL(TIOCSCTTY);
         STUB_IOCTL(TIOCMGET);
