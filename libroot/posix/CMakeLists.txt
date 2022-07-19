@@ -1,0 +1,36 @@
+project(libroot_posix)
+
+add_library(root_posix_objects OBJECT IMPORTED)
+set_property(TARGET root_posix_objects PROPERTY
+    IMPORTED_OBJECTS
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_arch_${HYCLONE_ARCH}.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_crypt.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_locale.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_main.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_pthread.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_signal.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_stdio.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_musl.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_arch_${HYCLONE_ARCH}.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_ctype.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_ext.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_iconv.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_libio.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_locale.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_math.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_misc.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_regex.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_stdio.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_stdlib.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_wcsmbs.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_stdlib.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_string.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_string_arch_${HYCLONE_ARCH}.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_sys.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_time.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_unistd.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_wchar.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix_malloc.o)
+
+add_library(root_posix STATIC blank.c)
+target_link_libraries(root_posix PRIVATE root_posix_objects)
