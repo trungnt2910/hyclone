@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <errno.h>
 #include <unistd.h>
 
@@ -23,7 +24,7 @@ int loader_fork()
     {
         // Set the thread_id slot.
         // libroot's getpid() function depends on it.
-        tls_set(TLS_THREAD_ID_SLOT, (void*)gettid());
+        tls_set(TLS_THREAD_ID_SLOT, (void*)(uintptr_t)gettid());
     }
     return status;
 }

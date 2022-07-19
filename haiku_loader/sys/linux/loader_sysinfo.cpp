@@ -12,8 +12,6 @@
 #include "haiku_errors.h"
 #include "loader_sysinfo.h"
 
-#include<iostream>
-
 int64_t get_cpu_count()
 {
     return get_nprocs();
