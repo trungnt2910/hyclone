@@ -15,10 +15,13 @@ add_executable(hyclone_server
     image.cpp
     process.cpp
     server_dispatch.cpp
+    server_workers.cpp
     shutdown.cpp
     system.cpp
 
     ${SERVER_SYSTEM_SPECIFIC_SOURCES})
+
+set_property(TARGET hyclone_server PROPERTY CXX_STANDARD 20)
 
 install(TARGETS hyclone_server DESTINATION bin)
 if(HYCLONE_HOST_LINUX)

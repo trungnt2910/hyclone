@@ -1,16 +1,20 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <future>
 #include <iostream>
-#include <vector>
+#include <memory>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <thread>
 #include <unistd.h>
+#include <vector>
 
 #include "servercalls.h"
 #include "server_servercalls.h"
+#include "server_workers.h"
 #include "system.h"
 
 #include "server_main.h"
@@ -96,40 +100,68 @@ int server_main(int argc, char **argv)
                 {
                     continue;
                 }
+                // POLLIN set but no bytes available. This
+                // probably means that the client has closed
+                // the connection.
+                if (inputBytes == 0)
+                {
+                    goto connection_close;
+                }
                 // Not enough data for a servercall.
                 if (inputBytes < kBufferSize)
                 {
                     continue;
                 }
-                intptr_t buffer[kBufferLength];
-                ssize_t bytes_read = read(fd, buffer, sizeof(buffer));
+
+                std::unique_ptr<intptr_t[]> buffer(new intptr_t[kBufferLength]);
+                ssize_t bytes_read = read(fd, buffer.get(), kBufferSize);
                 if (bytes_read == -1 || bytes_read != kBufferSize)
                 {
                     std::cerr << "read failed" << std::endl;
                 }
-                std::cerr << "received servercall: " << buffer[0] << std::endl;
+                std::cerr << "received servercall: " + std::to_string(buffer[0]) << std::endl;
 
-                // In the future this function might spawn threads or whatnot.
-                intptr_t returnValue = 
-                    server_dispatch(fd,
-                        buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6]);
+                const auto dispatch = [&](int fd, std::unique_ptr<intptr_t[]> buffer)
+                {
+                    intptr_t returnValue =
+                        server_dispatch(fd,
+                            buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6]);
 
-                write(fd, &returnValue, sizeof(returnValue));
+                    write(fd, &returnValue, sizeof(returnValue));
+                };
 
                 if (buffer[0] == SERVERCALL_ID_disconnect)
                 {
-                    close(fd);
-                    --oldSize;
-                    std::swap(pollfds[i], pollfds.back());
-                    pollfds.pop_back();
-
-                    // This means that pollfds.back() is actually a valid entry,
-                    // as no new entry has been added. We need to iterate through it.
-                    if (oldSize == pollfds.size())
-                    {
-                        --i;
-                    }
+                    // Synchronously dispatch this call to
+                    // quickly free the invalid fd.
+                    dispatch(fd, std::move(buffer));
+                    goto connection_close;
                 }
+
+                server_worker_run(dispatch, fd, std::move(buffer));
+            }
+            else if (revents & POLLHUP || revents & POLLERR)
+            {
+            connection_close:
+                std::cerr << "Closing: " << fd << std::endl;
+                close(fd);
+
+                std::swap(pollfds[i], pollfds.back());
+                pollfds.pop_back();
+                --oldSize;
+
+                // This means that pollfds.back() is actually a valid entry,
+                // as no new entry has been added. We need to iterate through it.
+                if (oldSize == pollfds.size())
+                {
+                    --i;
+                }
+
+                for (const auto & open : pollfds)
+                {
+                    std::cerr << open.fd << " ";
+                }
+                std::cerr << std::endl;
             }
         }
     }
