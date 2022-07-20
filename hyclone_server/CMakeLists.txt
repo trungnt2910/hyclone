@@ -13,6 +13,7 @@ add_executable(hyclone_server
 
     area.cpp
     image.cpp
+    port.cpp
     process.cpp
     server_dispatch.cpp
     server_workers.cpp

@@ -36,7 +36,7 @@ typedef uint64 bigtime_t;
 
 typedef int64 haiku_off_t;
 
-typedef long signed int	haiku_ssize_t;
+typedef long signed int     haiku_ssize_t;
 
 #define B_OS_NAME_LENGTH    32
 #define B_FILE_NAME_LENGTH  256
@@ -46,7 +46,7 @@ typedef long signed int	haiku_ssize_t;
 #define B_PAGE_SIZE         4096
 #endif
 
-struct user_space_program_args 
+struct user_space_program_args
 {
     char            program_name[B_OS_NAME_LENGTH];
     char            program_path[B_PATH_NAME_LENGTH];
@@ -65,5 +65,19 @@ typedef struct
     bigtime_t   user_time;
     bigtime_t   kernel_time;
 } team_usage_info;
+
+enum
+{
+    B_TIMEOUT           = 0x8,    /* relative timeout */
+    B_RELATIVE_TIMEOUT  = 0x8,    /* fails after a relative timeout
+                                                with B_TIMED_OUT */
+    B_ABSOLUTE_TIMEOUT  = 0x10,   /* fails after an absolute timeout
+                                                with B_TIMED_OUT */
+
+    /* experimental Haiku only API */
+    B_TIMEOUT_REAL_TIME_BASE        = 0x40,
+    B_ABSOLUTE_REAL_TIME_TIMEOUT    = B_ABSOLUTE_TIMEOUT
+                                        | B_TIMEOUT_REAL_TIME_BASE
+};
 
 #endif // __HAIKU_STRUCTS_H__

@@ -1,6 +1,8 @@
+#include <cstddef>
 #include <iostream>
 
 #include "haiku_errors.h"
+#include "port.h"
 #include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
@@ -51,6 +53,47 @@ size_t System::UnregisterConnection(intptr_t conn_id)
 {
     _connections.erase(conn_id);
     return _connections.size();
+}
+
+int System::RegisterPort(std::shared_ptr<Port>&& port)
+{
+    int id = _ports.Add(port);
+    port->_info.port = id;
+    // Haiku doesn't seem to do anything
+    // about ports with duplicate names,
+    // so neither should we.
+    _portNames.emplace(port->Name(), id);
+    return id;
+}
+
+std::weak_ptr<Port> System::GetPort(int port_id)
+{
+    if (_ports.IsValidId(port_id))
+    {
+        return _ports.Get(port_id);
+    }
+    return std::weak_ptr<Port>();
+}
+
+int System::FindPort(const std::string& portName)
+{
+    auto it = _portNames.find(portName);
+    if (it != _portNames.end())
+    {
+        return it->second;
+    }
+    return -1;
+}
+
+size_t System::UnregisterPort(int port_id)
+{
+    std::shared_ptr<Port> port = _ports.Get(port_id);
+    if (port)
+    {
+        _portNames.erase(port->Name());
+        _ports.Remove(port_id);
+    }
+    return _ports.Size();
 }
 
 void System::Shutdown()
