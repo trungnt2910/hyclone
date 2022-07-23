@@ -33,10 +33,21 @@ namespace LibHpkg::Model
 
         virtual std::any GetValue(const AttributeContext& context) const = 0;
 
+        std::any GetValue(const std::shared_ptr<AttributeContext>& context) const
+        {
+            return GetValue(*context);
+        }
+
         template <typename T>
-        T GetValue(const AttributeContext& context)
+        T GetValue(const AttributeContext& context) const
         {
             return std::any_cast<T>(GetValue(context));
+        }
+
+        template <typename T>
+        T GetValue(const std::shared_ptr<AttributeContext>& context) const
+        {
+            return std::any_cast<T>(GetValue(*context));
         }
 
         void SetChildAttributes(const std::vector<std::shared_ptr<Attribute>>& value)

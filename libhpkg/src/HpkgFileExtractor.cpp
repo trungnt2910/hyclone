@@ -76,6 +76,17 @@ namespace LibHpkg
         return std::make_shared<AttributeIterator>(GetPackageAttributeContext(), offset);
     }
 
+    std::vector<std::shared_ptr<Attribute>> HpkgFileExtractor::GetPackageAttributes() const
+    {
+        std::vector<std::shared_ptr<Attribute>> assembly;
+        auto attributeIterator = GetPackageAttributesIterator();
+        while (attributeIterator->HasNext())
+        {
+            assembly.push_back(attributeIterator->Next());
+        }
+        return assembly;
+    }
+
     std::shared_ptr<AttributeContext> HpkgFileExtractor::GetTocContext() const
     {
         auto context = std::make_shared<AttributeContext>();

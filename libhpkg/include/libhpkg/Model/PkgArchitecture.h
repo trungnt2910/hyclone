@@ -1,12 +1,7 @@
 #ifndef __LIBHPKG_MODEL_PKGARCHITECTURE_H__
 #define __LIBHPKG_MODEL_PKGARCHITECTURE_H__
 
-/*
- * Copyright 2013-2021, Andrew Lindesay
- * Distributed under the terms of the MIT License.
- */
-
-namespace HpkgReader::Model
+namespace LibHpkg::Model
 {
     /// <summary>
     /// <para>In the HPKR file format, the architecture is a numerical value.  These numerical

@@ -48,6 +48,8 @@ namespace LibHpkg
 
         std::shared_ptr<AttributeIterator> GetPackageAttributesIterator() const;
 
+        std::vector<std::shared_ptr<Model::Attribute>> GetPackageAttributes() const;
+
         std::shared_ptr<AttributeContext> GetTocContext() const;
 
         std::shared_ptr<AttributeIterator> GetTocIterator() const;
@@ -55,6 +57,11 @@ namespace LibHpkg
         std::vector<std::shared_ptr<Model::Attribute>> GetToc() const;
 
         HpkgHeader ReadHeader() const;
+
+        const std::filesystem::path& GetFile() const
+        {
+            return file;
+        }
     };
 }
 

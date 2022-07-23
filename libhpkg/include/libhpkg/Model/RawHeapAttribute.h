@@ -15,39 +15,6 @@
 
 namespace LibHpkg::Model
 {
-    class RawHeapAttribute: public RawAttribute
-    {
-        friend class std::hash<RawHeapAttribute>;
-    private:
-        const Heap::HeapCoordinates heapCoordinates;
-    
-    public:
-        RawHeapAttribute(const AttributeId& attributeId, const Heap::HeapCoordinates& heapCoordinates)
-            : RawAttribute(attributeId), heapCoordinates(heapCoordinates)
-        {
-        }
-
-        bool operator==(const RawHeapAttribute& other) const
-        {
-            return heapCoordinates == other.heapCoordinates;
-        }
-
-        virtual std::any GetValue(const AttributeContext& context) const override
-        {
-            return Heap::HeapInputStream(context.HeapReader, heapCoordinates);
-        }
-
-        virtual AttributeType GetAttributeType() const override
-        {
-            return AttributeType::RAW;
-        }
-
-        virtual std::string ToString() const override
-        {
-            return RawAttribute::ToString() + " : @" + heapCoordinates.ToString();
-        }
-    };
-
     class HeapByteSource: public Compat::ByteSource
     {
     private:
@@ -68,6 +35,45 @@ namespace LibHpkg::Model
         virtual std::optional<size_t> SizeIfKnown() const override
         {
             return heapCoordinates.GetLength();
+        }
+
+        const Heap::HeapCoordinates& GetHeapCoordinates() const
+        {
+            return heapCoordinates;
+        }
+    };
+
+    class RawHeapAttribute: public RawAttribute
+    {
+        friend class std::hash<RawHeapAttribute>;
+    private:
+        const Heap::HeapCoordinates heapCoordinates;
+
+    public:
+        RawHeapAttribute(const AttributeId& attributeId, const Heap::HeapCoordinates& heapCoordinates)
+            : RawAttribute(attributeId), heapCoordinates(heapCoordinates)
+        {
+        }
+
+        bool operator==(const RawHeapAttribute& other) const
+        {
+            return heapCoordinates == other.heapCoordinates;
+        }
+
+        virtual std::any GetValue(const AttributeContext& context) const override
+        {
+            return std::dynamic_pointer_cast<Compat::ByteSource>(
+                std::make_shared<HeapByteSource>(context.HeapReader, heapCoordinates));
+        }
+
+        virtual AttributeType GetAttributeType() const override
+        {
+            return AttributeType::RAW;
+        }
+
+        virtual std::string ToString() const override
+        {
+            return RawAttribute::ToString() + " : @" + heapCoordinates.ToString();
         }
 
         const Heap::HeapCoordinates& GetHeapCoordinates() const

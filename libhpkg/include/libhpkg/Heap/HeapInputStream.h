@@ -4,6 +4,7 @@
 #include <cassert>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #include "HeapCoordinates.h"
 #include "HeapReader.h"
@@ -14,21 +15,29 @@ namespace LibHpkg::Heap
     {
     private:
         std::shared_ptr<HeapReader> reader;
+        std::vector<uint8_t> buffer;
         const HeapCoordinates coordinates;
         size_t offsetInCoordinates = 0;
 
     public:
-        heapstreambuf(const std::shared_ptr<HeapReader>& reader, const HeapCoordinates& coordinates)
-            : reader(reader), coordinates(coordinates)
+        heapstreambuf(const std::shared_ptr<HeapReader>& reader, const HeapCoordinates& coordinates, size_t bufferSize = 8192)
+            : reader(reader), buffer(bufferSize), coordinates(coordinates)
         {
             assert(reader);
         }
         heapstreambuf(const heapstreambuf& other)
-            : reader(other.reader), coordinates(other.coordinates), offsetInCoordinates(other.offsetInCoordinates)
+            :
+            reader(other.reader), buffer(other.buffer),
+            coordinates(other.coordinates),
+            offsetInCoordinates(other.offsetInCoordinates)
         {
         }
         heapstreambuf(heapstreambuf&& other)
-            : reader(std::move(other.reader)), coordinates(other.coordinates), offsetInCoordinates(other.offsetInCoordinates)
+            :
+            reader(std::move(other.reader)),
+            buffer(std::move(other.buffer)),
+            coordinates(other.coordinates),
+            offsetInCoordinates(other.offsetInCoordinates)
         {
         }
     protected:
@@ -46,8 +55,8 @@ namespace LibHpkg::Heap
     private:
         heapstreambuf streambuf;
     public:
-        heapistream(const std::shared_ptr<HeapReader>& reader, const HeapCoordinates& coordinates)
-            : streambuf(reader, coordinates), std::istream(&streambuf)
+        heapistream(const std::shared_ptr<HeapReader>& reader, const HeapCoordinates& coordinates, size_t bufferSize = 8192)
+            : streambuf(reader, coordinates, bufferSize), std::istream(&streambuf)
         {
         }
         heapistream(const heapistream& other)

@@ -15,10 +15,15 @@ namespace LibHpkg::Compat
         auto stream = OpenStream();
         std::vector<uint8_t> result;
         result.reserve(SizeIfKnown().value_or(0));
-        
+
         while (stream->good())
         {
-            result.push_back(stream->get());
+            auto next = stream->get();
+            if (next == std::istream::traits_type::eof())
+            {
+                break;
+            }
+            result.push_back(next);
         }
 
         return result;

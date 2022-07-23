@@ -11,7 +11,7 @@
 
 namespace LibHpkg::Heap
 {
-    size_t Inflate(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsDictionary = nullptr);
+    static size_t Inflate(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsInput = nullptr, bool* needsDictionary = nullptr);
 
     HpkHeapReader::HpkHeapReader(
                 const std::filesystem::path& file,
@@ -172,9 +172,10 @@ namespace LibHpkg::Heap
                         // {
                             int read;
                             bool needsDictionary = false;
+                            bool needsInput = false;
 
-                            if (chunkUncompressedLength != 
-                                (read = Inflate(deflatedBuffer.data(), deflatedBuffer.size(), buffer.data(), buffer.size(), &needsDictionary)))
+                            if (chunkUncompressedLength !=
+                                (read = Inflate(deflatedBuffer.data(), deflatedBuffer.size(), buffer.data(), buffer.size(), &needsInput, &needsDictionary)))
                             {
                                 // the last chunk size uncompressed may be smaller than the chunk size,
                                 // so don't throw an exception if this happens.
@@ -185,10 +186,10 @@ namespace LibHpkg::Heap
                                         + " bytes; was expecting "
                                         + std::to_string(chunkUncompressedLength);
 
-                                    // if (inflater.NeedsInput())
-                                    // {
-                                    //     message += "; needs input";
-                                    // }
+                                    if (needsInput)
+                                    {
+                                        message += "; needs input";
+                                    }
 
                                     if (needsDictionary)
                                     {
@@ -223,8 +224,8 @@ namespace LibHpkg::Heap
             if (chunkUncompressedLength != read)
             {
                 throw HpkException(
-                    "problem reading chunk " 
-                    + std::to_string(index) 
+                    "problem reading chunk "
+                    + std::to_string(index)
                     + " of heap; only read "
                     + std::to_string(read)
                     + " of "
@@ -234,55 +235,33 @@ namespace LibHpkg::Heap
         }
     }
 
-    size_t Inflate(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsDictionary)
+    size_t Inflate(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsInput, bool* needsDictionary)
     {
-        z_stream strm  = {0};
-        strm.total_in  = strm.avail_in  = srcLen;
-        strm.total_out = strm.avail_out = dstLen;
-        strm.next_in   = (Bytef *)src;
-        strm.next_out  = (Bytef *)dst;
+        uLongf bytesUsed = dstLen;
+        int err = uncompress((Bytef*)dst, (uLongf*)&bytesUsed, (const Bytef*)src, (uLongf)srcLen);
 
-        strm.zalloc = Z_NULL;
-        strm.zfree  = Z_NULL;
-        strm.opaque = Z_NULL;
-
-        int err = -1;
-        size_t ret = -1;
-
-        err = inflateInit2(&strm, 15); //15 window bits, and the +32 tells zlib to to detect if using gzip or zlib
-        if (err == Z_OK) 
+        if (err != Z_OK)
         {
-            err = inflate(&strm, Z_FINISH);
-            if (err == Z_STREAM_END) 
-            {
-                ret = strm.total_out;
-            }
-            else 
-            {
-                goto fail;
-            }
-        }
-        else 
-        {
-        fail:
-            inflateEnd(&strm);
             switch (err)
             {
-                // Some known errors for compatibility with C# port.
                 case Z_NEED_DICT:
                     if (needsDictionary)
                     {
                         *needsDictionary = true;
                     }
-                    return 0;
+                    break;
+                case Z_STREAM_END:
+                    if (needsInput)
+                    {
+                        *needsInput = false;
+                    }
+                    break;
                 default:
-                    throw HpkException("zlib inflation failed with error: " + std::to_string(err));
+                    return -1;
             }
         }
 
-        inflateEnd(&strm);
-        assert(ret >= 0);
-        return ret;
+        return (size_t)bytesUsed;
     }
 
     int HpkHeapReader::ReadHeap(size_t offset)

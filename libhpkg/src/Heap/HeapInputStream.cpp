@@ -9,12 +9,18 @@ namespace LibHpkg::Heap
             return traits_type::eof();
         }
 
-        int_type nextByte = 
-            reader->ReadHeap(coordinates.GetOffset() + offsetInCoordinates);
+        size_t remainingLength = coordinates.GetLength() - offsetInCoordinates;
+        size_t readLength = std::min(remainingLength, buffer.size());
 
-        ++offsetInCoordinates;
-        
-        return nextByte;
+        reader->ReadHeap(buffer, 0, HeapCoordinates(coordinates.GetOffset() + offsetInCoordinates, readLength));
+
+        offsetInCoordinates += readLength;
+
+        setg((char*)buffer.data(),
+            (char*)buffer.data(),
+            (char*)buffer.data() + readLength);
+
+        return buffer[0];
     }
 
     heapstreambuf::pos_type heapstreambuf::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode mode)
