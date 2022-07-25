@@ -27,49 +27,57 @@ void Semaphore::Acquire(int tid, int count)
     }
 }
 
-bool Semaphore::TryAcquire(int tid, int count)
+int Semaphore::TryAcquire(int tid, int count)
 {
     std::unique_lock<std::mutex> lock(_countLock);
 
     if (_count >= count)
     {
         _count -= count;
-        return true;
+        return 0;
     }
 
-    return false;
+    return B_WOULD_BLOCK;
 }
 
-bool Semaphore::TryAcquireFor(int tid, int count, int64_t timeout)
+int Semaphore::TryAcquireFor(int tid, int count, int64_t timeout)
 {
     while (!TryAcquire(tid, count))
     {
         if (timeout >= 0)
         {
+            if (!_registered)
+            {
+                return B_BAD_SEM_ID;
+            }
             server_worker_sleep(kIntervalMicroseconds);
             timeout -= kIntervalMicroseconds;
         }
         else
         {
-            return false;
+            return B_TIMED_OUT;
         }
     }
 
-    return true;
+    return 0;
 }
 
-bool Semaphore::TryAcquireUntil(int tid, int count, int64_t timestamp)
+int Semaphore::TryAcquireUntil(int tid, int count, int64_t timestamp)
 {
     while (!TryAcquire(tid, count))
     {
         if (server_system_time() >= timestamp)
         {
-            return false;
+            return B_TIMED_OUT;
+        }
+        if (!_registered)
+        {
+            return B_BAD_SEM_ID;
         }
         server_worker_sleep(kIntervalMicroseconds);
     }
 
-    return true;
+    return 0;
 }
 
 void Semaphore::Release(int count)

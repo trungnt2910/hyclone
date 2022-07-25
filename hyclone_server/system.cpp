@@ -102,6 +102,7 @@ int System::CreateSemaphore(int pid, int count, const char* name)
     std::shared_ptr<Semaphore> semaphore = std::make_shared<Semaphore>(pid, count, name);
     int id = _semaphores.Add(semaphore);
     semaphore->_info.sem = id;
+    semaphore->_registered = true;
     return id;
 }
 
@@ -118,6 +119,8 @@ size_t System::UnregisterSemaphore(int id)
 {
     if (_semaphores.IsValidId(id))
     {
+        auto sem = _semaphores.Get(id);
+        sem->_registered = false;
         _semaphores.Remove(id);
     }
     return _semaphores.Size();
