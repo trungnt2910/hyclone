@@ -1,5 +1,8 @@
+#include <cstring>
+
 #include "BeDefs.h"
 #include "export.h"
+#include "extended_commpage.h"
 #include "haiku_errors.h"
 #include "haiku_thread.h"
 #include "linux_debug.h"
@@ -26,6 +29,11 @@ void MONIKA_EXPORT _kern_mutex_lock()
 void MONIKA_EXPORT _kern_mutex_unlock()
 {
     panic("_kern_mutex_unlock not implemented");
+}
+
+sem_id MONIKA_EXPORT _kern_create_sem(int count, const char *name)
+{
+    return GET_SERVERCALLS()->create_sem(count, name, strlen(name));
 }
 
 }

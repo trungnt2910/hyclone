@@ -97,9 +97,12 @@ void Process::Fork(Process& child)
     // child._pid = _pid;
     // No, child has its own threads.
     // child._threads = _threads;
-    
+
     child._images = _images;
     child._areas = _areas;
+
+    // No, semaphores don't seem to be inherited.
+    // child._owningSemaphores = _owningSemaphores;
 }
 
 size_t Process::ReadMemory(void* address, void* buffer, size_t size)

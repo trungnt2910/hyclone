@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "haiku_errors.h"
+#include "hsemaphore.h"
 #include "port.h"
 #include "process.h"
 #include "server_native.h"
@@ -96,6 +97,32 @@ size_t System::UnregisterPort(int port_id)
     return _ports.Size();
 }
 
+int System::CreateSemaphore(int pid, int count, const char* name)
+{
+    std::shared_ptr<Semaphore> semaphore = std::make_shared<Semaphore>(pid, count, name);
+    int id = _semaphores.Add(semaphore);
+    semaphore->_info.sem = id;
+    return id;
+}
+
+std::weak_ptr<Semaphore> System::GetSemaphore(int id)
+{
+    if (_semaphores.IsValidId(id))
+    {
+        return _semaphores.Get(id);
+    }
+    return std::weak_ptr<Semaphore>();
+}
+
+size_t System::UnregisterSemaphore(int id)
+{
+    if (_semaphores.IsValidId(id))
+    {
+        _semaphores.Remove(id);
+    }
+    return _semaphores.Size();
+}
+
 void System::Shutdown()
 {
     _isShuttingDown = true;
@@ -146,6 +173,11 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
         system.UnregisterProcess(context.pid);
     }
     system.UnregisterConnection(context.conn_id);
+
+    for (const auto& s: context.process->GetOwningSemaphores())
+    {
+        system.UnregisterSemaphore(s);
+    }
 
     std::cerr << "Unregistered: " << context.conn_id << " " << context.pid << " " << context.tid << std::endl;
 

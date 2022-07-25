@@ -11,6 +11,7 @@
 
 class Process;
 class Port;
+class Semaphore;
 
 class System
 {
@@ -20,6 +21,7 @@ private:
     std::unordered_map<intptr_t, std::pair<int, int>> _connections;
     IdMap<std::shared_ptr<Port>, int> _ports;
     std::unordered_map<std::string, int> _portNames;
+    IdMap<std::shared_ptr<Semaphore>, int> _semaphores;
     std::mutex _lock;
     System() = default;
     ~System() = default;
@@ -38,6 +40,11 @@ public:
     std::weak_ptr<Port> GetPort(int port_id);
     int FindPort(const std::string& portName);
     size_t UnregisterPort(int port_id);
+
+    int CreateSemaphore(int pid, int count, const char* name);
+    std::weak_ptr<Semaphore> GetSemaphore(int id);
+    size_t GetSemaphoreCount() const { return _semaphores.size(); }
+    size_t UnregisterSemaphore(int id);
 
     void Shutdown();
     bool IsShuttingDown() const { return _isShuttingDown; }

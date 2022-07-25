@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "haiku_area.h"
 #include "haiku_image.h"
@@ -20,6 +21,7 @@ private:
     IdMap<haiku_extended_image_info, int> _images;
     IdMap<haiku_area_info, int> _areas;
     std::mutex _lock;
+    std::unordered_set<int> _owningSemaphores;
 public:
     Process(int pid): _pid(pid) {}
     ~Process() = default;
@@ -47,6 +49,11 @@ public:
 
     // Copies managed information to child.
     void Fork(Process& child);
+
+    const std::unordered_set<int>& GetOwningSemaphores() const { return _owningSemaphores; }
+    void AddOwningSemaphore(int id) { _owningSemaphores.insert(id); }
+    void RemoveOwningSemaphore(int id) { _owningSemaphores.erase(id); }
+    bool IsOwningSemaphore(int id) const { return _owningSemaphores.contains(id); }
 
     size_t ReadMemory(void* address, void* buffer, size_t size);
     size_t WriteMemory(void* address, const void* buffer, size_t size);

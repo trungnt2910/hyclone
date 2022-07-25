@@ -76,7 +76,7 @@ status_t MONIKA_EXPORT _kern_get_system_info(haiku_system_info *info)
     if (result < 0)
     {
         return LinuxToB(-result);
-    } 
+    }
 
     // Boot time = current time - uptime.
     info->boot_time = (tp.tv_sec * 1000000LL + tp.tv_nsec / 1000) - (linux_sysinfo.uptime * 1000000LL);
@@ -96,7 +96,7 @@ status_t MONIKA_EXPORT _kern_get_system_info(haiku_system_info *info)
     info->page_faults = 0;
 
     info->max_sems = GET_HOSTCALLS()->get_max_sems();
-    info->used_sems = 0;
+    info->used_sems = GET_SERVERCALLS()->get_system_sem_count();
 
     // This is something we might need to call the kernel server.
     info->max_ports = 0;
