@@ -22,6 +22,7 @@ private:
     IdMap<haiku_area_info, int> _areas;
     std::mutex _lock;
     std::unordered_set<int> _owningSemaphores;
+    std::unordered_set<int> _owningPorts;
 public:
     Process(int pid): _pid(pid) {}
     ~Process() = default;
@@ -54,6 +55,11 @@ public:
     void AddOwningSemaphore(int id) { _owningSemaphores.insert(id); }
     void RemoveOwningSemaphore(int id) { _owningSemaphores.erase(id); }
     bool IsOwningSemaphore(int id) const { return _owningSemaphores.contains(id); }
+
+    const std::unordered_set<int>& GetOwningPorts() const { return _owningPorts; }
+    void AddOwningPort(int id) { _owningPorts.insert(id); }
+    void RemoveOwningPort(int id) { _owningPorts.erase(id); }
+    bool IsOwningPort(int id) const { return _owningPorts.contains(id); }
 
     size_t ReadMemory(void* address, void* buffer, size_t size);
     size_t WriteMemory(void* address, const void* buffer, size_t size);

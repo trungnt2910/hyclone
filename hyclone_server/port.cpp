@@ -8,6 +8,7 @@
 #include "BeDefs.h"
 #include "haiku_errors.h"
 #include "port.h"
+#include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
 #include "server_workers.h"
@@ -54,12 +55,21 @@ intptr_t server_hserver_call_create_port(hserver_context& context, int32 queue_l
     }
     auto newPort = std::make_shared<Port>(context.pid, queue_length, buffer.c_str());
 
+    int id;
+
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
 
-        return system.RegisterPort(std::move(newPort));
+        id = system.RegisterPort(std::move(newPort));
     }
+
+    {
+        auto lock = context.process->Lock();
+        context.process->AddOwningPort(id);
+    }
+
+    return id;
 }
 
 intptr_t server_hserver_call_find_port(hserver_context& context, const char *port_name, size_t portNameLength)

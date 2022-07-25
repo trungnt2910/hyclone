@@ -182,6 +182,11 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
         system.UnregisterSemaphore(s);
     }
 
+    for (const auto& s: context.process->GetOwningPorts())
+    {
+        system.UnregisterPort(s);
+    }
+
     std::cerr << "Unregistered: " << context.conn_id << " " << context.pid << " " << context.tid << std::endl;
 
     return B_OK;
