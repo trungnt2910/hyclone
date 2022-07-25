@@ -131,7 +131,7 @@ typedef uint32 haiku_fd_mask;
 
 #define HAIKU_NFDBITS (sizeof(haiku_fd_mask) * 8) /* bits per mask */
 
-typedef struct haiku_fd_set 
+typedef struct haiku_fd_set
 {
     haiku_fd_mask bits[_haiku_howmany(HAIKU_FD_SETSIZE, HAIKU_NFDBITS)];
 } haiku_fd_set;
@@ -211,42 +211,33 @@ int MONIKA_EXPORT _kern_read_link(int fd, const char* path, char *buffer, size_t
     }
 
     char hostPath[PATH_MAX];
-    size_t hostPathLength = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
-    if (hostPathLength < 0)
+    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
+
+    if (status < 0)
     {
-        return HAIKU_POSIX_EBADF;
+        return HAIKU_POSIX_ENOENT;
+    }
+    else if (status > sizeof(hostPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
     }
 
-    char readLinkPath[PATH_MAX];
-    long status = LINUX_SYSCALL3(__NR_readlink, hostPath, readLinkPath, sizeof(readLinkPath));
+    struct stat linuxStat;
+    status = LINUX_SYSCALL2(__NR_lstat, hostPath, &linuxStat);
+
     if (status < 0)
     {
         return LinuxToB(-status);
     }
 
-    if (readLinkPath[0] == '/')
+    status = LINUX_SYSCALL3(__NR_readlink, hostPath, buffer, *_bufferSize);
+
+    if (status < 0)
     {
-        *_bufferSize = GET_HOSTCALLS()->vchroot_unexpandat(fd, readLinkPath, buffer, *_bufferSize);
+        return LinuxToB(-status);
     }
-    // A relative path, we need to resolve it.
-    else
-    {
-        char* it = hostPath + hostPathLength;
-        while (*it != '/')
-        {
-            --it;
-        }
-        ++it;
-        char* readLinkPathIt = readLinkPath;
-        while (*readLinkPathIt != '\0' && it + 1 < hostPath + sizeof(hostPath))
-        {
-            *it = *readLinkPathIt;
-            ++it;
-            ++readLinkPathIt;
-        }
-        *it = '\0';
-        *_bufferSize = GET_HOSTCALLS()->vchroot_unexpandat(fd, hostPath, buffer, *_bufferSize);
-    }
+
+    *_bufferSize = linuxStat.st_size;
 
     return B_OK;
 }
@@ -787,7 +778,7 @@ ssize_t MONIKA_EXPORT _kern_select(int numfds,
 
     struct linux_pselect_arg linuxSigMaskArg = { linuxSigMask, sizeof(linuxSigMaskMemory) };
 
-    long result = 
+    long result =
         LINUX_SYSCALL6(__NR_pselect6, numfds, linuxReadSet, linuxWriteSet, linuxErrorSet, &linuxTimeout, &linuxSigMaskArg);
 
     if (result < 0)
@@ -834,7 +825,7 @@ status_t MONIKA_EXPORT _kern_create_dir(int fd, const char *path, int perms)
     {
         return HAIKU_POSIX_ENAMETOOLONG;
     }
-    
+
     status = LINUX_SYSCALL2(__NR_mkdir, hostPath, ModeBToLinux(perms));
 
     if (status < 0)
