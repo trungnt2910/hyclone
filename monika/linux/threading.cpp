@@ -33,7 +33,7 @@ void MONIKA_EXPORT _kern_mutex_unlock()
 
 sem_id MONIKA_EXPORT _kern_create_sem(int count, const char *name)
 {
-    return GET_SERVERCALLS()->create_sem(count, name, strlen(name));
+    return GET_SERVERCALLS()->create_sem(count, name, (name == NULL) ? 0 : strlen(name));
 }
 
 }
