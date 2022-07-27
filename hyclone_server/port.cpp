@@ -118,6 +118,57 @@ intptr_t server_hserver_call_get_port_info(hserver_context& context, port_id id,
     }
 }
 
+intptr_t server_hserver_call_set_port_owner(hserver_context& context, port_id id, team_id team)
+{
+    std::shared_ptr<Port> port;
+    std::shared_ptr<Process> oldOwner;
+    std::shared_ptr<Process> newOwner;
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+
+        port = system.GetPort(id).lock();
+
+        if (!port)
+        {
+            return B_BAD_PORT_ID;
+        }
+
+        oldOwner = system.GetProcess(port->GetInfo().team).lock();
+
+        // Owner dead so port probably dead?
+        if (!oldOwner)
+        {
+            std::cerr << "Port " << port->GetName() << " owned by dead process " << port->GetInfo().team << std::endl;
+            return B_BAD_PORT_ID;
+        }
+
+        newOwner = system.GetProcess(team).lock();
+
+        if (!newOwner)
+        {
+            return B_BAD_TEAM_ID;
+        }
+    }
+
+    {
+        auto lock = oldOwner->Lock();
+        oldOwner->RemoveOwningPort(id);
+    }
+
+    {
+        auto lock = newOwner->Lock();
+        newOwner->AddOwningPort(id);
+    }
+
+    {
+        auto lock = port->Lock();
+        port->SetOwner(team);
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_write_port_etc(hserver_context& context, port_id id, int32 messageCode, const void *msgBuffer,
     size_t bufferSize, uint32 flags, unsigned long long timeout)
 {

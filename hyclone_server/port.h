@@ -27,8 +27,10 @@ public:
     void Write(std::vector<char>&& message);
     std::vector<char> Read();
 
-    std::string Name() const { return _info.name; }
+    std::string GetName() const { return _info.name; }
     const haiku_port_info& GetInfo() const { return _info; }
+
+    void SetOwner(int team) { _info.team = team; }
 };
 
 #define HAIKU_PORT_MAX_QUEUE_LENGTH 4096

@@ -35,4 +35,9 @@ status_t MONIKA_EXPORT _kern_get_port_info(port_id id, struct haiku_port_info *i
     return GET_SERVERCALLS()->get_port_info(id, info);
 }
 
+status_t MONIKA_EXPORT _kern_set_port_owner(port_id port, team_id team)
+{
+    return GET_SERVERCALLS()->set_port_owner(port, team);
+}
+
 }
