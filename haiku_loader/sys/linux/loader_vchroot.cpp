@@ -7,8 +7,9 @@
 #include <vector>
 #include "loader_vchroot.h"
 
+std::string gHaikuPrefix = "";
+
 static const char* kHostMountPoint = "/SystemRoot/";
-static std::string sHaikuPrefix;
 static std::vector<std::string> sHaikuPrefixParts;
 
 static std::vector<std::string> GetParts(const std::string& path);
@@ -19,16 +20,16 @@ bool loader_init_vchroot(const char* hprefix)
     {
         return false;
     }
-    sHaikuPrefix = std::filesystem::canonical(hprefix).string();
-    if (sHaikuPrefix.empty())
+    gHaikuPrefix = std::filesystem::canonical(hprefix).string();
+    if (gHaikuPrefix.empty())
     {
         return false;
     }
-    if (sHaikuPrefix.back() == '/')
+    if (gHaikuPrefix.back() == '/')
     {
-        sHaikuPrefix.pop_back();
+        gHaikuPrefix.pop_back();
     }
-    sHaikuPrefixParts = GetParts(sHaikuPrefix);
+    sHaikuPrefixParts = GetParts(gHaikuPrefix);
     return true;
 }
 
@@ -62,9 +63,14 @@ size_t loader_vchroot_expand(const char* path, char* hostPath, size_t size)
             }
         }
     }
+    // Reflect the whole Linux devfs to Haiku.
+    else if (haikuRealPathParts[0] == "dev")
+    {
+        hostRealPath = haikuRealPath;
+    }
     else
     {
-        hostRealPath = sHaikuPrefix + "/";
+        hostRealPath = gHaikuPrefix + "/";
         for (size_t i = 0; i < haikuRealPathParts.size(); ++i)
         {
             hostRealPath += haikuRealPathParts[i];
@@ -109,6 +115,10 @@ size_t loader_vchroot_unexpand(const char* hostPath, char* path, size_t size)
                 haikuPath += "/";
             }
         }
+    }
+    else if (hostParts[0] == "dev")
+    {
+        haikuPath = hostRealPath;
     }
     else
     {
