@@ -60,7 +60,7 @@ enum servercall_id
 #undef HYCLONE_SERVERCALL5
 #undef HYCLONE_SERVERCALL6
 
-#define HYCLONE_SOCKET_NAME "/tmp/hyclone.sock"
+#define HYCLONE_SOCKET_NAME ".hyclone.sock"
 #define HYCLONE_SERVERCALL_MAX_ARGS (6)
 
 #endif // __HYCLONE_SERVERCALLS_H__

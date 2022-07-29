@@ -1,9 +1,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <future>
+#include <filesystem>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
@@ -13,6 +14,7 @@
 #include <vector>
 
 #include "servercalls.h"
+#include "server_prefix.h"
 #include "server_servercalls.h"
 #include "server_workers.h"
 #include "system.h"
@@ -27,8 +29,10 @@ int server_main(int argc, char **argv)
     struct sockaddr_un addr;
     int status;
 
+    std::string hycloneSocketPath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SOCKET_NAME;
+
     // daemon(0, 0);
-    unlink(HYCLONE_SOCKET_NAME);
+    unlink(hycloneSocketPath.c_str());
 
     int listen_socket = socket(AF_UNIX, SOCK_STREAM, 0);
     if (listen_socket < 0)
@@ -40,7 +44,7 @@ int server_main(int argc, char **argv)
     memset(&addr, 0, sizeof(struct sockaddr_un));
 
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, HYCLONE_SOCKET_NAME, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, hycloneSocketPath.c_str(), sizeof(addr.sun_path) - 1);
     status = bind(listen_socket, (const struct sockaddr *)&addr,
                   sizeof(struct sockaddr_un));
     if (status == -1)

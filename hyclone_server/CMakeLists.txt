@@ -3,6 +3,7 @@ project(hyclone_server)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/shared_headers)
 include_directories(${CMAKE_SOURCE_DIR}/shared_headers/${HYCLONE_ARCH})
+include_directories(${CMAKE_SOURCE_DIR}/hpkgvfs_analyze/include)
 
 string(TOLOWER ${HYCLONE_HOST} host)
 
@@ -17,6 +18,8 @@ add_executable(hyclone_server
     port.cpp
     process.cpp
     server_dispatch.cpp
+    server_filesystem.cpp
+    server_prefix.cpp
     server_workers.cpp
     shutdown.cpp
     system.cpp
@@ -24,7 +27,7 @@ add_executable(hyclone_server
     ${SERVER_SYSTEM_SPECIFIC_SOURCES})
 
 set_property(TARGET hyclone_server PROPERTY CXX_STANDARD 20)
-
+target_link_libraries(hyclone_server hpkgvfs)
 install(TARGETS hyclone_server DESTINATION bin)
 if(HYCLONE_HOST_LINUX)
     install(CODE "

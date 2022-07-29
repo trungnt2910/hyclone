@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "haiku_errors.h"
+#include "haiku_fs_info.h"
 #include "hsemaphore.h"
 #include "port.h"
 #include "process.h"
@@ -124,6 +125,27 @@ size_t System::UnregisterSemaphore(int id)
         _semaphores.Remove(id);
     }
     return _semaphores.Size();
+}
+
+int System::RegisterFSInfo(std::shared_ptr<haiku_fs_info>&& info)
+{
+    int id = _fsInfos.Add(info);
+    info->dev = id;
+    return id;
+}
+
+std::weak_ptr<haiku_fs_info> System::GetFSInfo(int id)
+{
+    if (_fsInfos.IsValidId(id))
+    {
+        return _fsInfos.Get(id);
+    }
+    return std::weak_ptr<haiku_fs_info>();
+}
+
+int System::NextFSInfoId(int id) const
+{
+    return _fsInfos.NextId(id);
 }
 
 void System::Shutdown()

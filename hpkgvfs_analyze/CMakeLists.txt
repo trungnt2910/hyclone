@@ -1,7 +1,6 @@
 project(hpkgvfs_analyze)
 
 include_directories(include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../libhpkg/include)
 
 file(GLOB_RECURSE libhpkgvfs_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/*.cpp)
 
@@ -11,6 +10,7 @@ endif()
 
 add_library(hpkgvfs STATIC ${libhpkgvfs_sources})
 target_link_libraries(hpkgvfs hpkg)
+target_include_directories(hpkgvfs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../libhpkg/include)
 set_property(TARGET hpkgvfs PROPERTY CXX_STANDARD 20)
 
 add_executable(hpkgvfs_analyze ${CMAKE_CURRENT_SOURCE_DIR}/src/hpkgvfs_analyze.cpp)

@@ -12,6 +12,7 @@
 class Process;
 class Port;
 class Semaphore;
+struct haiku_fs_info;
 
 class System
 {
@@ -22,6 +23,7 @@ private:
     IdMap<std::shared_ptr<Port>, int> _ports;
     std::unordered_map<std::string, int> _portNames;
     IdMap<std::shared_ptr<Semaphore>, int> _semaphores;
+    IdMap<std::shared_ptr<haiku_fs_info>, int> _fsInfos;
     std::mutex _lock;
     System() = default;
     ~System() = default;
@@ -45,6 +47,11 @@ public:
     std::weak_ptr<Semaphore> GetSemaphore(int id);
     size_t GetSemaphoreCount() const { return _semaphores.size(); }
     size_t UnregisterSemaphore(int id);
+
+    int RegisterFSInfo(std::shared_ptr<haiku_fs_info>&& info);
+    std::weak_ptr<haiku_fs_info> GetFSInfo(int id);
+    int NextFSInfoId(int id) const;
+    size_t UnregisterFSInfo(int id);
 
     void Shutdown();
     bool IsShuttingDown() const { return _isShuttingDown; }

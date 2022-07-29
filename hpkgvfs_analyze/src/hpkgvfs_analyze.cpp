@@ -61,8 +61,8 @@ int main(int argc, char** argv)
             }
 
             Package package(file.path().string());
-            installedPackages.emplace(file.path().filename(), file.last_write_time());
-            std::cout << "Preinstalled package: " << file.path().filename() << std::endl;
+            installedPackages.emplace(file.path().stem(), file.last_write_time());
+            std::cout << "Preinstalled package: " << file.path().stem() << std::endl;
             std::shared_ptr<Entry> entry = package.GetRootEntry(/*dropData*/ true);
             system->Merge(entry);
         }

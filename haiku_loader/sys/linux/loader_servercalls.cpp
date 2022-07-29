@@ -1,8 +1,10 @@
 #include <cstdlib>
 #include <fcntl.h>
-#include <stdexcept>
+#include <filesystem>
 #include <iostream>
 #include <pthread.h>
+#include <stdexcept>
+#include <string>
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
@@ -10,6 +12,7 @@
 
 #include "haiku_errors.h"
 #include "loader_servercalls.h"
+#include "loader_vchroot.h"
 #include "servercalls.h"
 
 class ServerConnection
@@ -35,7 +38,8 @@ ServerConnection::ServerConnection()
     _socket = -1;
     memset(&_addr, 0, sizeof(struct sockaddr_un));
     _addr.sun_family = AF_UNIX;
-    strncpy(_addr.sun_path, HYCLONE_SOCKET_NAME, sizeof(_addr.sun_path) - 1);
+    auto hycloneSocketPath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SOCKET_NAME;
+    strncpy(_addr.sun_path, hycloneSocketPath.c_str(), sizeof(_addr.sun_path) - 1);
 }
 
 ServerConnection::~ServerConnection()
@@ -62,14 +66,14 @@ bool ServerConnection::Connect(bool forceReconnect)
 
     int ret = connect(_socket, (const struct sockaddr *)&_addr,
                    sizeof(struct sockaddr_un));
-    if (ret == -1) 
+    if (ret == -1)
     {
         close(_socket);
         _socket = -1;
         return false;
     }
 
-    intptr_t args[HYCLONE_SERVERCALL_MAX_ARGS + 1] = 
+    intptr_t args[HYCLONE_SERVERCALL_MAX_ARGS + 1] =
         { SERVERCALL_ID_connect, getpid(), syscall(SYS_gettid), 0, 0, 0, 0 };
     intptr_t returnCode = -1;
 

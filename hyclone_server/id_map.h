@@ -45,7 +45,7 @@ public:
         return (id_t)(_items.size() - 1);
     }
 
-    id_t NextId(id_t id)
+    id_t NextId(id_t id) const
     {
         do
         {
@@ -60,7 +60,7 @@ public:
         return id;
     }
 
-    bool IsValidId(id_t id)
+    bool IsValidId(id_t id) const
     {
         return id >= 0 && id <= MaxId() && !_freeIds.count(id);
     }
