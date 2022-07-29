@@ -134,12 +134,14 @@ intptr_t server_hserver_call_unmap_memory(hserver_context& context, void* addres
                     continue;
                 }
 
-                // Every address here is either in the area or in the
-                // unmapped range. If it's not in the unmapped range, it must
-                // be in the area.
+                // If the current range is outside the unmapped range...
                 if (addresses[i + 1] <= (uint8_t*)address || addresses[i] >= (uint8_t*)address + size)
                 {
-                    survivingRanges.emplace_back(addresses[i], addresses[i + 1]);
+                    // And if the current range is in the existing area...
+                    if (addresses[i] >= (uint8_t*)area.address && addresses[i + 1] <= (uint8_t*)area.address + area.size)
+                    {
+                        survivingRanges.emplace_back(addresses[i], addresses[i + 1]);
+                    }
                 }
             }
 
