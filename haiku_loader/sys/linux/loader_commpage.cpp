@@ -35,7 +35,7 @@ void* loader_allocate_commpage()
 
     ((uint64_t*)commpage)[COMMPAGE_ENTRY_MAGIC] = COMMPAGE_SIGNATURE;
 	((uint64_t*)commpage)[COMMPAGE_ENTRY_VERSION] = COMMPAGE_VERSION;
-    ((uint64_t*)commpage)[COMMPAGE_ENTRY_REAL_TIME_DATA] = 
+    ((uint64_t*)commpage)[COMMPAGE_ENTRY_REAL_TIME_DATA] =
         (uint64_t)((uintptr_t)realTimeData - (uintptr_t)commpage);
 #ifdef __x86_64__
     // Stubbed.
@@ -72,6 +72,7 @@ void* loader_allocate_commpage()
     hostcalls_ptr->unmap_reserved_range = loader_unmap_reserved_range;
     hostcalls_ptr->is_in_reserved_range = loader_is_in_reserved_range;
     hostcalls_ptr->reserved_range_longest_mappable_from = loader_reserved_range_longest_mappable_from;
+    hostcalls_ptr->next_reserved_range = loader_next_reserved_range;
 
     hostcalls_ptr->lock_subsystem = loader_lock_subsystem;
     hostcalls_ptr->unlock_subsystem = loader_unlock_subsystem;
@@ -93,7 +94,7 @@ void* loader_allocate_commpage()
 
     hostcalls_ptr->at_exit = NULL;
     hostcalls_ptr->printf = printf;
-    
+
     servercalls* servercalls_ptr = (servercalls*)((uint8_t*)commpage + EXTENDED_COMMPAGE_SERVERCALLS_OFFSET);
     #define HYCLONE_SERVERCALL0(name) servercalls_ptr->name = loader_hserver_call_##name;
     #define HYCLONE_SERVERCALL1(name, arg1) HYCLONE_SERVERCALL0(name)

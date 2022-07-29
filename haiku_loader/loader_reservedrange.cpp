@@ -74,13 +74,13 @@ void loader_unregister_reserved_range(void* address, size_t size)
     {
         auto newRange = RangeInfo { oldRange.address, (size_t)((uint8_t*)address - oldRange.address) };
         std::set<RangeInfo> newRangeMappings;
-        while ((oldRangeMappingsIt != oldRangeMappings.end()) && 
+        while ((oldRangeMappingsIt != oldRangeMappings.end()) &&
                (oldRangeMappingsIt->address < newRange.address + newRange.size))
         {
-            newRangeMappings.insert(RangeInfo 
+            newRangeMappings.insert(RangeInfo
             {
                 oldRangeMappingsIt->address,
-                std::min(oldRangeMappingsIt->size, (size_t)(newRange.address + newRange.size - oldRangeMappingsIt->address)) 
+                std::min(oldRangeMappingsIt->size, (size_t)(newRange.address + newRange.size - oldRangeMappingsIt->address))
             });
             ++oldRangeMappingsIt;
         }
@@ -90,7 +90,7 @@ void loader_unregister_reserved_range(void* address, size_t size)
     {
         auto newRange = RangeInfo { (uint8_t*)address + size, oldRange.address + oldRange.size - (uint8_t*)address - size };
         std::set<RangeInfo> newRangeMappings;
-        while ((oldRangeMappingsIt != oldRangeMappings.end()) && 
+        while ((oldRangeMappingsIt != oldRangeMappings.end()) &&
                (oldRangeMappingsIt->address + oldRangeMappingsIt->size <= newRange.address))
         {
             ++oldRangeMappingsIt;
@@ -100,7 +100,7 @@ void loader_unregister_reserved_range(void* address, size_t size)
             auto newRangeMappingAddress = std::max(oldRangeMappingsIt->address, newRange.address);
             auto newRangeMappingSize = (std::size_t)
                 (oldRangeMappingsIt->address + oldRangeMappingsIt->size - newRangeMappingAddress);
-            newRangeMappings.insert(RangeInfo 
+            newRangeMappings.insert(RangeInfo
             {
                 newRangeMappingAddress,
                 newRangeMappingSize
@@ -117,7 +117,7 @@ void loader_map_reserved_range(void* address, size_t size)
 #endif
 
     assert(loader_reserved_range_longest_mappable_from(address, size) >= size);
-    
+
     auto it = sReservedRanges.upper_bound(RangeInfo { (uint8_t*)address, SIZE_MAX });
     --it;
 
@@ -188,7 +188,7 @@ void loader_unmap_reserved_range(void* address, size_t size)
     }
     if (oldRange.address + oldRange.size > (uint8_t*)address + size)
     {
-        auto newRange = 
+        auto newRange =
             RangeInfo { (uint8_t*)address + size, oldRange.address + oldRange.size - (uint8_t*)address - size };
         rangeMappings.insert(newRange);
     }
@@ -204,7 +204,7 @@ bool loader_is_in_reserved_range(void* address, size_t size)
 
     --it;
 
-    return (it->first.address <= (uint8_t*)address) && ((uint8_t*)address + size <= it->first.address + it->first.size);   
+    return (it->first.address <= (uint8_t*)address) && ((uint8_t*)address + size <= it->first.address + it->first.size);
 }
 
 size_t loader_reserved_range_longest_mappable_from(void* address, size_t maxSize)
@@ -235,15 +235,26 @@ size_t loader_reserved_range_longest_mappable_from(void* address, size_t maxSize
         return std::min(maxSize, (size_t)(mappingsIt->address - (uint8_t*)address));
     }
     --mappingsIt;
-    
+
     auto lastMappedAddress = mappingsIt->address + mappingsIt->size;
     if (lastMappedAddress > (uint8_t*)address)
     {
         return 0;
     }
-    
+
     ++mappingsIt;
     return std::min(maxSize, (size_t)(mappingsIt->address - (uint8_t*)address));
+}
+
+size_t loader_next_reserved_range(void* address, void** nextAddress)
+{
+    auto it = sReservedRanges.lower_bound(RangeInfo { (uint8_t*)address, 0 });
+    if (it == sReservedRanges.end())
+    {
+        return 0;
+    }
+    *nextAddress = it->first.address;
+    return it->first.size;
 }
 
 static void loader_reserved_range_debug()

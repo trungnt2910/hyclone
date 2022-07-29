@@ -585,6 +585,69 @@ int MONIKA_EXPORT _kern_get_area_info(int area, void* info)
     return GET_SERVERCALLS()->get_area_info(area, info);
 }
 
+int MONIKA_EXPORT _kern_unmap_memory(void *address, size_t size)
+{
+    MmanLock mmanLock;
+
+    char* beginAddress = (char*)address;
+    char* endAddress = beginAddress + size;
+
+    char* currentAddress = beginAddress;
+
+    if (size == 0)
+    {
+        return HAIKU_POSIX_EINVAL;
+    }
+
+    // Do the actual unmapping.
+    while (currentAddress < endAddress)
+    {
+        char* nextReservedAddress;
+        size_t nextReservedAddressSize = GET_HOSTCALLS()->next_reserved_range(currentAddress, (void**)&nextReservedAddress);
+
+        if (nextReservedAddressSize != 0)
+        {
+            if (nextReservedAddress >= endAddress)
+            {
+                nextReservedAddress = endAddress;
+                nextReservedAddressSize = 0;
+            }
+
+            if (nextReservedAddress + nextReservedAddressSize > endAddress)
+            {
+                nextReservedAddressSize = endAddress - nextReservedAddress;
+            }
+        }
+        else
+        {
+            nextReservedAddress = endAddress;
+            nextReservedAddressSize = 0;
+        }
+
+        // Unmap non-reserved addresses.
+        if (currentAddress < nextReservedAddress)
+        {
+            LINUX_SYSCALL2(__NR_munmap, currentAddress, nextReservedAddress - currentAddress);
+            currentAddress = nextReservedAddress;
+        }
+
+        // Return reserved addresses.
+        if (nextReservedAddressSize != 0)
+        {
+            LINUX_SYSCALL3(__NR_mprotect, nextReservedAddress, nextReservedAddressSize, PROT_NONE);
+            GET_HOSTCALLS()->unmap_reserved_range(nextReservedAddress, nextReservedAddressSize);
+            currentAddress = nextReservedAddress + nextReservedAddressSize;
+        }
+    }
+
+    currentAddress = beginAddress;
+
+    // Better do this in the server, where all area info is kept.
+    GET_SERVERCALLS()->unmap_memory(currentAddress, size);
+
+    return B_OK;
+}
+
 }
 
 int ProtBToLinux(int protection)
