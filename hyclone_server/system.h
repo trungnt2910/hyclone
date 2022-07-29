@@ -12,6 +12,7 @@
 class Process;
 class Port;
 class Semaphore;
+class Thread;
 struct haiku_fs_info;
 
 class System
@@ -19,6 +20,7 @@ class System
 private:
     bool _isShuttingDown = false;
     std::unordered_map<int, std::shared_ptr<Process>> _processes;
+    std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     std::unordered_map<intptr_t, std::pair<int, int>> _connections;
     IdMap<std::shared_ptr<Port>, int> _ports;
     std::unordered_map<std::string, int> _portNames;
@@ -33,6 +35,10 @@ public:
     std::weak_ptr<Process> RegisterProcess(int pid);
     std::weak_ptr<Process> GetProcess(int pid);
     size_t UnregisterProcess(int pid);
+
+    std::weak_ptr<Thread> RegisterThread(int pid, int tid);
+    std::weak_ptr<Thread> GetThread(int tid);
+    size_t UnregisterThread(int tid);
 
     std::pair<int, int> RegisterConnection(intptr_t conn_id, int pid, int tid);
     std::pair<int, int> GetThreadFromConnection(intptr_t conn_id);
@@ -50,6 +56,7 @@ public:
 
     int RegisterFSInfo(std::shared_ptr<haiku_fs_info>&& info);
     std::weak_ptr<haiku_fs_info> GetFSInfo(int id);
+    std::weak_ptr<haiku_fs_info> FindFSInfoByDevId(int devId);
     int NextFSInfoId(int id) const;
     size_t UnregisterFSInfo(int id);
 

@@ -30,6 +30,7 @@ public:
     std::unique_lock<std::mutex> Lock() { return std::unique_lock(_lock); }
 
     std::weak_ptr<Thread> RegisterThread(int tid);
+    std::weak_ptr<Thread> RegisterThread(const std::shared_ptr<Thread>& thread);
     std::weak_ptr<Thread> GetThread(int tid);
     size_t UnregisterThread(int tid);
 

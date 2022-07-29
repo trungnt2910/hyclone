@@ -40,4 +40,9 @@ status_t MONIKA_EXPORT _kern_set_port_owner(port_id port, team_id team)
     return GET_SERVERCALLS()->set_port_owner(port, team);
 }
 
+status_t MONIKA_EXPORT _kern_delete_port(port_id id)
+{
+    return GET_SERVERCALLS()->delete_port(id);
+}
+
 }

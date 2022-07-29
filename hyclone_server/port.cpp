@@ -72,6 +72,35 @@ intptr_t server_hserver_call_create_port(hserver_context& context, int32 queue_l
     return id;
 }
 
+intptr_t server_hserver_call_delete_port(hserver_context& context, int portId)
+{
+    auto& system = System::GetInstance();
+
+    std::shared_ptr<Port> port;
+
+    {
+        auto lock = system.Lock();
+
+        port = system.GetPort(portId).lock();
+        if (!port)
+        {
+            return B_BAD_PORT_ID;
+        }
+
+    }
+
+    {
+        auto lock = context.process->Lock();
+        context.process->RemoveOwningPort(portId);
+    }
+
+    {
+        auto lock = system.Lock();
+        system.UnregisterPort(portId);
+    }
+    return B_OK;
+}
+
 intptr_t server_hserver_call_find_port(hserver_context& context, const char *port_name, size_t portNameLength)
 {
     auto buffer = std::string(portNameLength, '\0');

@@ -1,10 +1,14 @@
 #include <filesystem>
 #include <iostream>
-#include <memory.h>
+#include <memory>
+#include <string>
 
+#include "haiku_errors.h"
 #include "haiku_fs_info.h"
+#include "process.h"
 #include "server_filesystem.h"
 #include "server_prefix.h"
+#include "server_servercalls.h"
 #include "system.h"
 
 bool server_setup_filesystem()
@@ -26,6 +30,7 @@ bool server_setup_filesystem()
         return false;
     }
 
+    // dev = 0
     system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
 
     if (!server_setup_devfs(info))
@@ -34,6 +39,7 @@ bool server_setup_filesystem()
         return false;
     }
 
+    // dev = 1
     system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
 
     if (!server_setup_packagefs(info))
@@ -42,6 +48,7 @@ bool server_setup_filesystem()
         return false;
     }
 
+    // dev = 2
     system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
 
     if (!server_setup_systemfs(info))
@@ -50,9 +57,34 @@ bool server_setup_filesystem()
         return false;
     }
 
+    // dev = 3
     system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
 
     return true;
+}
+
+intptr_t server_hserver_call_read_fs_info(hserver_context& context, int deviceId, void* info)
+{
+    auto& system = System::GetInstance();
+
+    std::shared_ptr<haiku_fs_info> fsInfo;
+
+    {
+        auto lock = system.Lock();
+
+        fsInfo = system.FindFSInfoByDevId(deviceId).lock();
+        if (!fsInfo)
+        {
+            return B_DEVICE_NOT_FOUND;
+        }
+    }
+
+    if (context.process->WriteMemory(info, fsInfo.get(), sizeof(haiku_fs_info)) != sizeof(haiku_fs_info))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
 }
 
 // Sample filesystem info of a Haiku machine.

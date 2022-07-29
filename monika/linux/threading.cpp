@@ -17,8 +17,7 @@ void MONIKA_EXPORT _kern_find_thread()
 
 status_t MONIKA_EXPORT _kern_get_thread_info(thread_id id, haiku_thread_info *info)
 {
-    trace("stub: _kern_get_thread_info");
-    return B_OK;
+    return GET_SERVERCALLS()->get_thread_info(id, info);
 }
 
 void MONIKA_EXPORT _kern_mutex_lock()
@@ -34,6 +33,11 @@ void MONIKA_EXPORT _kern_mutex_unlock()
 sem_id MONIKA_EXPORT _kern_create_sem(int count, const char *name)
 {
     return GET_SERVERCALLS()->create_sem(count, name, (name == NULL) ? 0 : strlen(name));
+}
+
+status_t MONIKA_EXPORT _kern_delete_sem(sem_id id)
+{
+    return GET_SERVERCALLS()->delete_sem(id);
 }
 
 }

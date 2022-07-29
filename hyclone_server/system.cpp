@@ -9,6 +9,7 @@
 #include "server_native.h"
 #include "server_servercalls.h"
 #include "system.h"
+#include "thread.h"
 
 System& System::GetInstance()
 {
@@ -35,6 +36,27 @@ size_t System::UnregisterProcess(int pid)
 {
     _processes.erase(pid);
     return _processes.size();
+}
+
+std::weak_ptr<Thread> System::RegisterThread(int pid, int tid)
+{
+    auto ptr = std::make_shared<Thread>(pid, tid);
+    _threads[tid] = ptr;
+    return ptr;
+}
+
+std::weak_ptr<Thread> System::GetThread(int tid)
+{
+    auto it = _threads.find(tid);
+    if (it == _threads.end())
+        return std::weak_ptr<Thread>();
+    return it->second;
+}
+
+size_t System::UnregisterThread(int tid)
+{
+    _threads.erase(tid);
+    return _threads.size();
 }
 
 std::pair<int, int> System::RegisterConnection(intptr_t conn_id, int pid, int tid)
@@ -130,15 +152,30 @@ size_t System::UnregisterSemaphore(int id)
 int System::RegisterFSInfo(std::shared_ptr<haiku_fs_info>&& info)
 {
     int id = _fsInfos.Add(info);
-    info->dev = id;
+    // Don't add the id here.
+    // info->dev = id;
     return id;
 }
 
+// Finds a fs_info by hyclone internal id.
 std::weak_ptr<haiku_fs_info> System::GetFSInfo(int id)
 {
     if (_fsInfos.IsValidId(id))
     {
         return _fsInfos.Get(id);
+    }
+    return std::weak_ptr<haiku_fs_info>();
+}
+
+// Finds a fs_info by system dev_t id.
+std::weak_ptr<haiku_fs_info> System::FindFSInfoByDevId(int devId)
+{
+    for (auto& info : _fsInfos)
+    {
+        if (info->dev == devId)
+        {
+            return info;
+        }
     }
     return std::weak_ptr<haiku_fs_info>();
 }
@@ -178,13 +215,15 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid)
 
     if (process)
     {
-        process->RegisterThread(tid);
-        return B_OK;
+        auto thread = system.RegisterThread(pid, tid).lock();
+        if (thread)
+        {
+            process->RegisterThread(thread);
+            return B_OK;
+        }
     }
-    else
-    {
-        return HAIKU_POSIX_ENOMEM;
-    }
+
+    return HAIKU_POSIX_ENOMEM;
 }
 
 intptr_t server_hserver_call_disconnect(hserver_context& context)
@@ -196,18 +235,18 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
     if (!context.process->UnregisterThread(context.tid))
     {
         system.UnregisterProcess(context.pid);
+        for (const auto& s: context.process->GetOwningSemaphores())
+        {
+            system.UnregisterSemaphore(s);
+        }
+
+        for (const auto& s: context.process->GetOwningPorts())
+        {
+            system.UnregisterPort(s);
+        }
     }
+    system.UnregisterThread(context.tid);
     system.UnregisterConnection(context.conn_id);
-
-    for (const auto& s: context.process->GetOwningSemaphores())
-    {
-        system.UnregisterSemaphore(s);
-    }
-
-    for (const auto& s: context.process->GetOwningPorts())
-    {
-        system.UnregisterPort(s);
-    }
 
     std::cerr << "Unregistered: " << context.conn_id << " " << context.pid << " " << context.tid << std::endl;
 

@@ -472,6 +472,9 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
         fd = AT_FDCWD;
     }
 
+    bool noTraverse = (openMode & HAIKU_O_NOTRAVERSE);
+
+    openMode &= ~HAIKU_O_NOTRAVERSE;
     int linuxFlags = OFlagsBToLinux(openMode);
     int linuxMode = ModeBToLinux(perms);
 
@@ -479,6 +482,11 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
     if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
     {
         return HAIKU_POSIX_EBADF;
+    }
+
+    if (noTraverse)
+    {
+        linuxFlags |= O_PATH | O_NOFOLLOW;
     }
 
     int result = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags, linuxMode);
@@ -834,6 +842,38 @@ status_t MONIKA_EXPORT _kern_create_dir(int fd, const char *path, int perms)
     }
 
     return B_OK;
+}
+
+status_t MONIKA_EXPORT _kern_read_fs_info(haiku_dev_t device, struct haiku_fs_info *info)
+{
+    return GET_SERVERCALLS()->read_fs_info(device, info);
+}
+
+// The functions below are clearly impossible
+// to be cleanly implemented in Hyclone, so
+// ENOSYS is directly returned and no logging is provided.
+status_t MONIKA_EXPORT _kern_read_index_stat(dev_t device, const char *name, struct haiku_stat *stat)
+{
+    // No support for indexing.
+    return HAIKU_POSIX_ENOSYS;
+}
+
+status_t MONIKA_EXPORT _kern_create_index(dev_t device, const char *name, uint32 type, uint32 flags)
+{
+    // No support for indexing.
+    return HAIKU_POSIX_ENOSYS;
+}
+
+status_t MONIKA_EXPORT _kern_open_dir_entry_ref()
+{
+    //trace("stub: _kern_open_dir_entry_ref");
+    return HAIKU_POSIX_ENOSYS;
+}
+
+status_t MONIKA_EXPORT _kern_open_entry_ref()
+{
+    //trace("stub: _kern_open_entry_ref");
+    return HAIKU_POSIX_ENOSYS;
 }
 
 }

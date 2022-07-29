@@ -23,6 +23,7 @@ add_executable(hyclone_server
     server_workers.cpp
     shutdown.cpp
     system.cpp
+    thread.cpp
 
     ${SERVER_SYSTEM_SPECIFIC_SOURCES})
 

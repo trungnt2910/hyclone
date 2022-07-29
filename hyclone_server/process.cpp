@@ -4,9 +4,15 @@
 
 std::weak_ptr<Thread> Process::RegisterThread(int tid)
 {
-    auto ptr = std::make_shared<Thread>(tid);
+    auto ptr = std::make_shared<Thread>(_pid, tid);
     _threads[tid] = ptr;
     return ptr;
+}
+
+std::weak_ptr<Thread> Process::RegisterThread(const std::shared_ptr<Thread>& thread)
+{
+    _threads[thread->GetTid()] = thread;
+    return thread;
 }
 
 std::weak_ptr<Thread> Process::GetThread(int tid)

@@ -16,8 +16,6 @@
 
 bool server_setup_rootfs(haiku_fs_info& info)
 {
-    // To be set by the system.
-    info.dev = 0;
     // same as in Haiku.
     info.flags = 0;
     info.block_size = 0;
@@ -35,6 +33,7 @@ bool server_setup_rootfs(haiku_fs_info& info)
     {
         return false;
     }
+    info.dev = (haiku_dev_t)statbuf.st_dev;
     info.root = (haiku_ino_t)statbuf.st_ino;
 
     auto binPath = (std::filesystem::path(gHaikuPrefix) / "bin");
@@ -65,8 +64,6 @@ bool server_setup_rootfs(haiku_fs_info& info)
 
 bool server_setup_devfs(haiku_fs_info& info)
 {
-    // To be set by the system.
-    info.dev = 0;
     // same as in Haiku.
     info.flags = 0;
     info.block_size = 0;
@@ -84,6 +81,7 @@ bool server_setup_devfs(haiku_fs_info& info)
     {
         return false;
     }
+    info.dev = (haiku_dev_t)statbuf.st_dev;
     info.root = (haiku_ino_t)statbuf.st_ino;
 
     return true;
@@ -91,8 +89,6 @@ bool server_setup_devfs(haiku_fs_info& info)
 
 bool server_setup_systemfs(haiku_fs_info& info)
 {
-    // To be set by the system.
-    info.dev = 0;
     info.flags = B_FS_IS_PERSISTENT | B_FS_IS_SHARED | B_FS_HAS_ATTR;
 
     struct statfs statfsbuf;
@@ -116,6 +112,7 @@ bool server_setup_systemfs(haiku_fs_info& info)
     {
         return false;
     }
+    info.dev = (haiku_dev_t)statbuf.st_dev;
     info.root = (haiku_ino_t)statbuf.st_ino;
 
     return true;
@@ -270,6 +267,14 @@ bool server_setup_packagefs(haiku_fs_info& info)
 
     strncpy(info.volume_name, "system", sizeof(info.volume_name));
     strncpy(info.fsh_name, "packagefs", sizeof(info.fsh_name));
+
+    struct stat statbuf;
+    if (stat(gHaikuPrefix.c_str(), &statbuf) != 0)
+    {
+        return false;
+    }
+    info.dev = (haiku_dev_t)statbuf.st_dev;
+    info.root = (haiku_ino_t)statbuf.st_ino;
 
     return true;
 }

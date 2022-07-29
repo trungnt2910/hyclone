@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <unistd.h>
 #include "loader_vchroot.h"
 
 std::string gHaikuPrefix = "";
@@ -150,10 +151,12 @@ size_t loader_vchroot_expandat(int fd, const char* path, char* hostPath, size_t 
     }
     else if (fd >= 0)
     {
-        std::string fdPath = std::filesystem::canonical(std::filesystem::path("/proc/self/fd") / std::to_string(fd)).string();
-        size_t length = loader_vchroot_unexpand(fdPath.c_str(), NULL, 0);
+        // For some reasons, std::canonical() does not work.
+        char fdPath[PATH_MAX];
+        readlink(("/proc/self/fd/" + std::to_string(fd)).c_str(), fdPath, sizeof(fdPath));
+        size_t length = loader_vchroot_unexpand(fdPath, NULL, 0);
         haikuPath = std::string(length, '\0');
-        loader_vchroot_unexpand(fdPath.c_str(), haikuPath.data(), length);
+        loader_vchroot_unexpand(fdPath, haikuPath.data(), length);
         if (haikuPath.back() != '/')
         {
             haikuPath += "/";
@@ -178,7 +181,9 @@ size_t loader_vchroot_unexpandat(int fd, const char* hostPath, char* path, size_
     }
     else if (fd >= 0)
     {
-        hostRealPath = std::filesystem::canonical(std::filesystem::path("/proc/self/fd") / std::to_string(fd)).string();
+        char fdPath[PATH_MAX];
+        readlink(("/proc/self/fd/" + std::to_string(fd)).c_str(), fdPath, sizeof(fdPath));
+        hostRealPath = fdPath;
         if (hostRealPath.back() != '/')
         {
             hostRealPath += "/";
