@@ -614,6 +614,41 @@ int MONIKA_EXPORT _kern_create_pipe(int *fds)
     return B_OK;
 }
 
+int MONIKA_EXPORT _kern_rename(int oldDir, const char *oldpath, int newDir, const char *newpath)
+{
+    char oldHostPath[PATH_MAX];
+    char newHostPath[PATH_MAX];
+
+    long status = GET_HOSTCALLS()->vchroot_expandat(oldDir, oldpath, oldHostPath, sizeof(oldHostPath));
+    if (status < 0)
+    {
+        return HAIKU_POSIX_EBADF;
+    }
+    else if (status > sizeof(oldHostPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
+    }
+
+    status = GET_HOSTCALLS()->vchroot_expandat(newDir, newpath, newHostPath, sizeof(newHostPath));
+    if (status < 0)
+    {
+        return HAIKU_POSIX_EBADF;
+    }
+    else if (status > sizeof(newHostPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
+    }
+
+    status = LINUX_SYSCALL2(__NR_rename, oldHostPath, newHostPath);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 int MONIKA_EXPORT _kern_unlink(int fd, const char* path)
 {
     if (fd == HAIKU_AT_FDCWD)
