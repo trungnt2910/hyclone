@@ -79,6 +79,22 @@ int MONIKA_EXPORT _kern_socket(int family, int type, int protocol)
     return status;
 }
 
+status_t MONIKA_EXPORT _kern_socketpair(int family, int type, int protocol, int *socketVector)
+{
+    int linuxFamily = SocketFamilyBToLinux(family);
+    int linuxType = SocketTypeBToLinux(type);
+    int linuxProtocol = SocketProtocolBToLinux(protocol);
+
+    long status = LINUX_SYSCALL4(__NR_socketpair, linuxFamily, linuxType, linuxProtocol, socketVector);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 status_t MONIKA_EXPORT _kern_connect(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
 {
     struct sockaddr_storage linuxAddress;
