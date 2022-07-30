@@ -6,6 +6,9 @@ include_directories(${CMAKE_SOURCE_DIR}/shared_headers/${HYCLONE_ARCH})
 add_library(root_os_system_time OBJECT system_time.cpp)
 target_compile_options(root_os_system_time PRIVATE -fPIC)
 
+add_library(root_os_time OBJECT time.cpp)
+target_compile_options(root_os_time PRIVATE -fPIC)
+
 add_library(root_os_tls OBJECT tls.cpp)
 target_compile_options(root_os_tls PRIVATE -fPIC)
 
@@ -21,9 +24,9 @@ if(HYCLONE_ARCH STREQUAL "x86_64")
         ${CMAKE_CURRENT_SOURCE_DIR}/arch/${HYCLONE_ARCH}/system_info.o
         #${CMAKE_CURRENT_SOURCE_DIR}/arch/${HYCLONE_ARCH}/system_time.o
         #${CMAKE_CURRENT_SOURCE_DIR}/arch/${HYCLONE_ARCH}/thread.o
-        ${CMAKE_CURRENT_SOURCE_DIR}/arch/${HYCLONE_ARCH}/time.o
+        #${CMAKE_CURRENT_SOURCE_DIR}/arch/${HYCLONE_ARCH}/time.o
         #${CMAKE_CURRENT_SOURCE_DIR}/arch/${HYCLONE_ARCH}/tls.o
-        
+
         # sources from generic
 		${CMAKE_CURRENT_SOURCE_DIR}/arch/${HYCLONE_ARCH}/generic_atomic.o
 		${CMAKE_CURRENT_SOURCE_DIR}/arch/${HYCLONE_ARCH}/generic_stack_trace.o)
@@ -74,5 +77,6 @@ set_property(TARGET root_os_objects PROPERTY
 add_library(root_os STATIC blank.c)
 target_link_libraries(root_os PRIVATE root_os_objects)
 target_link_libraries(root_os PRIVATE root_os_system_time)
+target_link_libraries(root_os PRIVATE root_os_time)
 target_link_libraries(root_os PRIVATE root_os_tls)
 target_compile_options(root_os PRIVATE -fPIC)

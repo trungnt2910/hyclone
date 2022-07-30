@@ -58,6 +58,7 @@ struct hostcalls
     // Time
     int64_t (*system_time)();
     int64_t (*system_time_nsecs)();
+    int64_t (*system_time_offset)();
     size_t (*system_timezone)(int* offset, char* buffer, size_t bufferSize);
 
     // Vchroot

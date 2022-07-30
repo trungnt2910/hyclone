@@ -86,6 +86,7 @@ void* loader_allocate_commpage()
 
     hostcalls_ptr->system_time = loader_system_time;
     hostcalls_ptr->system_time_nsecs = loader_system_time_nsecs;
+    hostcalls_ptr->system_time_offset = loader_system_time_offset;
     hostcalls_ptr->system_timezone = loader_system_timezone;
 
     hostcalls_ptr->vchroot_expand = loader_vchroot_expand;
