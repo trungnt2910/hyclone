@@ -120,9 +120,9 @@ haiku_pid_t MONIKA_EXPORT _kern_wait_for_child(thread_id child, uint32 flags,
 
     struct rusage linuxUsageInfo;
     siginfo_t linuxInfo;
+    // Always pass in linuxInfo for the pid information.
     long status = LINUX_SYSCALL5(__NR_waitid, child > 0 ? P_PID : P_ALL, child,
-        (info == NULL) ? NULL : &linuxInfo, linuxFlags,
-        (usageInfo == NULL) ? NULL : &linuxUsageInfo);
+        &linuxInfo, linuxFlags, (usageInfo == NULL) ? NULL : &linuxUsageInfo);
 
     if (status < 0)
     {
@@ -142,7 +142,9 @@ haiku_pid_t MONIKA_EXPORT _kern_wait_for_child(thread_id child, uint32 flags,
         usageInfo->kernel_time = linuxUsageInfo.ru_stime.tv_sec * 1000000 + linuxUsageInfo.ru_stime.tv_usec;
     }
 
-    return status;
+    // Status does not contain the child PID, but
+    // is always 0 on Linux.
+    return linuxInfo.si_pid;
 }
 
 status_t MONIKA_EXPORT _kern_get_team_usage_info(team_id team, int32 who, team_usage_info *info, size_t size)
