@@ -28,6 +28,7 @@ set(monika_sources
     rlimit.cpp
     shutdown.cpp
     signal.cpp
+    socket.cpp
     stubs.cpp
     sysinfo.cpp
     threading.cpp
