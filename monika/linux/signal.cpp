@@ -76,7 +76,7 @@ status_t MONIKA_EXPORT _kern_sigaction(int sig, const struct haiku_sigaction *ac
         oldLinuxSigaction = &oldLinuxSigactionMemory;
     }
 
-    status_t result = LINUX_SYSCALL4(__NR_rt_sigaction, 
+    status_t result = LINUX_SYSCALL4(__NR_rt_sigaction,
         SignalBToLinux(sig), linuxSigaction, oldLinuxSigaction, sizeof(linux_sigset_t));
 
     if (result < 0)
@@ -161,19 +161,21 @@ status_t MONIKA_EXPORT _kern_send_signal(int32 id, uint32 signal, const union ha
 {
     int linuxSignal = SignalBToLinux(signal);
 
-    union sigval linuxValueMemory;
-    union sigval *linuxValue = NULL;
+    union sigval linuxValue;
 
     if (userValue != NULL)
     {
-        linuxValueMemory = *(const union sigval*)userValue;
-        linuxValue = &linuxValueMemory;
+        linuxValue = *(const union sigval*)userValue;
+    }
+    else
+    {
+        memset(&linuxValue, 0, sizeof(linuxValue));
     }
 
     siginfo_t siginfo;
     siginfo.si_signo = linuxSignal;
     siginfo.si_code = SI_QUEUE;
-    siginfo.si_value = *linuxValue;
+    siginfo.si_value = linuxValue;
     siginfo.si_pid = LINUX_SYSCALL0(__NR_getpid);
     siginfo.si_uid = LINUX_SYSCALL0(__NR_getuid);
 
@@ -205,8 +207,8 @@ status_t MONIKA_EXPORT _kern_send_signal(int32 id, uint32 signal, const union ha
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_set_timer(int32 timerID, thread_id threadID, 
-    bigtime_t startTime, bigtime_t interval, 
+status_t MONIKA_EXPORT _kern_set_timer(int32 timerID, thread_id threadID,
+    bigtime_t startTime, bigtime_t interval,
     uint32 flags, struct user_timer_info* oldInfo)
 {
     trace("stub: _kern_set_timer");
