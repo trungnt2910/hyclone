@@ -14,6 +14,7 @@
 #include "linux_subsystemlock.h"
 #include "linux_syscall.h"
 #include "signal_conversion.h"
+#include "user_time_defs.h"
 
 static void SigHandlerTrampoline(int signal);
 static void SigActionTrampoline(int signal, siginfo_t *siginfo, void *context);
@@ -202,6 +203,14 @@ status_t MONIKA_EXPORT _kern_send_signal(int32 id, uint32 signal, const union ha
     }
 
     return B_OK;
+}
+
+status_t MONIKA_EXPORT _kern_set_timer(int32 timerID, thread_id threadID, 
+    bigtime_t startTime, bigtime_t interval, 
+    uint32 flags, struct user_timer_info* oldInfo)
+{
+    trace("stub: _kern_set_timer");
+    return HAIKU_POSIX_ENOSYS;
 }
 
 }

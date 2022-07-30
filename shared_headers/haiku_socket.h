@@ -156,4 +156,11 @@ struct haiku_ucred
     haiku_gid_t gid; /* GID of sender */
 };
 
+struct haiku_sockaddr_un
+{
+    uint8_t     sun_len;
+    uint8_t     sun_family;
+    char        sun_path[126];
+};
+
 #endif /* __HAIKU_SYS_SOCKET_H__ */

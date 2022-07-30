@@ -13,7 +13,7 @@ intptr_t server_hserver_call_register_image(hserver_context& context, void* imag
     {
         return B_BAD_VALUE;
     }
-    
+
     haiku_extended_image_info info;
     if (context.process->ReadMemory(image_info, &info, sizeof(info)) != sizeof(info))
     {
@@ -27,7 +27,7 @@ intptr_t server_hserver_call_register_image(hserver_context& context, void* imag
     }
 }
 
-intptr_t server_hserver_call_get_next_image_info(hserver_context& context, 
+intptr_t server_hserver_call_get_next_image_info(hserver_context& context,
     int target_pid, int* user_cookie, void* user_image_info, std::size_t size)
 {
     if (target_pid == 0)
@@ -49,12 +49,12 @@ intptr_t server_hserver_call_get_next_image_info(hserver_context& context,
         std::cerr << "get_next_image_info for host processes is currently not supported." << std::endl;
         return B_BAD_VALUE;
     }
-    
+
     if (size != sizeof(haiku_image_info))
     {
         return B_BAD_VALUE;
     }
-    
+
     int image_id;
 
     if (context.process->ReadMemory(user_cookie, &image_id, sizeof(image_id)) != sizeof(image_id))
@@ -99,7 +99,7 @@ intptr_t server_hserver_call_get_next_image_info(hserver_context& context,
 }
 
 intptr_t server_hserver_call_unregister_image(hserver_context& context, int image_id)
-{ 
+{
     auto lock = context.process->Lock();
     context.process->UnregisterImage(image_id);
     return B_OK;
