@@ -18,6 +18,12 @@ void MONIKA_EXPORT _kern_image_relocated(image_id id)
     }
 }
 
+status_t MONIKA_EXPORT _kern_get_image_info(image_id id, void *info, size_t size)
+{
+    CHECK_COMMPAGE();
+    return GET_SERVERCALLS()->get_image_info(id, info, size);
+}
+
 status_t MONIKA_EXPORT _kern_get_next_image_info(team_id team, int32* cookie, void *info, size_t size)
 {
     CHECK_COMMPAGE();

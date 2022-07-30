@@ -1,6 +1,7 @@
 HYCLONE_SERVERCALL2(connect, int, int)
 HYCLONE_SERVERCALL0(disconnect)
 HYCLONE_SERVERCALL2(register_image, void*, size_t)
+HYCLONE_SERVERCALL3(get_image_info, int, void*, size_t)
 HYCLONE_SERVERCALL4(get_next_image_info, int, int*, void*, size_t)
 HYCLONE_SERVERCALL1(unregister_image, int)
 HYCLONE_SERVERCALL1(image_relocated, int)

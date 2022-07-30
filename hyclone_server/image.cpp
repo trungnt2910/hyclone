@@ -27,6 +27,33 @@ intptr_t server_hserver_call_register_image(hserver_context& context, void* imag
     }
 }
 
+intptr_t server_hserver_call_get_image_info(hserver_context& context, int id, void* info, std::size_t size)
+{
+    if (size != sizeof(haiku_image_info))
+    {
+        return B_BAD_VALUE;
+    }
+
+    haiku_image_info image_info;
+
+    {
+        auto lock = context.process->Lock();
+        if (!context.process->IsValidImageId(id))
+        {
+            return B_BAD_VALUE;
+        }
+
+        image_info = context.process->GetImage(id).basic_info;
+    }
+
+    if (context.process->WriteMemory(info, &image_info, sizeof(image_info)) != sizeof(image_info))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_get_next_image_info(hserver_context& context,
     int target_pid, int* user_cookie, void* user_image_info, std::size_t size)
 {
