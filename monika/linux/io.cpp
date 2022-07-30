@@ -884,6 +884,17 @@ status_t MONIKA_EXPORT _kern_read_fs_info(haiku_dev_t device, struct haiku_fs_in
     return GET_SERVERCALLS()->read_fs_info(device, info);
 }
 
+status_t MONIKA_EXPORT _kern_fsync(int fd)
+{
+    int status = LINUX_SYSCALL1(__NR_fsync, fd);
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 // The functions below are clearly impossible
 // to be cleanly implemented in Hyclone, so
 // ENOSYS is directly returned and no logging is provided.
