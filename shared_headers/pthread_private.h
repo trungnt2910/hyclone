@@ -3,7 +3,13 @@
 
 #include "BeDefs.h"
 
-#define HAIKU_PTHREAD_KEYS_MAX  256
+#define HAIKU_PTHREAD_KEYS_MAX              256
+
+#define HAIKU_THREAD_DETACHED               0x01
+#define HAIKU_THREAD_DEAD                   0x02
+#define HAIKU_THREAD_CANCELED               0x04
+#define HAIKU_THREAD_CANCEL_ENABLED         0x08
+#define HAIKU_THREAD_CANCEL_ASYNCHRONOUS    0x10
 
 struct haiku_pthread_cleanup_handler
 {
@@ -12,7 +18,7 @@ struct haiku_pthread_cleanup_handler
     void *argument;
 };
 
-struct haiku_pthread_key_data 
+struct haiku_pthread_key_data
 {
     int32 sequence;
     void  *value;

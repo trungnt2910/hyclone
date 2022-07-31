@@ -1,6 +1,7 @@
 #ifndef __HYCLONE_THREAD_H__
 #define __HYCLONE_THREAD_H__
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -12,6 +13,7 @@ class Thread
 private:
     haiku_thread_info _info;
     std::mutex _lock;
+    std::atomic<bool> _suspended = false;
     int _tid;
 public:
     Thread(int pid, int tid);
@@ -21,6 +23,11 @@ public:
 
     int GetTid() const { return _tid; }
     const haiku_thread_info& GetInfo() const { return _info; }
+    haiku_thread_info& GetInfo() { return _info; }
+    void SuspendSelf();
+    void SetSuspended(bool suspended);
+    void Resume();
+    void WaitForResume();
 };
 
 #endif // __HYCLONE_PROCESS_H__

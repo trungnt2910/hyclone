@@ -15,6 +15,7 @@
 #include "loader_readdir.h"
 #include "loader_reservedrange.h"
 #include "loader_servercalls.h"
+#include "loader_spawn_thread.h"
 #include "loader_sysinfo.h"
 #include "loader_systemtime.h"
 #include "loader_tls.h"
@@ -79,6 +80,8 @@ void* loader_allocate_commpage()
 
     hostcalls_ptr->fork = loader_fork;
     hostcalls_ptr->exec = loader_exec;
+
+    hostcalls_ptr->spawn_thread = loader_spawn_thread;
 
     hostcalls_ptr->opendir = loader_opendir;
     hostcalls_ptr->closedir = loader_closedir;

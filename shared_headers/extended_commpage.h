@@ -50,6 +50,9 @@ struct hostcalls
     int (*fork)();
     int (*exec)(const char* path, const char* const* flatArgs, size_t flatArgsSize, int argc, int envc, int umask);
 
+    // Thread
+    int (*spawn_thread)(void* thread_creation_attributes);
+
     // Readdir
     void (*opendir)(int fd);
     void (*closedir)(int fd);

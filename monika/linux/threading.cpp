@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "BeDefs.h"
+#include "errno_conversion.h"
 #include "export.h"
 #include "extended_commpage.h"
 #include "haiku_errors.h"
@@ -9,6 +10,27 @@
 
 extern "C"
 {
+
+thread_id MONIKA_EXPORT _kern_spawn_thread(void* attributes)
+{
+    long status = GET_HOSTCALLS()->spawn_thread(attributes);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return status;
+}
+
+status_t MONIKA_EXPORT _kern_suspend_thread(thread_id thread)
+{
+    return GET_SERVERCALLS()->suspend_thread(thread);
+}
+status_t MONIKA_EXPORT _kern_resume_thread(thread_id thread)
+{
+    return GET_SERVERCALLS()->resume_thread(thread);
+}
 
 void MONIKA_EXPORT _kern_find_thread()
 {
