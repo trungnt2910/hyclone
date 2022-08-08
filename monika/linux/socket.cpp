@@ -59,6 +59,7 @@ static int SocketTypeBToLinux(int type);
 static int SocketProtocolBToLinux(int protocol);
 static int SocketAddressBToLinux(const struct haiku_sockaddr *addr, haiku_socklen_t addrlen,
                                   struct sockaddr_storage *storage);
+static int SocketAddressLinuxToB(const struct sockaddr *addr, struct haiku_sockaddr_storage *storage);
 static int SendMessageFlagsBToLinux(int flags);
 
 extern "C"
@@ -116,6 +117,60 @@ status_t MONIKA_EXPORT _kern_connect(int socket, const struct haiku_sockaddr *ad
     }
 
     return B_OK;
+}
+
+ssize_t MONIKA_EXPORT _kern_recvfrom(int socket, void *data, size_t length, int flags,
+    struct haiku_sockaddr *address, haiku_socklen_t *_addressLength)
+{
+    struct sockaddr_storage linuxAddressStorage;
+    memset(&linuxAddressStorage, 0, sizeof(linuxAddressStorage));
+    socklen_t linuxAddressLengthStorage = 0;
+
+    struct sockaddr* linuxAddress = NULL;
+    socklen_t* linuxAddressLength = NULL;
+
+    if (address != NULL || _addressLength != NULL)
+    {
+        linuxAddress = (struct sockaddr*)&linuxAddressStorage;
+        linuxAddressLength = &linuxAddressLengthStorage;
+        if (_addressLength != NULL)
+        {
+            *linuxAddressLength = *_addressLength;
+        }
+    }
+
+    int linuxFlags = SendMessageFlagsBToLinux(flags);
+
+    long status = LINUX_SYSCALL6(__NR_recvfrom, socket, data, length,
+        linuxFlags, linuxAddress, linuxAddressLength);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    if (address != NULL || _addressLength != NULL)
+    {
+        struct haiku_sockaddr_storage haikuAddressStorage;
+        memset(&haikuAddressStorage, 0, sizeof(haikuAddressStorage));
+
+        int realLength = SocketAddressLinuxToB(linuxAddress, &haikuAddressStorage);
+
+        haiku_socklen_t memoryLength = (_addressLength == NULL) ? 0 : *_addressLength;
+        haiku_socklen_t copyLength = std::min(memoryLength, (haiku_socklen_t)realLength);
+
+        if (address != NULL)
+        {
+            memcpy(address, &haikuAddressStorage, copyLength);
+        }
+
+        if (_addressLength != NULL)
+        {
+            *_addressLength = copyLength;
+        }
+    }
+
+    return status;
 }
 
 ssize_t MONIKA_EXPORT _kern_send(int socket, const void *data, size_t length, int flags)
@@ -220,6 +275,56 @@ static int SocketAddressBToLinux(const struct haiku_sockaddr *addr, haiku_sockle
             return sizeof(struct sockaddr_in6);
         }
 #define UNIMPLEMENTED_SOCKADDR(name) case HAIKU_##name: trace("Unimplemented sockaddr: "#name); return -1;
+        //UNIMPLEMENTED_SOCKADDR(AF_INET);
+        UNIMPLEMENTED_SOCKADDR(AF_APPLETALK);
+        UNIMPLEMENTED_SOCKADDR(AF_ROUTE);
+        UNIMPLEMENTED_SOCKADDR(AF_LINK);
+        //UNIMPLEMENTED_SOCKADDR(AF_INET6);
+        UNIMPLEMENTED_SOCKADDR(AF_DLI);
+        UNIMPLEMENTED_SOCKADDR(AF_IPX);
+        UNIMPLEMENTED_SOCKADDR(AF_NOTIFY);
+        //UNIMPLEMENTED_SOCKADDR(AF_UNIX);
+        UNIMPLEMENTED_SOCKADDR(AF_BLUETOOTH);
+#undef UNIMPLEMENTED_SOCKADDR
+        default:
+            trace("Unsupported socket family.");
+            return -1;
+    }
+}
+
+static int SocketAddressLinuxToB(const struct sockaddr *addr, struct haiku_sockaddr_storage *storage)
+{
+    switch (addr->sa_family)
+    {
+        case AF_UNIX:
+        {
+            struct sockaddr_un *linux_un = (struct sockaddr_un *)addr;
+            struct haiku_sockaddr_un *haiku_un = (struct haiku_sockaddr_un *)storage;
+            haiku_un->sun_family = HAIKU_AF_UNIX;
+            strncpy(haiku_un->sun_path, linux_un->sun_path, std::min(sizeof(linux_un->sun_path), sizeof(haiku_un->sun_path)));
+            return sizeof(struct haiku_sockaddr_un);
+        }
+        case AF_INET:
+        {
+            struct sockaddr_in *linux_in = (struct sockaddr_in *)addr;
+            struct haiku_sockaddr_in *haiku_in = (struct haiku_sockaddr_in *)storage;
+            haiku_in->sin_family = HAIKU_AF_INET;
+            haiku_in->sin_port = linux_in->sin_port;
+            haiku_in->sin_addr.s_addr = linux_in->sin_addr.s_addr;
+            return sizeof(struct haiku_sockaddr_in);
+        }
+        case AF_INET6:
+        {
+            struct sockaddr_in6 *linux_in6 = (struct sockaddr_in6 *)addr;
+            struct haiku_sockaddr_in6 *haiku_in6 = (struct haiku_sockaddr_in6 *)storage;
+            haiku_in6->sin6_family = HAIKU_AF_INET6;
+            haiku_in6->sin6_port = linux_in6->sin6_port;
+            haiku_in6->sin6_flowinfo = linux_in6->sin6_flowinfo;
+            memcpy(&haiku_in6->sin6_addr, &linux_in6->sin6_addr, sizeof(linux_in6->sin6_addr));
+            haiku_in6->sin6_scope_id = linux_in6->sin6_scope_id;
+            return sizeof(struct haiku_sockaddr_in6);
+        }
+#define UNIMPLEMENTED_SOCKADDR(name) case ##name: trace("Unimplemented sockaddr: "#name); return -1;
         //UNIMPLEMENTED_SOCKADDR(AF_INET);
         UNIMPLEMENTED_SOCKADDR(AF_APPLETALK);
         UNIMPLEMENTED_SOCKADDR(AF_ROUTE);
