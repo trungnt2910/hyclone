@@ -59,6 +59,7 @@ static int SocketTypeBToLinux(int type);
 static int SocketProtocolBToLinux(int protocol);
 static int SocketAddressBToLinux(const struct haiku_sockaddr *addr, haiku_socklen_t addrlen,
                                   struct sockaddr_storage *storage);
+static int SendMessageFlagsBToLinux(int flags);
 
 extern "C"
 {
@@ -115,6 +116,25 @@ status_t MONIKA_EXPORT _kern_connect(int socket, const struct haiku_sockaddr *ad
     }
 
     return B_OK;
+}
+
+ssize_t MONIKA_EXPORT _kern_send(int socket, const void *data, size_t length, int flags)
+{
+    int linuxFlags = SendMessageFlagsBToLinux(flags);
+
+    // According to man pages:
+    // send(sockfd, buf, len, flags);
+    //   is equivalent to
+    // sendto(sockfd, buf, len, flags, NULL, 0);
+    // LINUX_SYSCALLX macros automatically zeros out unused parameters for us.
+    long status = LINUX_SYSCALL4(__NR_sendto, socket, data, length, linuxFlags);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return status;
 }
 
 }
@@ -215,4 +235,20 @@ static int SocketAddressBToLinux(const struct haiku_sockaddr *addr, haiku_sockle
             trace("Unsupported socket family.");
             return -1;
     }
+}
+
+static int SendMessageFlagsBToLinux(int flags)
+{
+    int linuxFlags = 0;
+    if (flags & HAIKU_MSG_EOF)
+    {
+        linuxFlags |= MSG_FIN;
+        flags &= ~HAIKU_MSG_EOF;
+    }
+#define SUPPORTED_SEND_MESSAGE_FLAG(name) if (flags & HAIKU_##name) linuxFlags |= name;
+#define UNSUPPORTED_SEND_MESSAGE_FLAG(name) if (flags & HAIKU_##name) trace("Unsupported send message flag: "#name);
+#include "socket_values.h"
+#undef SUPPORTED_SEND_MESSAGE_FLAG
+#undef UNSUPPORTED_SEND_MESSAGE_FLAG
+    return linuxFlags;
 }
