@@ -15,8 +15,6 @@
 #include "linux_debug.h"
 #include "linux_syscall.h"
 
-#include "extended_commpage.h"
-
 static int SocketFamilyBToLinux(int family);
 static int SocketTypeBToLinux(int type);
 static int SocketProtocolBToLinux(int protocol);
@@ -157,6 +155,112 @@ ssize_t MONIKA_EXPORT _kern_send(int socket, const void *data, size_t length, in
     return status;
 }
 
+status_t MONIKA_EXPORT _kern_getsockopt(int socket, int level, int option,
+    void *value, haiku_socklen_t *_length)
+{
+    // This function could, and SHOULD, be unified with _kern_setsockopt.
+    int linuxLevel;
+    socklen_t linuxLength = (_length) ? *_length : 0;
+
+    switch (level)
+    {
+        case HAIKU_SOL_SOCKET:
+        {
+            linuxLevel = SOL_SOCKET;
+            int linuxOption = SocketOptionBToLinux(option);
+
+            switch (linuxOption)
+            {
+                // value is a int*
+                case SO_ACCEPTCONN:
+                case SO_BROADCAST:
+                case SO_DEBUG:
+                case SO_DONTROUTE:
+                case SO_KEEPALIVE:
+                case SO_OOBINLINE:
+                case SO_REUSEADDR:
+                case SO_REUSEPORT:
+                case SO_SNDBUF:
+                case SO_SNDLOWAT:
+                case SO_RCVBUF:
+                case SO_RCVLOWAT:
+                // These two need marshalling.
+                // case SO_TYPE:
+                {
+                    long status = LINUX_SYSCALL5(__NR_getsockopt, socket, linuxLevel, linuxOption, value, &linuxLength);
+                    if (status < 0)
+                    {
+                        return LinuxToB(-status);
+                    }
+                    if (_length != NULL)
+                    {
+                        *_length = linuxLength;
+                    }
+                    return B_OK;
+                }
+                case SO_ERROR:
+                {
+                    int errValue = 0;
+                    long status = LINUX_SYSCALL5(__NR_getsockopt, socket, linuxLevel, linuxOption, &errValue, &linuxLength);
+                    if (status < 0)
+                    {
+                        return LinuxToB(-status);
+                    }
+                    errValue = LinuxToB(errValue);
+                    memcpy(value, &errValue, sizeof(errValue));
+                    if (_length != NULL)
+                    {
+                        *_length = linuxLength;
+                    }
+                    return B_OK;
+                }
+                default:
+                    trace("_kern_getsockopt: Unimplemented SOL_SOCKET option.");
+                    return HAIKU_POSIX_ENOSYS;
+            }
+        }
+        break;
+        case HAIKU_IPPROTO_TCP:
+        {
+            linuxLevel = IPPROTO_TCP;
+            int linuxOption = TcpOptionBToLinux(option);
+
+            switch (linuxOption)
+            {
+                case TCP_NODELAY:
+                case TCP_MAXSEG:
+                {
+                    long status = LINUX_SYSCALL5(__NR_getsockopt, socket, linuxLevel, linuxOption, value, &linuxLength);
+                    if (status < 0)
+                    {
+                        return LinuxToB(-status);
+                    }
+                    if (_length != NULL)
+                    {
+                        *_length = linuxLength;
+                    }
+                    return B_OK;
+                }
+                default:
+                    trace("_kern_getsockopt: Unimplemented IPPROTO_TCP option.");
+                    return HAIKU_POSIX_ENOSYS;
+            }
+        }
+        break;
+#define UNIMPLEMENTED_LEVEL(name) case HAIKU_##name: trace("Unimplemented getsockopt level: "#name); return HAIKU_POSIX_EPROTONOSUPPORT;
+        UNIMPLEMENTED_LEVEL(IPPROTO_IP)
+        UNIMPLEMENTED_LEVEL(IPPROTO_IPV6)
+        UNIMPLEMENTED_LEVEL(IPPROTO_ICMP)
+        UNIMPLEMENTED_LEVEL(IPPROTO_RAW)
+        //UNIMPLEMENTED_LEVEL(IPPROTO_TCP)
+        UNIMPLEMENTED_LEVEL(IPPROTO_UDP)
+#undef UNIMPLEMENTED_LEVEL
+        default:
+            trace("Unsupported getsockopt level.");
+            return HAIKU_POSIX_EPROTONOSUPPORT;
+    }
+}
+
 status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
     const void *value, haiku_socklen_t length)
 {
@@ -196,8 +300,7 @@ status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
                     return B_OK;
                 }
                 default:
-                    GET_HOSTCALLS()->printf("_kern_setsockopt: unsupported socket option %d\n", option);
-                    trace("Unimplemented SOL_SOCKET option.");
+                    trace("_kern_setsockopt: Unimplemented SOL_SOCKET option.");
                     return HAIKU_POSIX_ENOSYS;
             }
         }
@@ -220,8 +323,7 @@ status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
                     return B_OK;
                 }
                 default:
-                    GET_HOSTCALLS()->printf("_kern_setsockopt: unsupported TCP option %d\n", option);
-                    trace("Unimplemented IPPROTO_TCP option.");
+                    trace("_kern_setsockopt: Unimplemented IPPROTO_TCP option.");
                     return HAIKU_POSIX_ENOSYS;
             }
         }
@@ -416,7 +518,6 @@ static int SocketOptionBToLinux(int option)
 #undef SUPPORTED_SOCKET_OPTION
 #undef UNSUPPORTED_SOCKET_OPTION
         default:
-            GET_HOSTCALLS()->printf("_kern_setsockopt: unsupported socket option %d\n", option);
             trace("Unsupported socket option.");
             return -1;
     }
@@ -432,7 +533,6 @@ static int TcpOptionBToLinux(int option)
 #undef SUPPORTED_TCP_OPTION
 #undef UNSUPPORTED_TCP_OPTION
         default:
-            GET_HOSTCALLS()->printf("_kern_setsockopt: unsupported tcp option %d\n", option);
             trace("Unsupported tcp option.");
             return -1;
     }
