@@ -342,6 +342,56 @@ status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
     }
 }
 
+status_t MONIKA_EXPORT _kern_getpeername(int socket,
+    struct haiku_sockaddr *address, haiku_socklen_t *_addressLength)
+{
+    struct sockaddr_storage linuxAddressStorage;
+    struct sockaddr* linuxAddress = (struct sockaddr*)&linuxAddressStorage;
+    socklen_t linuxAddressLength = sizeof(linuxAddressStorage);
+
+    long status = LINUX_SYSCALL3(__NR_getpeername, socket, linuxAddress, &linuxAddressLength);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    struct haiku_sockaddr_storage haikuAddressStorage;
+    haiku_socklen_t realLen = SocketAddressLinuxToB(linuxAddress, &haikuAddressStorage);
+    haiku_socklen_t memoryLength = std::min(realLen, *_addressLength);
+
+    memcpy(address, &haikuAddressStorage, memoryLength);
+
+    *_addressLength = realLen;
+
+    return B_OK;
+}
+
+status_t MONIKA_EXPORT _kern_getsockname(int socket,
+    struct sockaddr *address, socklen_t *_addressLength)
+{
+    struct sockaddr_storage linuxAddressStorage;
+    struct sockaddr* linuxAddress = (struct sockaddr*)&linuxAddressStorage;
+    socklen_t linuxAddressLength = sizeof(linuxAddressStorage);
+
+    long status = LINUX_SYSCALL3(__NR_getsockname, socket, linuxAddress, &linuxAddressLength);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    struct haiku_sockaddr_storage haikuAddressStorage;
+    haiku_socklen_t realLen = SocketAddressLinuxToB(linuxAddress, &haikuAddressStorage);
+    haiku_socklen_t memoryLength = std::min(realLen, *_addressLength);
+
+    memcpy(address, &haikuAddressStorage, memoryLength);
+
+    *_addressLength = realLen;
+
+    return B_OK;
+}
+
 }
 
 static int SocketFamilyBToLinux(int family)
