@@ -151,6 +151,10 @@ int LinuxToB(int linuxErrno)
             {
                 return HAIKU_POSIX_EWOULDBLOCK;
             }
+            else if (linuxErrno == 0)
+            {
+                return 0;
+            }
             return B_BAD_VALUE;
     }
 }
