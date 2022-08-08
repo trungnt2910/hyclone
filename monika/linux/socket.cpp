@@ -2,65 +2,30 @@
 #include <cstdint>
 #include <cstring>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
 #include "errno_conversion.h"
 #include "export.h"
 #include "haiku_errors.h"
+#include "haiku_netinet_in.h"
+#include "haiku_netinet_tcp.h"
 #include "haiku_socket.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
 
-typedef uint32_t haiku_in_addr_t;
-
-/* IP Version 4 address */
-struct haiku_in_addr
-{
-    haiku_in_addr_t s_addr;
-};
-
-/* IP Version 4 socket address */
-struct haiku_sockaddr_in
-{
-    uint8_t                 sin_len;
-    uint8_t                 sin_family;
-    uint16_t                sin_port;
-    struct haiku_in_addr    sin_addr;
-    int8_t                  sin_zero[24];
-};
-
-struct haiku_in6_addr
-{
-    union
-    {
-        uint8_t                 u6_addr8[16];
-        uint16_t                u6_addr16[8];
-        uint32_t                u6_addr32[4];
-    } in6_u;
-    #define haiku_s6_addr       in6_u.u6_addr8
-    #define haiku_s6_addr16     in6_u.u6_addr16
-    #define haiku_s6_addr32     in6_u.u6_addr32
-};
-
-/* IP Version 6 socket address. */
-struct haiku_sockaddr_in6
-{
-    uint8_t                     sin6_len;
-    uint8_t                     sin6_family;
-    uint16_t                    sin6_port;
-    uint32_t                    sin6_flowinfo;
-    struct haiku_in6_addr       sin6_addr;
-    uint32_t                    sin6_scope_id;
-};
+#include "extended_commpage.h"
 
 static int SocketFamilyBToLinux(int family);
 static int SocketTypeBToLinux(int type);
 static int SocketProtocolBToLinux(int protocol);
+static int SocketOptionBToLinux(int option);
 static int SocketAddressBToLinux(const struct haiku_sockaddr *addr, haiku_socklen_t addrlen,
                                   struct sockaddr_storage *storage);
 static int SocketAddressLinuxToB(const struct sockaddr *addr, struct haiku_sockaddr_storage *storage);
 static int SendMessageFlagsBToLinux(int flags);
+static int TcpOptionBToLinux(int options);
 
 extern "C"
 {
@@ -190,6 +155,89 @@ ssize_t MONIKA_EXPORT _kern_send(int socket, const void *data, size_t length, in
     }
 
     return status;
+}
+
+status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
+    const void *value, haiku_socklen_t length)
+{
+    int linuxLevel;
+
+    switch (level)
+    {
+        case HAIKU_SOL_SOCKET:
+        {
+            linuxLevel = SOL_SOCKET;
+            int linuxOption = SocketOptionBToLinux(option);
+
+            switch (linuxOption)
+            {
+                // value is a int*
+                case SO_ACCEPTCONN:
+                case SO_BROADCAST:
+                case SO_DEBUG:
+                case SO_DONTROUTE:
+                case SO_KEEPALIVE:
+                case SO_OOBINLINE:
+                case SO_REUSEADDR:
+                case SO_REUSEPORT:
+                case SO_SNDBUF:
+                case SO_SNDLOWAT:
+                case SO_RCVBUF:
+                case SO_RCVLOWAT:
+                // These two need marshalling.
+                // case SO_ERROR:
+                // case SO_TYPE:
+                {
+                    long status = LINUX_SYSCALL5(__NR_setsockopt, socket, linuxLevel, linuxOption, value, length);
+                    if (status < 0)
+                    {
+                        return LinuxToB(-status);
+                    }
+                    return B_OK;
+                }
+                default:
+                    GET_HOSTCALLS()->printf("_kern_setsockopt: unsupported socket option %d\n", option);
+                    trace("Unimplemented SOL_SOCKET option.");
+                    return HAIKU_POSIX_ENOSYS;
+            }
+        }
+        break;
+        case HAIKU_IPPROTO_TCP:
+        {
+            linuxLevel = IPPROTO_TCP;
+            int linuxOption = TcpOptionBToLinux(option);
+
+            switch (linuxOption)
+            {
+                case TCP_NODELAY:
+                case TCP_MAXSEG:
+                {
+                    long status = LINUX_SYSCALL5(__NR_setsockopt, socket, linuxLevel, linuxOption, value, length);
+                    if (status < 0)
+                    {
+                        return LinuxToB(-status);
+                    }
+                    return B_OK;
+                }
+                default:
+                    GET_HOSTCALLS()->printf("_kern_setsockopt: unsupported TCP option %d\n", option);
+                    trace("Unimplemented IPPROTO_TCP option.");
+                    return HAIKU_POSIX_ENOSYS;
+            }
+        }
+        break;
+#define UNIMPLEMENTED_LEVEL(name) case HAIKU_##name: trace("Unimplemented setsockopt level: "#name); return HAIKU_POSIX_EPROTONOSUPPORT;
+        UNIMPLEMENTED_LEVEL(IPPROTO_IP)
+        UNIMPLEMENTED_LEVEL(IPPROTO_IPV6)
+        UNIMPLEMENTED_LEVEL(IPPROTO_ICMP)
+        UNIMPLEMENTED_LEVEL(IPPROTO_RAW)
+        //UNIMPLEMENTED_LEVEL(IPPROTO_TCP)
+        UNIMPLEMENTED_LEVEL(IPPROTO_UDP)
+#undef UNIMPLEMENTED_LEVEL
+        default:
+            trace("Unsupported setsockopt level.");
+            return HAIKU_POSIX_EPROTONOSUPPORT;
+    }
 }
 
 }
@@ -356,4 +404,36 @@ static int SendMessageFlagsBToLinux(int flags)
 #undef SUPPORTED_SEND_MESSAGE_FLAG
 #undef UNSUPPORTED_SEND_MESSAGE_FLAG
     return linuxFlags;
+}
+
+static int SocketOptionBToLinux(int option)
+{
+    switch (option)
+    {
+#define SUPPORTED_SOCKET_OPTION(name) case HAIKU_##name: return name;
+#define UNSUPPORTED_SOCKET_OPTION(name) case HAIKU_##name: trace("Unsupported socket option: "#name); return -1;
+#include "socket_values.h"
+#undef SUPPORTED_SOCKET_OPTION
+#undef UNSUPPORTED_SOCKET_OPTION
+        default:
+            GET_HOSTCALLS()->printf("_kern_setsockopt: unsupported socket option %d\n", option);
+            trace("Unsupported socket option.");
+            return -1;
+    }
+}
+
+static int TcpOptionBToLinux(int option)
+{
+    switch (option)
+    {
+#define SUPPORTED_TCP_OPTION(name) case HAIKU_##name: return name;
+#define UNSUPPORTED_TCP_OPTION(name) case HAIKU_##name: trace("Unsupported tcp option: "#name); return -1;
+#include "socket_values.h"
+#undef SUPPORTED_TCP_OPTION
+#undef UNSUPPORTED_TCP_OPTION
+        default:
+            GET_HOSTCALLS()->printf("_kern_setsockopt: unsupported tcp option %d\n", option);
+            trace("Unsupported tcp option.");
+            return -1;
+    }
 }
