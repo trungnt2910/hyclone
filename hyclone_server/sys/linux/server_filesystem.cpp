@@ -278,3 +278,20 @@ bool server_setup_packagefs(haiku_fs_info& info)
 
     return true;
 }
+
+bool server_setup_settings()
+{
+    std::filesystem::path settingsPath = std::filesystem::path(gHaikuPrefix) / "boot" / "system" / "settings";
+    std::filesystem::path networkSettingsPath = settingsPath / "network";
+
+    std::filesystem::create_directories(networkSettingsPath);
+
+    std::filesystem::copy_file("/etc/hostname", networkSettingsPath / "hostname",
+        std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::copy_file("/etc/hosts", networkSettingsPath / "hosts",
+        std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::copy_file("/etc/resolv.conf", networkSettingsPath / "resolv.conf",
+        std::filesystem::copy_options::overwrite_existing);
+
+    return true;
+}

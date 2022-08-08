@@ -60,6 +60,11 @@ bool server_setup_filesystem()
     // dev = 3
     system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
 
+    if (!server_setup_settings())
+    {
+        std::cerr << "failed to setup system settings." << std::endl;
+    }
+
     return true;
 }
 
