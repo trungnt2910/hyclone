@@ -2,10 +2,12 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
+#include <mutex>
 #include <pthread.h>
 #include <string>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <unordered_map>
 
 #include "haiku_area.h"
 #include "haiku_tls.h"
@@ -24,6 +26,9 @@ struct loader_trampoline_args
 };
 
 static void* loader_pthread_entry_trampoline(void* arg);
+
+static std::unordered_map<int, pthread_t> sHostPthreadObjects;
+static std::mutex sHostPthreadObjectsLock;
 
 // To-Do: This function assumes that the stack grows down.
 // This may not be true for some architectures other than x86_64.
@@ -62,15 +67,6 @@ int loader_spawn_thread(void* arg)
     pthread_attr_setstack(&linux_thread_attributes, attributes->stack_address, attributes->stack_size);
     pthread_attr_setguardsize(&linux_thread_attributes, attributes->guard_size);
 
-    if (attributes->flags & HAIKU_THREAD_DETACHED)
-    {
-        pthread_attr_setdetachstate(&linux_thread_attributes, PTHREAD_CREATE_DETACHED);
-    }
-    else
-    {
-        pthread_attr_setdetachstate(&linux_thread_attributes, PTHREAD_CREATE_JOINABLE);
-    }
-
     sched_param sched;
     sched.sched_priority = attributes->priority;
     pthread_attr_setschedparam(&linux_thread_attributes, &sched);
@@ -88,7 +84,48 @@ int loader_spawn_thread(void* arg)
     }
 
     thread_id.wait(0);
-    return thread_id.load();
+
+    int thread_id_nonatomic = thread_id.load();
+
+    {
+        auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
+        sHostPthreadObjects[thread_id_nonatomic] = thread;
+    }
+
+    return thread_id_nonatomic;
+}
+
+void loader_exit_thread(int retVal)
+{
+    int tid = gettid();
+    {
+        auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
+        auto it = sHostPthreadObjects.find(tid);
+        if (it != sHostPthreadObjects.end())
+        {
+            pthread_t thread = it->second;
+            sHostPthreadObjects.erase(it);
+            // Now no one in Hyclone knows about this thread.
+            pthread_detach(thread);
+        }
+    }
+    pthread_exit((void*)(intptr_t)retVal);
+}
+
+int loader_wait_for_thread(int thread_id, int* retVal)
+{
+    pthread_t thread;
+    {
+        auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
+        auto it = sHostPthreadObjects.find(thread_id);
+        if (it == sHostPthreadObjects.end())
+        {
+            return -ESRCH;
+        }
+        thread = it->second;
+    }
+    // Zero if succeeds, positive error code on error.
+    return -pthread_join(thread, (void**)retVal);
 }
 
 void* loader_pthread_entry_trampoline(void* arg)

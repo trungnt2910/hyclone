@@ -52,6 +52,8 @@ struct hostcalls
 
     // Thread
     int (*spawn_thread)(void* thread_creation_attributes);
+    void (*exit_thread)(int status);
+    int (*wait_for_thread)(int thread, int* status);
 
     // Readdir
     void (*opendir)(int fd);

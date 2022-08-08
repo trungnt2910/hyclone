@@ -82,6 +82,8 @@ void* loader_allocate_commpage()
     hostcalls_ptr->exec = loader_exec;
 
     hostcalls_ptr->spawn_thread = loader_spawn_thread;
+    hostcalls_ptr->exit_thread = loader_exit_thread;
+    hostcalls_ptr->wait_for_thread = loader_wait_for_thread;
 
     hostcalls_ptr->opendir = loader_opendir;
     hostcalls_ptr->closedir = loader_closedir;

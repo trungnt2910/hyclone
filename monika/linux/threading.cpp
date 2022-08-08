@@ -32,6 +32,22 @@ status_t MONIKA_EXPORT _kern_resume_thread(thread_id thread)
     return GET_SERVERCALLS()->resume_thread(thread);
 }
 
+status_t MONIKA_EXPORT _kern_exit_thread(status_t returnValue)
+{
+    GET_HOSTCALLS()->exit_thread(returnValue);
+    return 0;
+}
+
+status_t MONIKA_EXPORT _kern_wait_for_thread(thread_id thread, status_t *_returnCode)
+{
+    long status = GET_HOSTCALLS()->wait_for_thread(thread, _returnCode);
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+    return 0;
+}
+
 void MONIKA_EXPORT _kern_find_thread()
 {
     panic("_kern_find_thread not implemented");
