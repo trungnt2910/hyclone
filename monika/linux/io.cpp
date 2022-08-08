@@ -2,6 +2,7 @@
 #include <cstring>
 
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/select.h>
@@ -18,6 +19,7 @@
 #include "fcntl_conversion.h"
 #include "haiku_errors.h"
 #include "haiku_fcntl.h"
+#include "haiku_poll.h"
 #include "haiku_signal.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
@@ -152,6 +154,8 @@ static int ModeBToLinux(int mode);
 static int ModeLinuxToB(int mode);
 static int SeekTypeBToLinux(int seekType);
 static void FdSetBToLinux(const haiku_fd_set& fdSet, fd_set& linuxFdSet);
+static int PollEventsBToLinux(int pollEvents);
+static int PollEventsLinuxToB(int pollEvents);
 static bool IsTty(int fd);
 
 extern "C"
@@ -832,6 +836,50 @@ ssize_t MONIKA_EXPORT _kern_select(int numfds,
     return result;
 }
 
+ssize_t MONIKA_EXPORT _kern_poll(struct haiku_pollfd *fds, int numFDs,
+    bigtime_t timeout, const haiku_sigset_t *sigMask)
+{
+    size_t memSize = ((numFDs * sizeof(struct pollfd)) + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
+    struct pollfd *linuxFds =
+        (struct pollfd *)
+            LINUX_SYSCALL6(__NR_mmap, NULL, memSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+
+    for (size_t i = 0; i < numFDs; ++i)
+    {
+        linuxFds[i].fd = fds[i].fd;
+        linuxFds[i].events = PollEventsBToLinux(fds[i].events);
+    }
+
+    linux_sigset_t linuxSigMaskMemory;
+    linux_sigset_t* linuxSigMask = NULL;
+
+    if (sigMask != NULL)
+    {
+        linuxSigMaskMemory = SigSetBToLinux(*sigMask);
+        linuxSigMask = &linuxSigMaskMemory;
+    }
+
+    struct timespec linuxTimeout;
+    linuxTimeout.tv_sec = timeout / 1000000;
+    linuxTimeout.tv_nsec = (timeout % 1000000) * 1000;
+
+    long status = LINUX_SYSCALL5(__NR_ppoll, linuxFds, numFDs, &linuxTimeout, linuxSigMask, sizeof(linuxSigMaskMemory));
+
+    if (status < 0)
+    {
+        LINUX_SYSCALL2(__NR_munmap, linuxFds, memSize);
+        return LinuxToB(-status);
+    }
+
+    for (size_t i = 0; i < numFDs; ++i)
+    {
+        fds[i].revents = PollEventsLinuxToB(linuxFds[i].revents);
+    }
+
+    LINUX_SYSCALL2(__NR_munmap, linuxFds, memSize);
+    return status;
+}
+
 status_t MONIKA_EXPORT _kern_setcwd(int fd, const char *path)
 {
     if (fd == HAIKU_AT_FDCWD)
@@ -971,4 +1019,22 @@ bool IsTty(int fd)
         return false;
     }
     return true;
+}
+
+int PollEventsBToLinux(int pollEvents)
+{
+    int linuxEvents = 0;
+#define SUPPORTED_POLL_FLAG(name) if (pollEvents & HAIKU_##name) linuxEvents |= name;
+#include "poll_values.h"
+#undef SUPPORTED_POLL_FLAG
+    return linuxEvents;
+}
+
+int PollEventsLinuxToB(int pollEvents)
+{
+    int haikuEvents = 0;
+#define SUPPORTED_POLL_FLAG(name) if (pollEvents & name) haikuEvents |= HAIKU_##name;
+#include "poll_values.h"
+#undef SUPPORTED_POLL_FLAG
+    return haikuEvents;
 }
