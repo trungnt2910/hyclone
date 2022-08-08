@@ -163,4 +163,23 @@ struct haiku_sockaddr_un
     char        sun_path[126];
 };
 
+// Originally from Haiku's netinet/in.h
+/* Protocol definitions */
+#define HAIKU_IPPROTO_IP              0   /* 0, IPv4 */
+#define HAIKU_IPPROTO_HOPOPTS         0   /* 0, IPv6 hop-by-hop options */
+#define HAIKU_IPPROTO_ICMP            1   /* 1, ICMP (v4) */
+#define HAIKU_IPPROTO_IGMP            2   /* 2, IGMP (group management) */
+#define HAIKU_IPPROTO_TCP             6   /* 6, tcp */
+#define HAIKU_IPPROTO_UDP             17  /* 17, UDP */
+#define HAIKU_IPPROTO_IPV6            41  /* 41, IPv6 in IPv6 */
+#define HAIKU_IPPROTO_ROUTING         43  /* 43, Routing */
+#define HAIKU_IPPROTO_FRAGMENT        44  /* 44, IPv6 fragmentation header */
+#define HAIKU_IPPROTO_ESP             50  /* 50, Encap Sec. Payload */
+#define HAIKU_IPPROTO_AH              51  /* 51, Auth Header */
+#define HAIKU_IPPROTO_ICMPV6          58  /* 58, IPv6 ICMP */
+#define HAIKU_IPPROTO_NONE            59  /* 59, IPv6 no next header */
+#define HAIKU_IPPROTO_DSTOPTS         60  /* 60, IPv6 destination option */
+#define HAIKU_IPPROTO_ETHERIP         97  /* 97, Ethernet in IPv4 */
+#define HAIKU_IPPROTO_RAW             255 /* 255 */
+
 #endif /* __HAIKU_SYS_SOCKET_H__ */
