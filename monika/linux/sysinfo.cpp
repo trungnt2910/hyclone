@@ -153,4 +153,15 @@ status_t MONIKA_EXPORT _kern_get_cpu_info(uint32 firstCPU, uint32 cpuCount, haik
     return B_OK;
 }
 
+status_t MONIKA_EXPORT _kern_cpu_enabled(uint32 cpu)
+{
+    if (cpu < 0 || cpu >= GET_HOSTCALLS()->get_cpu_count())
+    {
+        return false;
+    }
+    haiku_cpu_info info;
+    GET_HOSTCALLS()->get_cpu_info(cpu, &info);
+    return info.enabled;
+}
+
 }
