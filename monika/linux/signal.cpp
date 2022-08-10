@@ -84,11 +84,6 @@ status_t MONIKA_EXPORT _kern_sigaction(int sig, const struct haiku_sigaction *ac
         return LinuxToB(-result);
     }
 
-    if (action != NULL)
-    {
-        sHaikuSignalHandlers[sig] = *action;
-    }
-
     if (oldAction != NULL)
     {
         SigactionLinuxToB(*oldLinuxSigaction, *oldAction);
@@ -104,6 +99,12 @@ status_t MONIKA_EXPORT _kern_sigaction(int sig, const struct haiku_sigaction *ac
             haiku_sigaction_set_sa_handler(*oldAction,
                 haiku_sigaction_get_sa_handler(sHaikuSignalHandlers[sig]));
         }
+    }
+
+    // Only modify our handler array after the old signal has been retrieved.
+    if (action != NULL)
+    {
+        sHaikuSignalHandlers[sig] = *action;
     }
 
     return B_OK;
