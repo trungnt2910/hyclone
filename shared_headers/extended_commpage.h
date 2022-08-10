@@ -55,6 +55,11 @@ struct hostcalls
     void (*exit_thread)(int status);
     int (*wait_for_thread)(int thread, int* status);
 
+    // Mutex
+    int (*mutex_lock)(int32_t* mutex, const char* name, uint32_t flags, int64_t timeout);
+    int (*mutex_unlock)(int32_t* mutex, uint32_t flags);
+    int (*mutex_switch_lock)(int32_t* fromMutex, int32_t* toMutex, const char* name, uint32_t flags, int64_t timeout);
+
     // Readdir
     void (*opendir)(int fd);
     void (*closedir)(int fd);

@@ -25,7 +25,7 @@ size_t loader_build_path(char* buffer, size_t bufferSize)
 	const char* hpath_expanded = getenv("_HPATH_EXPANDED");
 	if (hpath_expanded != NULL && strcmp(hpath_expanded, "1") == 0)
 	{
-		result << getenv("PATH");	
+		result << getenv("PATH");
 	}
 	else
 	{

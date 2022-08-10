@@ -58,14 +58,21 @@ status_t MONIKA_EXPORT _kern_get_thread_info(thread_id id, haiku_thread_info *in
     return GET_SERVERCALLS()->get_thread_info(id, info);
 }
 
-void MONIKA_EXPORT _kern_mutex_lock()
+status_t MONIKA_EXPORT _kern_mutex_lock(int32* mutex, const char* name,
+    uint32 flags, bigtime_t timeout)
 {
-    panic("_kern_mutex_lock not implemented");
+    return GET_HOSTCALLS()->mutex_lock(mutex, name, flags, timeout);
 }
 
-void MONIKA_EXPORT _kern_mutex_unlock()
+status_t MONIKA_EXPORT _kern_mutex_unlock(int32* mutex, uint32 flags)
 {
-    panic("_kern_mutex_unlock not implemented");
+    return GET_HOSTCALLS()->mutex_unlock(mutex, flags);
+}
+
+status_t MONIKA_EXPORT _kern_mutex_switch_lock(int32* fromMutex, int32* toMutex,
+    const char* name, uint32 flags, bigtime_t timeout)
+{
+    return GET_HOSTCALLS()->mutex_switch_lock(fromMutex, toMutex, name, flags, timeout);
 }
 
 sem_id MONIKA_EXPORT _kern_create_sem(int count, const char *name)

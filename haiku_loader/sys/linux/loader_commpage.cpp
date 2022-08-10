@@ -12,6 +12,7 @@
 #include "loader_exec.h"
 #include "loader_fork.h"
 #include "loader_lock.h"
+#include "loader_mutex.h"
 #include "loader_readdir.h"
 #include "loader_reservedrange.h"
 #include "loader_servercalls.h"
@@ -84,6 +85,10 @@ void* loader_allocate_commpage()
     hostcalls_ptr->spawn_thread = loader_spawn_thread;
     hostcalls_ptr->exit_thread = loader_exit_thread;
     hostcalls_ptr->wait_for_thread = loader_wait_for_thread;
+
+    hostcalls_ptr->mutex_lock = loader_mutex_lock;
+    hostcalls_ptr->mutex_unlock = loader_mutex_unlock;
+    hostcalls_ptr->mutex_switch_lock = loader_mutex_switch_lock;
 
     hostcalls_ptr->opendir = loader_opendir;
     hostcalls_ptr->closedir = loader_closedir;

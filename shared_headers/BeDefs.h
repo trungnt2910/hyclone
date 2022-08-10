@@ -41,6 +41,7 @@ typedef long signed int     haiku_ssize_t;
 #define B_OS_NAME_LENGTH    32
 #define B_FILE_NAME_LENGTH  256
 #define B_PATH_NAME_LENGTH  1024
+#define B_INFINITE_TIMEOUT  (9223372036854775807LL)
 
 #ifdef __x86_64__
 #define B_PAGE_SIZE         4096
