@@ -1,5 +1,6 @@
 // Use this instead of the POSIX termios for setting custom baud.
 #include <asm/termios.h>
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 
@@ -160,15 +161,18 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
             {
                 return LinuxToB(-result);
             }
-            if (buffer == NULL || length != sizeof(struct haiku_winsize))
+            // The length parameter seems to always be 0 in this case.
+            // If it faults, it faults. We can't check the length of the
+            // struct passed here.
+            if (buffer == NULL)
             {
                 return B_BAD_VALUE;
             }
-            struct haiku_winsize& haiku_winsize = *(struct haiku_winsize*)buffer;
-            haiku_winsize.ws_row = linux_winsize.ws_row;
-            haiku_winsize.ws_col = linux_winsize.ws_col;
-            haiku_winsize.ws_xpixel = linux_winsize.ws_xpixel;
-            haiku_winsize.ws_ypixel = linux_winsize.ws_ypixel;
+            struct haiku_winsize* haiku_winsize = (struct haiku_winsize*)buffer;
+            haiku_winsize->ws_row = linux_winsize.ws_row;
+            haiku_winsize->ws_col = linux_winsize.ws_col;
+            haiku_winsize->ws_xpixel = linux_winsize.ws_xpixel;
+            haiku_winsize->ws_ypixel = linux_winsize.ws_ypixel;
             return B_OK;
         }
         case HAIKU_TIOCGPGRP:
@@ -230,7 +234,7 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
         STUB_IOCTL(TCSETDTR);
         STUB_IOCTL(TCSETRTS);
         //STUB_IOCTL(TIOCGWINSZ);
-        STUB_IOCTL(TIOCSWINSZ);
+        //STUB_IOCTL(TIOCSWINSZ);
         STUB_IOCTL(TCVTIME);
         //STUB_IOCTL(TIOCGPGRP);
         //STUB_IOCTL(TIOCSPGRP);
