@@ -175,6 +175,25 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
             haiku_winsize->ws_ypixel = linux_winsize.ws_ypixel;
             return B_OK;
         }
+        case HAIKU_TIOCSWINSZ:
+        {
+            struct winsize linux_winsize;
+            if (buffer == NULL)
+            {
+                return B_BAD_VALUE;
+            }
+            struct haiku_winsize* haiku_winsize = (struct haiku_winsize*)buffer;
+            linux_winsize.ws_row = haiku_winsize->ws_row;
+            linux_winsize.ws_col = haiku_winsize->ws_col;
+            linux_winsize.ws_xpixel = haiku_winsize->ws_xpixel;
+            linux_winsize.ws_ypixel = haiku_winsize->ws_ypixel;
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TIOCSWINSZ, &linux_winsize);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            return B_OK;
+        }
         case HAIKU_TIOCGPGRP:
         {
             int result = LINUX_SYSCALL3(__NR_ioctl, fd, TIOCGPGRP, buffer);
