@@ -14,21 +14,11 @@
 #include "linux_subsystemlock.h"
 #include "linux_syscall.h"
 #include "signal_conversion.h"
+#include "signal_defs.h"
 #include "user_time_defs.h"
 
 static void SigHandlerTrampoline(int signal);
 static void SigActionTrampoline(int signal, siginfo_t *siginfo, void *context);
-
-#define HAIKU_SIGNAL_FIRST 1
-#define HAIKU_SIGNAL_LAST 30
-
-// additional send_signal_etc() flags
-#define SIGNAL_FLAG_QUEUING_REQUIRED        (0x10000)
-    // force signal queuing, i.e. fail instead of falling back to unqueued
-    // signals, when queuing isn't possible
-#define SIGNAL_FLAG_SEND_TO_THREAD          (0x20000)
-    // interpret the the given ID as a thread_id rather than a team_id (syscall
-    // use only)
 
 static int sSignalSubsystemLock = HYCLONE_SUBSYSTEM_LOCK_UNINITIALIZED;
 haiku_sigaction sHaikuSignalHandlers[HAIKU_NSIG];

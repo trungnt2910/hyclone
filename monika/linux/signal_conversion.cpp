@@ -7,8 +7,10 @@
 
 #include "errno_conversion.h"
 #include "extended_commpage.h"
+#include "extended_signal.h"
 #include "linux_debug.h"
 #include "signal_conversion.h"
+#include "signal_defs.h"
 
 // From Linux <asm/signal.h>
 // Conflicts with various stuff from <sys/signal.h>
@@ -16,21 +18,33 @@
 
 int SignalBToLinux(int signal)
 {
-    switch (signal)
+    enum
     {
 #define UNSUPPORTED_SIGNAL(signal)                           \
-    case HAIKU_##signal:                                     \
-        trace("SignalBToLinux: unsupported signal: "#signal);\
-        return SIGUSR1;
-#define SUPPORTED_SIGNAL(signal)                             \
-    case HAIKU_##signal:                                     \
-        return signal;
+        HYCLONE_UNSUPPORTED_SIGNAL_##signal,
 
 #include "signal_values.h"
 
 #undef UNSUPPORTED_SIGNAL
+    };
+    switch (signal)
+    {
+#define SUPPORTED_SIGNAL(signal)                             \
+    case HAIKU_##signal:                                     \
+        return signal;
+#define UNSUPPORTED_SIGNAL(signal)                           \
+    case HAIKU_##signal:                                     \
+        return GET_HOSTCALLS()->get_sigrtmin() + HYCLONE_UNSUPPORTED_SIGNAL_##signal;
+
+#include "signal_values.h"
+
 #undef SUPPORTED_SIGNAL
+#undef UNSUPPORTED_SIGNAL
     default:
+        if (signal >= SIGNAL_REALTIME_MIN)
+        {
+            return HYCLONE_MIN_AVAILABLE_REALTIME_SIGNAL + signal - SIGNAL_REALTIME_MIN;
+        }
         trace("SignalBToLinux: unsupported signal");
         return SIGUSR1;
     }
@@ -154,12 +168,12 @@ linux_sigset_t SigSetBToLinux(haiku_sigset_t sigset)
 {
     linux_sigset_t linuxSigset;
     memset(&linuxSigset, 0, sizeof(linuxSigset));
-    for (const auto i : 
+    for (const auto i :
     {
 #define SUPPORTED_SIGNAL(signal) HAIKU_##signal,
 #include "signal_values.h"
 #undef SUPPORTED_SIGNAL
-    })    
+    })
     {
         if (haiku_sigismember(sigset, i))
         {
@@ -175,7 +189,7 @@ haiku_sigset_t SigSetLinuxToB(linux_sigset_t sigset)
 {
     haiku_sigset_t haikuSigset;
     memset(&haikuSigset, 0, sizeof(haikuSigset));
-    for (const auto i : 
+    for (const auto i :
     {
 #define SUPPORTED_SIGNAL(signal) signal,
 #include "signal_values.h"
@@ -302,7 +316,7 @@ int SigCodeLinuxToB(int signal, int siCode)
 }
 
 void SiginfoLinuxToB(const siginfo_t &linuxSiginfo, haiku_siginfo_t &siginfo)
-{    
+{
     siginfo.si_signo = SignalLinuxToB(linuxSiginfo.si_signo);
     siginfo.si_code = SigCodeLinuxToB(linuxSiginfo.si_signo, linuxSiginfo.si_code);
     siginfo.si_errno = LinuxToB(linuxSiginfo.si_errno);

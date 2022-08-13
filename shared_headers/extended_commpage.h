@@ -60,6 +60,10 @@ struct hostcalls
     int (*mutex_unlock)(int32_t* mutex, uint32_t flags);
     int (*mutex_switch_lock)(int32_t* fromMutex, int32_t* toMutex, const char* name, uint32_t flags, int64_t timeout);
 
+    // Signals
+    int (*get_sigrtmin)();
+    int (*get_sigrtmax)();
+
     // Readdir
     void (*opendir)(int fd);
     void (*closedir)(int fd);

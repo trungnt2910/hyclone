@@ -16,6 +16,7 @@
 #include "loader_readdir.h"
 #include "loader_reservedrange.h"
 #include "loader_servercalls.h"
+#include "loader_signal.h"
 #include "loader_spawn_thread.h"
 #include "loader_sysinfo.h"
 #include "loader_systemtime.h"
@@ -89,6 +90,9 @@ void* loader_allocate_commpage()
     hostcalls_ptr->mutex_lock = loader_mutex_lock;
     hostcalls_ptr->mutex_unlock = loader_mutex_unlock;
     hostcalls_ptr->mutex_switch_lock = loader_mutex_switch_lock;
+
+    hostcalls_ptr->get_sigrtmin = loader_get_sigrtmin;
+    hostcalls_ptr->get_sigrtmax = loader_get_sigrtmax;
 
     hostcalls_ptr->opendir = loader_opendir;
     hostcalls_ptr->closedir = loader_closedir;

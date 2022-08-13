@@ -26,6 +26,7 @@ cp -fv $HAIKU_LIBROOT/posix/**/posix*.o $SCRIPT_DIR/libroot/posix
 cp -fv $HAIKU_LIBROOT/posix/glibc/**/posix*.o $SCRIPT_DIR/libroot/posix
 cp -fv $HAIKU_LIBROOT/posix/arch/$HAIKU_ARCH/posix*.o $SCRIPT_DIR/libroot/posix
 cp -fv $HAIKU_LIBROOT/posix/**/arch/$HAIKU_ARCH/posix*.o $SCRIPT_DIR/libroot/posix
+cp -fv $HAIKU_LIBROOT/posix/signal/*.o $SCRIPT_DIR/libroot/posix/signal
 cp -fv $HAIKU_LIBROOT/os/arch/$HAIKU_ARCH/*.o $SCRIPT_DIR/libroot/os/arch/$HAIKU_ARCH
 cp -fv $HAIKU_LIBROOT/os/*.o $SCRIPT_DIR/libroot/os
 cp -fv $HAIKU_LIBROOT/libroot_init.o $SCRIPT_DIR/libroot
