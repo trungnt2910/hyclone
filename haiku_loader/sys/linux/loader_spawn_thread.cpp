@@ -97,18 +97,12 @@ int loader_spawn_thread(void* arg)
 
 void loader_exit_thread(int retVal)
 {
-    int tid = gettid();
-    {
-        auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
-        auto it = sHostPthreadObjects.find(tid);
-        if (it != sHostPthreadObjects.end())
-        {
-            pthread_t thread = it->second;
-            sHostPthreadObjects.erase(it);
-            // Now no one in Hyclone knows about this thread.
-            pthread_detach(thread);
-        }
-    }
+    // Do not clean anything here.
+    // The owning program has a responsibility to
+    // call wait_for_thread, or the higher-level POSIX
+    // pthread_join to clean up resources.
+    // wait_for_thread may be called after the thread has exited,
+    // so cleaning information here results in a loss of data.
     pthread_exit((void*)(intptr_t)retVal);
 }
 
