@@ -203,10 +203,7 @@ bool server_setup_packagefs(haiku_fs_info& info)
         {
             std::cerr << "Uninstalling package: " << kvp.first << std::endl;
             boot->RemovePackage(kvp.first);
-            if (write)
-            {
-                boot->WriteToDisk(root);
-            }
+            boot->WriteToDisk(root);
         }
         else if (it->second > kvp.second)
         {
@@ -215,11 +212,8 @@ bool server_setup_packagefs(haiku_fs_info& info)
             Package package((packagesPath / (it->first + ".hpkg")).string());
             std::shared_ptr<Entry> entry = package.GetRootEntry();
             system->Merge(entry);
-            if (write)
-            {
-                boot->WriteToDisk(root);
-            }
-            boot->Drop(!write);
+            boot->WriteToDisk(root);
+            boot->Drop();
         }
         else
         {
@@ -238,12 +232,11 @@ bool server_setup_packagefs(haiku_fs_info& info)
         Package package((packagesPath / (pkg.first + ".hpkg")).string());
         std::shared_ptr<Entry> entry = package.GetRootEntry();
         system->Merge(entry);
-        if (write)
-        {
-            boot->WriteToDisk(root);
-        }
-        boot->Drop(!write);
+        boot->WriteToDisk(root);
+        boot->Drop();
     }
+
+    std::cerr << "Done extracting packagefs." << std::endl;
 
     std::filesystem::path systemPath = root / "boot" / "system";
 

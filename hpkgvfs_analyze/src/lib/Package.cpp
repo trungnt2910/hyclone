@@ -216,6 +216,12 @@ namespace HpkgVfs
 
                 package->SetData(std::move(buffer));
             }
+            else
+            {
+                // This updates the internal state in the entry, preventing
+                // an operation that writes an empty file to disk.
+                package->Drop(true);
+            }
         }
 
         package_links_self->SetTarget("../..");
