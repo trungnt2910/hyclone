@@ -97,18 +97,9 @@ int loader_spawn_thread(void* arg)
 
 void loader_exit_thread(int retVal)
 {
-    int tid = gettid();
-    {
-        auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
-        auto it = sHostPthreadObjects.find(tid);
-        if (it != sHostPthreadObjects.end())
-        {
-            pthread_t thread = it->second;
-            sHostPthreadObjects.erase(it);
-            // Now no one in Hyclone knows about this thread.
-            pthread_detach(thread);
-        }
-    }
+    // Don't clean anything here, pthread states
+    // in the loader will be cleaned when the app calls
+    // wait_for_thread
     pthread_exit((void*)(intptr_t)retVal);
 }
 
@@ -125,7 +116,16 @@ int loader_wait_for_thread(int thread_id, int* retVal)
         thread = it->second;
     }
     // Zero if succeeds, positive error code on error.
-    return -pthread_join(thread, (void**)retVal);
+    int error = pthread_join(thread, (void**)retVal);
+    if (error != 0)
+    {
+        return -error;
+    }
+    {
+        auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
+        sHostPthreadObjects.erase(thread_id);
+    }
+    return 0;
 }
 
 void* loader_pthread_entry_trampoline(void* arg)

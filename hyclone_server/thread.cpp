@@ -105,6 +105,7 @@ intptr_t server_hserver_call_register_thread_info(hserver_context& context, void
     threadInfo.sem = info.sem;
     threadInfo.stack_base = info.stack_base;
     threadInfo.stack_end = info.stack_end;
+    threadInfo.state = info.state;
 
     // Used when registering a newly spawned thread.
     if (threadInfo.state == B_THREAD_SUSPENDED)
