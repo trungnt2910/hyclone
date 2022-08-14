@@ -14,6 +14,7 @@ static const char* kHostMountPoint = "/SystemRoot/";
 static std::vector<std::string> sHaikuPrefixParts;
 
 static std::vector<std::string> GetParts(const std::string& path);
+static std::string HaikuPathFromFdAndPath(int fd, const char* path);
 
 bool loader_init_vchroot(const char* hprefix)
 {
@@ -144,31 +145,7 @@ size_t loader_vchroot_unexpand(const char* hostPath, char* path, size_t size)
 
 size_t loader_vchroot_expandat(int fd, const char* path, char* hostPath, size_t size)
 {
-    std::string haikuPath;
-    if (path[0] == '/')
-    {
-        haikuPath = path;
-    }
-    else if (fd >= 0)
-    {
-        // For some reasons, std::canonical() does not work.
-        char fdPath[PATH_MAX];
-        readlink(("/proc/self/fd/" + std::to_string(fd)).c_str(), fdPath, sizeof(fdPath));
-        size_t length = loader_vchroot_unexpand(fdPath, NULL, 0);
-        haikuPath = std::string(length, '\0');
-        loader_vchroot_unexpand(fdPath, haikuPath.data(), length);
-        if (haikuPath.back() != '/')
-        {
-            haikuPath += "/";
-        }
-        haikuPath += path;
-    }
-    else
-    {
-        // For relative paths at cwd, let loader_vchroot_expand handle.
-        haikuPath = path;
-    }
-
+    std::string haikuPath = HaikuPathFromFdAndPath(fd, path);
     return loader_vchroot_expand(haikuPath.c_str(), hostPath, size);
 }
 
@@ -196,6 +173,57 @@ size_t loader_vchroot_unexpandat(int fd, const char* hostPath, char* path, size_
         hostRealPath = hostPath;
     }
     return loader_vchroot_unexpand(hostRealPath.c_str(), path, size);
+}
+
+#include <iostream>
+
+size_t loader_vchroot_expandlink(const char* path, char* hostPath, size_t size)
+{
+    std::string currentPath;
+    const char* oldPath = path;
+    while (true)
+    {
+        std::string currentHostPath(PATH_MAX, '\0');
+        size_t currentHostPathLength = loader_vchroot_expand(path, currentHostPath.data(), currentHostPath.size());
+        if (currentHostPathLength > currentHostPath.size())
+        {
+            currentHostPath.resize(currentHostPathLength);
+            loader_vchroot_expand(path, currentHostPath.data(), currentHostPath.size());
+        }
+        else
+        {
+            currentHostPath.resize(currentHostPathLength);
+        }
+
+        if (!std::filesystem::is_symlink(currentHostPath))
+        {
+            //std::cerr << "loader_vchroot_expandlink: expanded from " << oldPath << " to " << currentHostPath << std::endl;
+            if (hostPath != NULL)
+            {
+                strncpy(hostPath, currentHostPath.c_str(), size);
+            }
+            return currentHostPath.size();
+        }
+
+        auto linkPath = std::filesystem::read_symlink(currentHostPath);
+        if (linkPath.is_relative())
+        {
+            currentPath = std::filesystem::path(path).parent_path() / linkPath;
+        }
+        else
+        {
+            currentPath = linkPath.string();
+        }
+
+        // Continue expanding the link.
+        path = currentPath.c_str();
+    }
+}
+
+size_t loader_vchroot_expandlinkat(int fd, const char* path, char* hostPath, size_t size)
+{
+    std::string haikuPath = HaikuPathFromFdAndPath(fd, path);
+    return loader_vchroot_expand(haikuPath.c_str(), hostPath, size);
 }
 
 std::vector<std::string> GetParts(const std::string& path)
@@ -255,4 +283,34 @@ std::vector<std::string> GetParts(const std::string& path)
     }
 
     return parts;
+}
+
+std::string HaikuPathFromFdAndPath(int fd, const char* path)
+{
+    std::string haikuPath;
+    if (path[0] == '/')
+    {
+        haikuPath = path;
+    }
+    else if (fd >= 0)
+    {
+        // For some reasons, std::canonical() does not work.
+        char fdPath[PATH_MAX];
+        readlink(("/proc/self/fd/" + std::to_string(fd)).c_str(), fdPath, sizeof(fdPath));
+        size_t length = loader_vchroot_unexpand(fdPath, NULL, 0);
+        haikuPath = std::string(length, '\0');
+        loader_vchroot_unexpand(fdPath, haikuPath.data(), length);
+        if (haikuPath.back() != '/')
+        {
+            haikuPath += "/";
+        }
+        haikuPath += path;
+    }
+    else
+    {
+        // For relative paths at cwd, let loader_vchroot_expand handle.
+        haikuPath = path;
+    }
+
+    return haikuPath;
 }

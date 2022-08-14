@@ -80,6 +80,7 @@ struct hostcalls
     size_t (*vchroot_unexpand)(const char* hostPath, char* path, size_t size);
     size_t (*vchroot_expandat)(int fd, const char* path, char* hostPath, size_t size);
     size_t (*vchroot_unexpandat)(int fd, const char* path, char* hostPath, size_t size);
+    size_t (*vchroot_expandlink)(const char* path, char* hostPath, size_t size);
 
     // Hooks
     void (*at_exit)(int value);

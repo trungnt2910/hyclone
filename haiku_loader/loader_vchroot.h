@@ -18,6 +18,9 @@ size_t loader_vchroot_unexpand(const char* hostPath, char* path, size_t size);
 size_t loader_vchroot_expandat(int fd, const char* path, char* hostPath, size_t size);
 size_t loader_vchroot_unexpandat(int fd, const char* path, char* hostPath, size_t size);
 
+// Like loader_vchroot_expand, but traverses symlinks.
+size_t loader_vchroot_expandlink(const char* path, char* hostPath, size_t size);
+
 bool loader_init_vchroot(const char* hprefix);
 
 extern std::string gHaikuPrefix;

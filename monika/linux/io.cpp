@@ -260,17 +260,35 @@ int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, h
     if (path != NULL)
     {
         char hostPath[PATH_MAX];
-        if (GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath)) < 0)
-        {
-            return HAIKU_POSIX_EBADF;
-        }
 
         if (traverseLink)
         {
+            long expandStatus = GET_HOSTCALLS()->vchroot_expandlink(path, hostPath, sizeof(hostPath));
+
+            if (expandStatus < 0)
+            {
+                return HAIKU_POSIX_ENOENT;
+            }
+            else if (expandStatus > sizeof(hostPath))
+            {
+                return HAIKU_POSIX_ENAMETOOLONG;
+            }
+
             result = LINUX_SYSCALL2(__NR_stat, hostPath, &linuxstat);
         }
         else
         {
+            long expandStatus = GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath));
+
+            if (expandStatus < 0)
+            {
+                return HAIKU_POSIX_ENOENT;
+            }
+            else if (expandStatus > sizeof(hostPath))
+            {
+                return HAIKU_POSIX_ENAMETOOLONG;
+            }
+
             result = LINUX_SYSCALL2(__NR_lstat, hostPath, &linuxstat);
         }
     }
@@ -388,9 +406,23 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
     else
     {
         char hostPath[PATH_MAX];
-        if (GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath)) < 0)
+        long expandStatus;
+        if (!traverseLink)
         {
-            return HAIKU_POSIX_EBADF;
+            expandStatus = GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath));
+        }
+        else
+        {
+            expandStatus = GET_HOSTCALLS()->vchroot_expandlink(path, hostPath, sizeof(hostPath));
+        }
+
+        if (expandStatus < 0)
+        {
+            return HAIKU_POSIX_ENOENT;
+        }
+        else if (expandStatus > sizeof(hostPath))
+        {
+            return HAIKU_POSIX_ENAMETOOLONG;
         }
 
         if (statMask & B_STAT_MODE)
@@ -483,9 +515,24 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
     int linuxMode = ModeBToLinux(perms);
 
     char hostPath[PATH_MAX];
-    if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
+
+    long expandStatus;
+    if (noTraverse)
     {
-        return HAIKU_POSIX_EBADF;
+        expandStatus = GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath));
+    }
+    else
+    {
+        expandStatus = GET_HOSTCALLS()->vchroot_expandlink(path, hostPath, sizeof(hostPath));
+    }
+
+    if (expandStatus < 0)
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+    else if (expandStatus > sizeof(hostPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
     }
 
     if (noTraverse)
@@ -554,7 +601,7 @@ int MONIKA_EXPORT _kern_access(int fd, const char* path, int mode, bool effectiv
     long status;
 
     char hostPath[PATH_MAX];
-    if (GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath)) < 0)
+    if (GET_HOSTCALLS()->vchroot_expandlink(path, hostPath, sizeof(hostPath)) < 0)
     {
         return HAIKU_POSIX_EBADF;
     }
