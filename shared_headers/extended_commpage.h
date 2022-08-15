@@ -46,6 +46,13 @@ struct hostcalls
     void (*lock_subsystem)(int* subsystemId);
     void (*unlock_subsystem)(int subsystemId);
 
+    // Id map
+    void* (*idmap_create)();
+    void (*idmap_destroy)(void* idmap);
+    int (*idmap_add)(void* idmap, void* data);
+    void* (*idmap_get)(void* idmap, int id);
+    void (*idmap_remove)(void* idmap, int id);
+
     // Fork
     int (*fork)();
     int (*exec)(const char* path, const char* const* flatArgs, size_t flatArgsSize, int argc, int envc, int umask);

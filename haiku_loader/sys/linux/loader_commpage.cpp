@@ -11,6 +11,7 @@
 #include "haiku_tls.h"
 #include "loader_exec.h"
 #include "loader_fork.h"
+#include "loader_idmap.h"
 #include "loader_lock.h"
 #include "loader_mutex.h"
 #include "loader_readdir.h"
@@ -79,6 +80,12 @@ void* loader_allocate_commpage()
 
     hostcalls_ptr->lock_subsystem = loader_lock_subsystem;
     hostcalls_ptr->unlock_subsystem = loader_unlock_subsystem;
+
+    hostcalls_ptr->idmap_create = loader_idmap_create;
+    hostcalls_ptr->idmap_destroy = loader_idmap_destroy;
+    hostcalls_ptr->idmap_add = loader_idmap_add;
+    hostcalls_ptr->idmap_get = loader_idmap_get;
+    hostcalls_ptr->idmap_remove = loader_idmap_remove;
 
     hostcalls_ptr->fork = loader_fork;
     hostcalls_ptr->exec = loader_exec;

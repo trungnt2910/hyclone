@@ -16,7 +16,7 @@ set(monika_sources
     signal_conversion.cpp
     signal_restore.S
     stringutils.cpp
-    
+
     debug.cpp
     fcntl.cpp
     image.cpp
@@ -33,6 +33,7 @@ set(monika_sources
     sysinfo.cpp
     threading.cpp
     time.cpp
+    timer.cpp
     userid.cpp)
 
 add_library(monika STATIC ${monika_sources})
