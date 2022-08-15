@@ -192,8 +192,10 @@ bool server_setup_packagefs(haiku_fs_info& info)
 
     for (const auto& pair : toRename)
     {
-        std::cerr << "Renaming " << pair.first << " to " << pair.second << std::endl;
-        std::filesystem::rename(pair.first, pair.second);
+        const std::filesystem::path& oldName = pair.first;
+        auto newName = oldName.parent_path() / pair.second;
+        std::cerr << "Renaming " << oldName << " to " << newName << std::endl;
+        std::filesystem::rename(oldName, newName);
     }
 
     for (const auto& kvp: installedPackages)
