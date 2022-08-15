@@ -101,6 +101,18 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
             TermiosLinuxToB(linux_termios, *haiku_termios);
             return B_OK;
         }
+        case HAIKU_TCSETA:
+        {
+            const struct haiku_termios* haiku_termios = (const struct haiku_termios*)buffer;
+            linux_termios linux_termios;
+            TermiosBToLinux(*haiku_termios, linux_termios);
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCSETS, &linux_termios);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            return B_OK;
+        }
         case HAIKU_TCSETAW:
         {
             const struct haiku_termios* haiku_termios = (const struct haiku_termios*)buffer;
@@ -241,7 +253,7 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
         STUB_IOCTL(FIOSEEKDATA);
         STUB_IOCTL(FIOSEEKHOLE);
         //STUB_IOCTL(TCGETA);
-        STUB_IOCTL(TCSETA);
+        //STUB_IOCTL(TCSETA);
         //STUB_IOCTL(TCSETAF);
         //STUB_IOCTL(TCSETAW);
         STUB_IOCTL(TCWAITEVENT);
