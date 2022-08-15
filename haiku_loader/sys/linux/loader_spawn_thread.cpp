@@ -115,12 +115,17 @@ int loader_wait_for_thread(int thread_id, int* retVal)
         }
         thread = it->second;
     }
+    // A temporary pointer.
+    // Attempting to cast retVal (a int*) to a void** on 64-bit
+    // platforms may corrupt data during assignment.
+    void* retPtr;
     // Zero if succeeds, positive error code on error.
-    int error = pthread_join(thread, (void**)retVal);
+    int error = pthread_join(thread, &retPtr);
     if (error != 0)
     {
         return -error;
     }
+    *retVal = (int)(intptr_t)retPtr;
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
         sHostPthreadObjects.erase(thread_id);
