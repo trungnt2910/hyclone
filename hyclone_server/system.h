@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "id_map.h"
+#include "server_apploadnotification.h"
 
 class Process;
 class Port;
@@ -27,6 +28,7 @@ private:
     IdMap<std::shared_ptr<Semaphore>, int> _semaphores;
     IdMap<std::shared_ptr<haiku_fs_info>, int> _fsInfos;
     std::mutex _lock;
+    AppLoadNotificationService _appLoadNotificationService;
     System() = default;
     ~System() = default;
 public:
@@ -62,6 +64,9 @@ public:
 
     void Shutdown();
     bool IsShuttingDown() const { return _isShuttingDown; }
+
+    AppLoadNotificationService& GetAppLoadNotificationService() { return _appLoadNotificationService; }
+    const AppLoadNotificationService& GetAppLoadNotificationService() const { return _appLoadNotificationService; }
 
     std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(_lock); }
 

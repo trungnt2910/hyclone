@@ -18,6 +18,7 @@
 #include "loader_reservedrange.h"
 #include "loader_servercalls.h"
 #include "loader_signal.h"
+#include "loader_spawn.h"
 #include "loader_spawn_thread.h"
 #include "loader_sysinfo.h"
 #include "loader_systemtime.h"
@@ -89,6 +90,7 @@ void* loader_allocate_commpage()
 
     hostcalls_ptr->fork = loader_fork;
     hostcalls_ptr->exec = loader_exec;
+    hostcalls_ptr->spawn = loader_spawn;
 
     hostcalls_ptr->spawn_thread = loader_spawn_thread;
     hostcalls_ptr->exit_thread = loader_exit_thread;

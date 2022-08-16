@@ -17,6 +17,7 @@ add_executable(hyclone_server
     image.cpp
     port.cpp
     process.cpp
+    server_apploadnotification.cpp
     server_dispatch.cpp
     server_filesystem.cpp
     server_prefix.cpp

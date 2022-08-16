@@ -56,6 +56,7 @@ struct hostcalls
     // Fork
     int (*fork)();
     int (*exec)(const char* path, const char* const* flatArgs, size_t flatArgsSize, int argc, int envc, int umask);
+    int (*spawn)(const char* path, const char* const* flatArgs, size_t flatArgsSize, int argc, int envc, int priority, int flags, int errorPort, int errorToken);
 
     // Thread
     int (*spawn_thread)(void* thread_creation_attributes);

@@ -12,6 +12,7 @@
 #include "extended_commpage.h"
 #include "linux_syscall.h"
 #include "signal_conversion.h"
+#include "syscall_load_image.h"
 
 enum
 {
@@ -87,6 +88,38 @@ int MONIKA_EXPORT _kern_exec(const char *path, const char* const* flatArgs,
 
     // Should never reach here.
     return status;
+}
+
+thread_id MONIKA_EXPORT _kern_load_image(const char* const* flatArgs,
+    size_t flatArgsSize, int32 argCount, int32 envCount,
+    int32 priority, uint32 flags, port_id errorPort,
+    uint32 errorToken)
+{
+    if (argCount < 1)
+    {
+        return B_BAD_VALUE;
+    }
+
+    long status = GET_HOSTCALLS()->spawn(flatArgs[0], flatArgs, flatArgsSize, argCount, envCount, priority, flags, errorPort, errorToken);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    int pid = status;
+
+    if (flags & B_WAIT_TILL_LOADED)
+    {
+        status = GET_SERVERCALLS()->wait_for_app_load(pid);
+
+        if (status < 0)
+        {
+            return status;
+        }
+    }
+
+    return pid;
 }
 
 haiku_pid_t MONIKA_EXPORT _kern_wait_for_child(thread_id child, uint32 flags,

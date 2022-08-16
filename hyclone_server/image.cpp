@@ -4,7 +4,9 @@
 #include "haiku_errors.h"
 #include "haiku_image.h"
 #include "process.h"
+#include "server_apploadnotification.h"
 #include "server_servercalls.h"
+#include "server_workers.h"
 #include "system.h"
 
 intptr_t server_hserver_call_register_image(hserver_context& context, void* image_info, std::size_t size)
@@ -134,6 +136,21 @@ intptr_t server_hserver_call_unregister_image(hserver_context& context, int imag
 
 intptr_t server_hserver_call_image_relocated(hserver_context& context, int image_id)
 {
-    std::cerr << "[" << context.pid << "/" << context.tid << "]" << "stub: server_hserver_call_image_relocated" << std::endl;
+    const haiku_extended_image_info* imageInfo;
+
+    {
+        auto lock = context.process->Lock();
+        imageInfo = &context.process->GetImage(image_id);
+    }
+
+    if (imageInfo->basic_info.type == B_APP_IMAGE)
+    {
+        server_worker_run([](int pid)
+        {
+            auto& service = System::GetInstance().GetAppLoadNotificationService();
+            service.NotifyAppLoad(pid, B_OK, kDefaultNotificationTimeout);
+        }, std::move(context.pid));
+    }
+
     return B_OK;
 }

@@ -51,6 +51,8 @@ void MONIKA_EXPORT _kern_loading_app_failed(status_t error)
 
     trace("_kern_loading_app_failed");
 
+    GET_SERVERCALLS()->notify_loading_app(error);
+
     if (__gCommPageAddress != NULL)
     {
         GET_HOSTCALLS()->at_exit(error);

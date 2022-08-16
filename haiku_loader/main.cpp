@@ -12,6 +12,7 @@
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 rld_export **__gRuntimeLoaderPtr;
 runtime_loader_info gRuntimeLoaderInfo;
@@ -182,7 +183,9 @@ int main(int argc, char** argv, char** envp)
 {
 	if (argc <= 1)
 	{
-		std::cout << "Usage: " << argv[0] << " [--umask <umask>] <path to haiku executable> [args]" << std::endl;
+		std::cout << "Usage: " << argv[0]
+			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--] "
+			<< "<path to haiku executable> [args]" << std::endl;
 		return 1;
 	}
 
@@ -219,20 +222,61 @@ int main(int argc, char** argv, char** envp)
     uint8* user_args_memory = NULL;
 	user_space_program_args args;
 
-	if (strcmp(argv[0], "--umask") == 0)
+	args.umask = -1;
+	args.error_port = -1;
+	args.error_token = 0;
+
+	while (strncmp(argv[0], "--", 2) == 0)
 	{
+		const char* currentArg = argv[0];
 		++argv; --argc;
-		if (argc <= 0)
+		try
 		{
-			std::cout << "Missing value for --umask flag.";
+			if (strcmp(currentArg, "--umask") == 0)
+			{
+				if (argc <= 0)
+				{
+					std::cout << "Missing value for --umask flag.";
+					return 1;
+				}
+				args.umask = std::stoll(argv[0]);
+				++argv; --argc;
+			}
+			else if (strcmp(currentArg, "--error-port") == 0)
+			{
+				if (argc <= 0)
+				{
+					std::cout << "Missing value for --error-port flag.";
+					return 1;
+				}
+				args.error_port = std::stoll(argv[0]);
+				++argv; --argc;
+			}
+			else if (strcmp(currentArg, "--error-token") == 0)
+			{
+				if (argc <= 0)
+				{
+					std::cout << "Missing value for --error-token flag.";
+					return 1;
+				}
+				args.error_token = std::stoll(argv[0]);
+				++argv; --argc;
+			}
+			else if (strcmp(currentArg, "--") == 0)
+			{
+				break;
+			}
+			else
+			{
+				std::cout << "Unknown flag: " << currentArg << std::endl;
+				return 1;
+			}
+		}
+		catch(const std::exception& e)
+		{
+			std::cerr << "Error parsing value for " << currentArg << ": " << e.what() << std::endl;
 			return 1;
 		}
-		args.umask = strtoll(argv[0], NULL, 8);
-		++argv; --argc;
-	}
-	else
-	{
-		args.umask = -1;
 	}
 
     loader_build_args(user_args_memory, args, argv, envp);
