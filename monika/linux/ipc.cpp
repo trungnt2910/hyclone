@@ -19,6 +19,13 @@ port_id MONIKA_EXPORT _kern_create_port(int32 queue_length, const char *name)
     return GET_SERVERCALLS()->create_port(queue_length, name, strlen(name));
 }
 
+size_t MONIKA_EXPORT _kern_read_port_etc(port_id port, int32 *msgCode,
+    void *msgBuffer, size_t bufferSize, uint32 flags,
+    bigtime_t timeout)
+{
+    return GET_SERVERCALLS()->read_port_etc(port, msgCode, msgBuffer, bufferSize, flags, timeout);
+}
+
 status_t MONIKA_EXPORT _kern_write_port_etc(port_id port, int32 messageCode, const void *msgBuffer,
     size_t bufferSize, uint32 flags, bigtime_t timeout)
 {

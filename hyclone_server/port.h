@@ -16,7 +16,7 @@ class Port
     friend class System;
 private:
     haiku_port_info _info;
-    std::queue<std::vector<char>> _messages;
+    std::queue<std::pair<int, std::vector<char>>> _messages;
     std::mutex _lock;
 public:
     Port(int pid, int capacity, const char* name);
@@ -24,8 +24,8 @@ public:
 
     std::unique_lock<std::mutex> Lock() { return std::unique_lock(_lock); }
 
-    void Write(std::vector<char>&& message);
-    std::vector<char> Read();
+    void Write(int code, std::vector<char>&& message);
+    std::pair<int, std::vector<char>> Read();
 
     std::string GetName() const { return _info.name; }
     const haiku_port_info& GetInfo() const { return _info; }
