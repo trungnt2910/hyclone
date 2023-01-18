@@ -218,5 +218,15 @@ void SigHandlerTrampoline(int signal)
 
 void SigActionTrampoline(int signal, siginfo_t *siginfo, void *context)
 {
-    panic("stub: SigActionTrampoline");
+    signal = SignalLinuxToB(signal);
+
+    haiku_sigaction_t handler = (haiku_sigaction_t)
+        haiku_sigaction_get_sa_sigaction(sHaikuSignalHandlers[signal]);
+
+    haiku_siginfo_t haikuSiginfo;
+    SiginfoLinuxToB(*siginfo, haikuSiginfo);
+
+    // TODO: Marshal context to Haiku's context type.
+
+    handler(signal, &haikuSiginfo, context);
 }
