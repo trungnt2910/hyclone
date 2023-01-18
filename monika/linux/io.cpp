@@ -664,6 +664,11 @@ int MONIKA_EXPORT _kern_access(int fd, const char* path, int mode, bool effectiv
         fd = AT_FDCWD;
     }
 
+    if (path == nullptr || path[0] == '\0')
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+
     int linuxMode = 0;
 
     if (mode == HAIKU_F_OK)
