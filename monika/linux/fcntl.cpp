@@ -89,7 +89,26 @@ void FlockLinuxToB(const struct flock& linuxFlock, struct haiku_flock& haikuFloc
     panic("stub: FlockLinuxToB");
 }
 
+short FlockLTypeBToLinux(short type)
+{
+    switch (type)
+    {
+        case HAIKU_F_RDLCK:
+            return F_RDLCK;
+        case HAIKU_F_WRLCK:
+            return F_WRLCK;
+        case HAIKU_F_UNLCK:
+            return F_UNLCK;
+        default:
+            return -1;
+    }
+}
+
 void FlockBToLinux(const struct haiku_flock& haikuFlock, struct flock& linuxFlock)
 {
-    panic("stub: FlockBToLinux");
+    linuxFlock.l_type = FlockLTypeBToLinux(haikuFlock.l_type);
+    linuxFlock.l_whence = SeekTypeBToLinux(haikuFlock.l_whence);
+    linuxFlock.l_start = haikuFlock.l_start;
+    linuxFlock.l_len = haikuFlock.l_len;
+    linuxFlock.l_pid = haikuFlock.l_pid;
 }

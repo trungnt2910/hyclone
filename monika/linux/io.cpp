@@ -97,10 +97,6 @@ struct linux_dirent
     */
 };
 
-#define HAIKU_SEEK_SET 0
-#define HAIKU_SEEK_CUR 1
-#define HAIKU_SEEK_END 2
-
 enum
 {
     B_STAT_MODE                 = 0x0001,
@@ -153,7 +149,6 @@ typedef struct haiku_fd_set
 
 static int ModeBToLinux(int mode);
 static int ModeLinuxToB(int mode);
-static int SeekTypeBToLinux(int seekType);
 static void FdSetBToLinux(const haiku_fd_set& fdSet, fd_set& linuxFdSet);
 static int PollEventsBToLinux(int pollEvents);
 static int PollEventsLinuxToB(int pollEvents);
@@ -1190,21 +1185,6 @@ int ModeLinuxToB(int mode)
 {
     // Hopefully they're the same.
     return mode;
-}
-
-int SeekTypeBToLinux(int seekType)
-{
-    switch (seekType)
-    {
-    case HAIKU_SEEK_SET:
-        return SEEK_SET;
-    case HAIKU_SEEK_CUR:
-        return SEEK_CUR;
-    case HAIKU_SEEK_END:
-        return SEEK_END;
-    default:
-        panic("SeekTypeBToLinux: Unknown seek type.");
-    }
 }
 
 void FdSetBToLinux(const struct haiku_fd_set& set, fd_set& linuxSet)

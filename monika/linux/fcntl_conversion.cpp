@@ -58,3 +58,22 @@ int OFlagsLinuxToB(int flags)
 
     return haikuFlags;
 }
+
+#define HAIKU_SEEK_SET 0
+#define HAIKU_SEEK_CUR 1
+#define HAIKU_SEEK_END 2
+
+int SeekTypeBToLinux(int seekType)
+{
+    switch (seekType)
+    {
+    case HAIKU_SEEK_SET:
+        return SEEK_SET;
+    case HAIKU_SEEK_CUR:
+        return SEEK_CUR;
+    case HAIKU_SEEK_END:
+        return SEEK_END;
+    default:
+        panic("SeekTypeBToLinux: Unknown seek type.");
+    }
+}
