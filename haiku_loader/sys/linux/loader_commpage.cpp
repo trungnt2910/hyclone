@@ -117,6 +117,7 @@ void* loader_allocate_commpage()
     hostcalls_ptr->vchroot_expandat = loader_vchroot_expandat;
     hostcalls_ptr->vchroot_unexpandat = loader_vchroot_unexpandat;
     hostcalls_ptr->vchroot_expandlink = loader_vchroot_expandlink;
+    hostcalls_ptr->vchroot_expandlinkat = loader_vchroot_expandlinkat;
 
     hostcalls_ptr->at_exit = NULL;
     hostcalls_ptr->printf = printf;

@@ -20,6 +20,8 @@ size_t loader_vchroot_unexpandat(int fd, const char* path, char* hostPath, size_
 
 // Like loader_vchroot_expand, but traverses symlinks.
 size_t loader_vchroot_expandlink(const char* path, char* hostPath, size_t size);
+// Like loader_vchroot_expandat, but traverses symlinks.
+size_t loader_vchroot_expandlinkat(int fd, const char* path, char* hostPath, size_t size);
 
 bool loader_init_vchroot(const char* hprefix);
 
