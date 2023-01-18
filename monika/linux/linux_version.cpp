@@ -19,24 +19,25 @@ bool is_linux_version_at_least(int major, int minor)
     int kernelMinor = 0;
 
     size_t pos = 0;
-    while (pos < sizeof(uname_info.release) && uname_info.release[pos] != '.')
+
+    while (uname_info.release[pos] != '\0' && uname_info.release[pos] != '.')
     {
         kernelMajor = kernelMajor * 10 + uname_info.release[pos] - '0';
         ++pos;
     }
 
-    if (major < kernelMajor)
-    {
-        return false;
-    }
-
     ++pos;
 
-    while (pos < sizeof(uname_info.release) && uname_info.release[pos] != '.')
+    while (uname_info.release[pos] != '\0' && uname_info.release[pos] != '.')
     {
         kernelMinor = kernelMinor * 10 + uname_info.release[pos] - '0';
         ++pos;
     }
 
-    return minor >= kernelMinor;
+    if (kernelMajor != major)
+    {
+        return kernelMajor > major;
+    }
+
+    return kernelMajor >= minor;
 }

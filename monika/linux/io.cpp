@@ -246,6 +246,50 @@ int MONIKA_EXPORT _kern_read_link(int fd, const char* path, char *buffer, size_t
     return B_OK;
 }
 
+status_t MONIKA_EXPORT _kern_create_symlink(int fd, const char *path, const char *toPath, int mode)
+{
+    // Linux does not support permissions on symlinks.
+    (void)mode;
+
+    if (fd == HAIKU_AT_FDCWD)
+    {
+        fd = AT_FDCWD;
+    }
+
+    char hostPath[PATH_MAX];
+    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
+
+    if (status < 0)
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+    else if (status > sizeof(hostPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
+    }
+
+    char hostToPath[PATH_MAX];
+    status = GET_HOSTCALLS()->vchroot_expand(toPath, hostToPath, sizeof(hostToPath));
+
+    if (status < 0)
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+    else if (status > sizeof(hostToPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
+    }
+
+    status = LINUX_SYSCALL2(__NR_symlink, hostToPath, hostPath);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, haiku_stat* st, size_t statSize)
 {
     struct stat linuxstat;
@@ -255,6 +299,11 @@ int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, h
     if (statSize > sizeof(haiku_stat))
     {
         return B_BAD_VALUE;
+    }
+
+    if (fd == HAIKU_AT_FDCWD)
+    {
+        fd = AT_FDCWD;
     }
 
     if (path != NULL)
@@ -278,7 +327,7 @@ int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, h
         }
         else
         {
-            long expandStatus = GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath));
+            long expandStatus = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
 
             if (expandStatus < 0)
             {
@@ -610,9 +659,53 @@ int MONIKA_EXPORT _kern_access(int fd, const char* path, int mode, bool effectiv
     {
         if (!is_linux_version_at_least(5, 8))
         {
-            return HAIKU_POSIX_ENOSYS;
+            struct stat linuxstat;
+            status = LINUX_SYSCALL4(__NR_newfstatat, AT_FDCWD, hostPath, &linuxstat, AT_SYMLINK_NOFOLLOW);
+
+            if (status < 0)
+            {
+                return LinuxToB(-status);
+            }
+
+            if (linuxMode == F_OK)
+            {
+                return B_OK;
+            }
+
+            int euid = LINUX_SYSCALL0(__NR_geteuid);
+
+            // root can read and write any file, and execute any file that anyone can execute.
+            if (euid == 0 && ((linuxMode & X_OK) == 0 || (linuxstat.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))))
+            {
+                return B_OK;
+            }
+
+            int granted = 0;
+
+            if (euid == linuxstat.st_uid)
+            {
+                granted |= (linuxstat.st_mode >> 6) & linuxMode;
+            }
+
+            // TODO: Check group membership.
+            if (linuxstat.st_gid == LINUX_SYSCALL0(__NR_getegid))
+            {
+                granted |= (linuxstat.st_mode >> 3) & linuxMode;
+            }
+
+            granted |= linuxstat.st_mode & linuxMode;
+
+            if (granted == linuxMode)
+            {
+                return B_OK;
+            }
+
+            return HAIKU_POSIX_EACCES;
         }
-        status = LINUX_SYSCALL4(__NR_faccessat2, AT_FDCWD, hostPath, linuxMode, AT_EACCESS);
+        else
+        {
+            status = LINUX_SYSCALL4(__NR_faccessat2, AT_FDCWD, hostPath, linuxMode, AT_EACCESS);
+        }
     }
     else
     {
@@ -965,6 +1058,30 @@ status_t MONIKA_EXPORT _kern_create_dir(int fd, const char *path, int perms)
     }
 
     status = LINUX_SYSCALL2(__NR_mkdir, hostPath, ModeBToLinux(perms));
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
+status_t MONIKA_EXPORT _kern_remove_dir(int fd, const char *path)
+{
+    char hostPath[PATH_MAX];
+    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
+
+    if (status < 0)
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+    else if (status > sizeof(hostPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
+    }
+
+    status = LINUX_SYSCALL1(__NR_rmdir, hostPath);
 
     if (status < 0)
     {
