@@ -105,6 +105,90 @@ intptr_t server_hserver_call_area_for(hserver_context& context, void* address)
     }
 }
 
+intptr_t server_hserver_call_set_memory_protection(hserver_context& context, void* address, size_t size, unsigned int protection)
+{
+    {
+        auto lock = context.process->Lock();
+        int id = -1;
+        while ((id = context.process->NextAreaId(id)) != -1)
+        {
+            auto& area = context.process->GetArea(id);
+
+            std::array<uint8_t*, 4> addresses =
+            {
+                (uint8_t*)area.address,
+                (uint8_t*)area.address + area.size,
+                (uint8_t*)address,
+                (uint8_t*)address + size
+            };
+
+            std::sort(addresses.begin(), addresses.end());
+
+            std::vector<std::pair<uint8_t*, uint8_t*>> unchangedRanges;
+            std::vector<std::pair<uint8_t*, uint8_t*>> changedRanges;
+
+            for (size_t i = 0; i + 1 < addresses.size(); ++i)
+            {
+                if (addresses[i] == addresses[i + 1])
+                {
+                    continue;
+                }
+
+                bool outsideChangedRange = addresses[i + 1] <= (uint8_t*)address || addresses[i] >= (uint8_t*)address + size;
+                bool insideExistingArea = addresses[i] >= (uint8_t*)area.address && addresses[i + 1] <= (uint8_t*)area.address + area.size;
+
+                if (insideExistingArea)
+                {
+                    if (outsideChangedRange)
+                    {
+                        unchangedRanges.emplace_back(addresses[i], addresses[i + 1]);
+                    }
+                    else
+                    {
+                        changedRanges.emplace_back(addresses[i], addresses[i + 1]);
+                    }
+                }
+            }
+
+            if (changedRanges.size() == 0)
+            {
+                // Nothing to do here, the protection hasn't changed.
+                continue;
+            }
+
+            if (unchangedRanges.size() == 0)
+            {
+                // Everything has changed.
+                area.protection = protection;
+            }
+            else
+            {
+                area.address = unchangedRanges[0].first;
+                area.size = unchangedRanges[0].second - unchangedRanges[0].first;
+
+                for (size_t i = 1; i < unchangedRanges.size(); ++i)
+                {
+                    haiku_area_info newArea = area;
+                    newArea.address = unchangedRanges[i].first;
+                    newArea.size = unchangedRanges[i].second - unchangedRanges[i].first;
+                    context.process->RegisterArea(newArea);
+                }
+
+                for (const auto& [begin, end]: changedRanges)
+                {
+                    haiku_area_info newArea = area;
+                    newArea.address = begin;
+                    newArea.size = end - begin;
+                    newArea.protection = protection;
+                    context.process->RegisterArea(newArea);
+                }
+            }
+        }
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_unmap_memory(hserver_context& context, void* address, size_t size)
 {
     {

@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
+#include "BeDefs.h"
 #include "errno_conversion.h"
 #include "export.h"
 #include "extended_commpage.h"
@@ -242,6 +243,28 @@ int MONIKA_EXPORT _kern_set_area_protection(int area, uint32_t newProtection)
     status = GET_SERVERCALLS()->set_area_protection(area, newProtection);
 
     return status;
+}
+
+status_t MONIKA_EXPORT _kern_set_memory_protection(void *address, size_t size, uint32 protection)
+{
+    int mprotect_prot = 0;
+    if (protection & B_READ_AREA)
+        mprotect_prot |= PROT_READ;
+    if (protection & B_WRITE_AREA)
+        mprotect_prot |= PROT_WRITE;
+    if (protection & B_EXECUTE_AREA)
+        mprotect_prot |= PROT_EXEC;
+
+    long status = GET_SERVERCALLS()->set_memory_protection(address, size, protection);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    status = LINUX_SYSCALL3(__NR_mprotect, address, size, mprotect_prot);
+
+    return LinuxToB(-status);
 }
 
 // This function is undocumented, but here's the behavior
