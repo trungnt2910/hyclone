@@ -21,6 +21,7 @@
 #include "haiku_fcntl.h"
 #include "haiku_poll.h"
 #include "haiku_signal.h"
+#include "haiku_uio.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
 #include "linux_version.h"
@@ -186,6 +187,44 @@ ssize_t MONIKA_EXPORT _kern_write(int fd, haiku_off_t pos, const void* buffer, s
     return bytesWritten;
 }
 
+ssize_t MONIKA_EXPORT _kern_writev(int fd, off_t pos, const struct haiku_iovec *vecs, size_t count)
+{
+    if (pos != -1)
+    {
+        off_t result = LINUX_SYSCALL3(__NR_lseek, fd, pos, SEEK_SET);
+        if (result < 0)
+        {
+            return LinuxToB(-result);
+        }
+    }
+
+    size_t memSize = ((count * sizeof(struct iovec)) + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
+    struct iovec *linuxVecs =
+        (struct iovec *)
+            LINUX_SYSCALL6(__NR_mmap, NULL, memSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+
+    if ((void*)linuxVecs == MAP_FAILED)
+    {
+        return HAIKU_POSIX_ENOMEM;
+    }
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        linuxVecs[i].iov_base = vecs[i].iov_base;
+        linuxVecs[i].iov_len = vecs[i].iov_len;
+    }
+
+    long bytesWritten = LINUX_SYSCALL3(__NR_writev, fd, linuxVecs, count);
+
+    LINUX_SYSCALL2(__NR_munmap, linuxVecs, memSize);
+
+    if (bytesWritten < 0)
+    {
+        return LinuxToB(-bytesWritten);
+    }
+
+    return bytesWritten;
+}
 
 ssize_t MONIKA_EXPORT _kern_read(int fd, haiku_off_t pos, void* buffer, size_t bufferSize)
 {
