@@ -109,6 +109,8 @@ void Process::Fork(Process& child)
 
     // No, semaphores don't seem to be inherited.
     // child._owningSemaphores = _owningSemaphores;
+
+    child._forkUnlocked = true;
 }
 
 size_t Process::ReadMemory(void* address, void* buffer, size_t size)

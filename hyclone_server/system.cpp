@@ -8,6 +8,7 @@
 #include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
+#include "server_workers.h"
 #include "system.h"
 #include "thread.h"
 
@@ -204,13 +205,14 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid)
     auto lock = system.Lock();
     system.RegisterConnection(context.conn_id, pid, tid);
 
-    std::cerr << "Registered: " << context.conn_id << " " << pid << " " << tid << std::endl;
+    std::cerr << "Connection started: " << context.conn_id << " " << pid << " " << tid << std::endl;
 
     // Might already be registered by fork().
     auto process = system.GetProcess(pid).lock();
     if (!process)
     {
         process = system.RegisterProcess(pid).lock();
+        std::cerr << "Registered process: " << context.conn_id << " " << pid << std::endl;
     }
 
     if (process)
@@ -270,14 +272,41 @@ intptr_t server_hserver_call_fork(hserver_context& context, int newPid)
         if (!child)
         {
             system.RegisterProcess(newPid);
+            std::cerr << "Registered process: " << context.conn_id << " " << newPid << " from fork parent " << context.pid << std::endl;
             child = system.GetProcess(newPid).lock();
         }
+
+        auto parentLock = context.process->Lock();
+        auto childLock = child->Lock();
+
+        // Copy information, especially area info, as soon as possible.
+        // Else, calls such as `area_for` may fail before the copy is complete.
+        context.process->Fork(*child);
+        std::cerr << context.pid << " unlocked fork for " << newPid << "." << std::endl;
     }
 
-    auto parentLock = context.process->Lock();
-    auto childLock = child->Lock();
-
-    context.process->Fork(*child);
-
     return B_OK;
+}
+
+intptr_t server_hserver_call_wait_for_fork_unlock(hserver_context& context)
+{
+    while (true)
+    {
+        {
+            auto procLock = context.process->Lock();
+
+            if (context.process->IsForkUnlocked())
+            {
+                return B_OK;
+            }
+        }
+
+        std::cerr << context.process->GetPid() <<  ": Fork not unlocked." << std::endl;
+        // Sleep for a short time as fork happens quite quickly.
+        server_worker_sleep(50);
+    }
+
+    // Should not reach here.
+    std::cerr << "server_hserver_call_wait_for_fork_unlock: Impossible code path reached." << std::endl;
+    return B_BAD_DATA;
 }

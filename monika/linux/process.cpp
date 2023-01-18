@@ -71,6 +71,10 @@ thread_id MONIKA_EXPORT _kern_fork()
             return status;
         }
     }
+    else
+    {
+        GET_SERVERCALLS()->wait_for_fork_unlock();
+    }
 
     return id;
 }

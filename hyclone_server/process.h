@@ -16,6 +16,7 @@ class Process
 {
 private:
     int _pid;
+    bool _forkUnlocked;
 
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     IdMap<haiku_extended_image_info, int> _images;
@@ -24,7 +25,7 @@ private:
     std::unordered_set<int> _owningSemaphores;
     std::unordered_set<int> _owningPorts;
 public:
-    Process(int pid): _pid(pid) {}
+    Process(int pid): _pid(pid), _forkUnlocked(false) {}
     ~Process() = default;
 
     std::unique_lock<std::mutex> Lock() { return std::unique_lock(_lock); }
@@ -51,6 +52,8 @@ public:
 
     // Copies managed information to child.
     void Fork(Process& child);
+    // Checks whether this child process has been unlocked by fork yet.
+    bool IsForkUnlocked() const { return _forkUnlocked; }
 
     const std::unordered_set<int>& GetOwningSemaphores() const { return _owningSemaphores; }
     void AddOwningSemaphore(int id) { _owningSemaphores.insert(id); }
