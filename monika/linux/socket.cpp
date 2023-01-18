@@ -136,6 +136,11 @@ ssize_t MONIKA_EXPORT _kern_recvfrom(int socket, void *data, size_t length, int 
     return status;
 }
 
+ssize_t MONIKA_EXPORT _kern_recv(int socket, void *data, size_t length, int flags)
+{
+    return _kern_recvfrom(socket, data, length, flags, NULL, NULL);
+}
+
 ssize_t MONIKA_EXPORT _kern_send(int socket, const void *data, size_t length, int flags)
 {
     int linuxFlags = SendMessageFlagsBToLinux(flags);
