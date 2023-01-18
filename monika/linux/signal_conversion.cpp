@@ -29,6 +29,9 @@ int SignalBToLinux(int signal)
     };
     switch (signal)
     {
+    case 0:
+        // Null signal, return the same.
+        return 0;
 #define SUPPORTED_SIGNAL(signal)                             \
     case HAIKU_##signal:                                     \
         return signal;
@@ -54,6 +57,9 @@ int SignalLinuxToB(int signal)
 {
     switch (signal)
     {
+    case 0:
+        // Null signal, return the same.
+        return 0;
 #define UNSUPPORTED_SIGNAL(signal)
 #define SUPPORTED_SIGNAL(signal)                             \
     case signal:                                             \

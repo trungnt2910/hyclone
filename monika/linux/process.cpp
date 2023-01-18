@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <linux/resource.h>
+#include <memory.h>
 #include <signal.h>
 #include <wait.h>
 
@@ -153,6 +154,10 @@ haiku_pid_t MONIKA_EXPORT _kern_wait_for_child(thread_id child, uint32 flags,
 
     struct rusage linuxUsageInfo;
     siginfo_t linuxInfo;
+
+    // Initialize this structure else it'll return crap.
+    memset(&linuxInfo, 0, sizeof(linuxInfo));
+
     // Always pass in linuxInfo for the pid information.
     long status = LINUX_SYSCALL5(__NR_waitid, child > 0 ? P_PID : P_ALL, child,
         &linuxInfo, linuxFlags, (usageInfo == NULL) ? NULL : &linuxUsageInfo);
