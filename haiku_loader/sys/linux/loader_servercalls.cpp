@@ -73,6 +73,19 @@ bool ServerConnection::Connect(bool forceReconnect)
         return false;
     }
 
+    int maxFd = sysconf(_SC_OPEN_MAX) - 1;
+    while (maxFd >= 0 && fcntl(maxFd, F_GETFD) != -1)
+    {
+        --maxFd;
+    }
+
+    if (maxFd >= 0)
+    {
+        dup2(_socket, maxFd);
+        close(_socket);
+        _socket = maxFd;
+    }
+
     intptr_t args[HYCLONE_SERVERCALL_MAX_ARGS + 1] =
         { SERVERCALL_ID_connect, getpid(), syscall(SYS_gettid), 0, 0, 0, 0 };
     intptr_t returnCode = -1;
