@@ -60,6 +60,28 @@ status_t MONIKA_EXPORT _kern_socketpair(int family, int type, int protocol, int 
     return B_OK;
 }
 
+status_t MONIKA_EXPORT _kern_bind(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
+{
+    struct sockaddr_storage linuxAddress;
+    memset(&linuxAddress, 0, sizeof(linuxAddress));
+
+    int length = SocketAddressBToLinux(address, addressLength, &linuxAddress);
+
+    if (length < 0)
+    {
+        return HAIKU_POSIX_ENOSYS;
+    }
+
+    long status = LINUX_SYSCALL3(__NR_bind, socket, (struct sockaddr *)&linuxAddress, length);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 status_t MONIKA_EXPORT _kern_connect(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
 {
     struct sockaddr_storage linuxAddress;
@@ -80,6 +102,65 @@ status_t MONIKA_EXPORT _kern_connect(int socket, const struct haiku_sockaddr *ad
     }
 
     return B_OK;
+}
+
+status_t MONIKA_EXPORT _kern_listen(int socket, int backlog)
+{
+    long status = LINUX_SYSCALL2(__NR_listen, socket, backlog);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
+int MONIKA_EXPORT _kern_accept(int socket, struct haiku_sockaddr *address,
+    haiku_socklen_t *_addressLength)
+{
+    struct sockaddr_storage linuxAddressStorage;
+    memset(&linuxAddressStorage, 0, sizeof(linuxAddressStorage));
+    socklen_t linuxAddressLengthStorage = 0;
+
+    struct sockaddr* linuxAddress = NULL;
+    socklen_t* linuxAddressLength = NULL;
+
+    if (address != NULL || _addressLength != NULL)
+    {
+        linuxAddress = (struct sockaddr*)&linuxAddressStorage;
+        linuxAddressLength = &linuxAddressLengthStorage;
+    }
+
+    long fd = LINUX_SYSCALL3(__NR_accept, socket, linuxAddress, linuxAddressLength);
+
+    if (fd < 0)
+    {
+        return LinuxToB(-fd);
+    }
+
+    if (address != NULL || _addressLength != NULL)
+    {
+        struct haiku_sockaddr_storage haikuAddressStorage;
+        memset(&haikuAddressStorage, 0, sizeof(haikuAddressStorage));
+
+        int realLength = SocketAddressLinuxToB(linuxAddress, &haikuAddressStorage);
+
+        haiku_socklen_t memoryLength = (_addressLength == NULL) ? 0 : *_addressLength;
+        haiku_socklen_t copyLength = std::min(memoryLength, (haiku_socklen_t)realLength);
+
+        if (address != NULL)
+        {
+            memcpy(address, &haikuAddressStorage, copyLength);
+        }
+
+        if (_addressLength != NULL)
+        {
+            *_addressLength = copyLength;
+        }
+    }
+
+    return fd;
 }
 
 ssize_t MONIKA_EXPORT _kern_recvfrom(int socket, void *data, size_t length, int flags,
@@ -104,12 +185,12 @@ ssize_t MONIKA_EXPORT _kern_recvfrom(int socket, void *data, size_t length, int 
 
     int linuxFlags = SendMessageFlagsBToLinux(flags);
 
-    long status = LINUX_SYSCALL6(__NR_recvfrom, socket, data, length,
+    long bytesReceived = LINUX_SYSCALL6(__NR_recvfrom, socket, data, length,
         linuxFlags, linuxAddress, linuxAddressLength);
 
-    if (status < 0)
+    if (bytesReceived < 0)
     {
-        return LinuxToB(-status);
+        return LinuxToB(-bytesReceived);
     }
 
     if (address != NULL || _addressLength != NULL)
@@ -133,12 +214,40 @@ ssize_t MONIKA_EXPORT _kern_recvfrom(int socket, void *data, size_t length, int 
         }
     }
 
-    return status;
+    return bytesReceived;
 }
 
 ssize_t MONIKA_EXPORT _kern_recv(int socket, void *data, size_t length, int flags)
 {
     return _kern_recvfrom(socket, data, length, flags, NULL, NULL);
+}
+
+ssize_t MONIKA_EXPORT _kern_sendto(int socket, const void *data, size_t length,
+    int flags, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
+{
+    struct sockaddr_storage linuxAddressStorage;
+    memset(&linuxAddressStorage, 0, sizeof(linuxAddressStorage));
+
+    struct sockaddr* linuxAddress = NULL;
+    socklen_t linuxAddressLength = 0;
+
+    if (address != NULL)
+    {
+        linuxAddress = (struct sockaddr*)&linuxAddressStorage;
+        linuxAddressLength = SocketAddressBToLinux(address, addressLength, &linuxAddressStorage);
+    }
+
+    int linuxFlags = SendMessageFlagsBToLinux(flags);
+
+    long bytesSent = LINUX_SYSCALL6(__NR_sendto, socket, data, length,
+        linuxFlags, linuxAddress, linuxAddressLength);
+
+    if (bytesSent < 0)
+    {
+        return LinuxToB(-bytesSent);
+    }
+
+    return bytesSent;
 }
 
 ssize_t MONIKA_EXPORT _kern_send(int socket, const void *data, size_t length, int flags)
