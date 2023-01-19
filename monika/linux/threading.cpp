@@ -7,6 +7,7 @@
 #include "haiku_errors.h"
 #include "haiku_thread.h"
 #include "linux_debug.h"
+#include "linux_syscall.h"
 
 extern "C"
 {
@@ -36,6 +37,11 @@ status_t MONIKA_EXPORT _kern_exit_thread(status_t returnValue)
 {
     GET_HOSTCALLS()->exit_thread(returnValue);
     return 0;
+}
+
+void _kern_thread_yield(void)
+{
+    LINUX_SYSCALL0(__NR_sched_yield);
 }
 
 status_t MONIKA_EXPORT _kern_wait_for_thread(thread_id thread, status_t *_returnCode)
