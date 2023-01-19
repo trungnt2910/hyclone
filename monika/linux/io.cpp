@@ -150,6 +150,7 @@ typedef struct haiku_fd_set
 static int ModeBToLinux(int mode);
 static int ModeLinuxToB(int mode);
 static void FdSetBToLinux(const haiku_fd_set& fdSet, fd_set& linuxFdSet);
+static void FdSetLinuxToB(const fd_set& linuxFdSet, haiku_fd_set& fdSet);
 static int PollEventsBToLinux(int pollEvents);
 static int PollEventsLinuxToB(int pollEvents);
 static bool IsTty(int fd);
@@ -1076,6 +1077,43 @@ ssize_t MONIKA_EXPORT _kern_select(int numfds,
         return LinuxToB(-result);
     }
 
+    if (readSet != NULL)
+    {
+        // Not a timeout.
+        if (result > 0)
+        {
+            FdSetLinuxToB(linuxReadSetMemory, *readSet);
+        }
+        else
+        {
+            HAIKU_FD_ZERO(readSet);
+        }
+    }
+
+    if (writeSet != NULL)
+    {
+        if (result > 0)
+        {
+            FdSetLinuxToB(linuxReadSetMemory, *writeSet);
+        }
+        else
+        {
+            HAIKU_FD_ZERO(writeSet);
+        }
+    }
+
+    if (errorSet != NULL)
+    {
+        if (result > 0)
+        {
+            FdSetLinuxToB(linuxReadSetMemory, *errorSet);
+        }
+        else
+        {
+            HAIKU_FD_ZERO(errorSet);
+        }
+    }
+
     return result;
 }
 
@@ -1264,11 +1302,23 @@ int ModeLinuxToB(int mode)
 void FdSetBToLinux(const struct haiku_fd_set& set, fd_set& linuxSet)
 {
     FD_ZERO(&linuxSet);
-    for (int i = 0; i < FD_SETSIZE; i++)
+    for (int i = 0; i < FD_SETSIZE; ++i)
     {
         if (HAIKU_FD_ISSET(i, &set))
         {
             FD_SET(i, &linuxSet);
+        }
+    }
+}
+
+void FdSetLinuxToB(const fd_set& linuxSet, struct haiku_fd_set& set)
+{
+    HAIKU_FD_ZERO(&set);
+    for (int i = 0; i < FD_SETSIZE; ++i)
+    {
+        if (FD_ISSET(i, &linuxSet))
+        {
+            HAIKU_FD_SET(i, &set);
         }
     }
 }
