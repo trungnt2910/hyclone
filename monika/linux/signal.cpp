@@ -186,7 +186,14 @@ status_t MONIKA_EXPORT _kern_send_signal(int32 id, uint32 signal, const union ha
     }
     else
     {
-        status = LINUX_SYSCALL3(__NR_rt_sigqueueinfo, id, linuxSignal, &siginfo);
+        if (flags & SIGNAL_FLAG_QUEUING_REQUIRED)
+        {
+            status = LINUX_SYSCALL3(__NR_rt_sigqueueinfo, id, linuxSignal, &siginfo);
+        }
+        else
+        {
+            status = LINUX_SYSCALL2(__NR_kill, id, linuxSignal);
+        }
     }
 
     if (status < 0)
