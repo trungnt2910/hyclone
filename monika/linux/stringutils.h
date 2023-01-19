@@ -15,4 +15,6 @@ size_t stringutils_strlcat(char * dst, const char * src, size_t maxlen);
 #define strlcpy stringutils_strlcpy
 #define strlcat stringutils_strlcat
 
+#define IS_NULL_OR_EMPTY(str) ((str) == NULL || (str)[0] == '\0')
+
 #endif // __STRINGUTILS_H__

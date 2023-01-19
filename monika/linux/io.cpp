@@ -626,6 +626,11 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
 {
     if (fd == HAIKU_AT_FDCWD)
     {
+        if (IS_NULL_OR_EMPTY(path))
+        {
+            return HAIKU_POSIX_ENOENT;
+        }
+
         fd = AT_FDCWD;
     }
 
@@ -697,7 +702,7 @@ int MONIKA_EXPORT _kern_access(int fd, const char* path, int mode, bool effectiv
         fd = AT_FDCWD;
     }
 
-    if (path == nullptr || path[0] == '\0')
+    if (IS_NULL_OR_EMPTY(path))
     {
         return HAIKU_POSIX_ENOENT;
     }
@@ -837,6 +842,11 @@ int MONIKA_EXPORT _kern_create_pipe(int *fds)
 
 int MONIKA_EXPORT _kern_rename(int oldDir, const char *oldpath, int newDir, const char *newpath)
 {
+    if (IS_NULL_OR_EMPTY(oldpath) || IS_NULL_OR_EMPTY(newpath))
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+
     char oldHostPath[PATH_MAX];
     char newHostPath[PATH_MAX];
 
@@ -877,6 +887,11 @@ int MONIKA_EXPORT _kern_unlink(int fd, const char* path)
         fd = AT_FDCWD;
     }
 
+    if (IS_NULL_OR_EMPTY(path))
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+
     char hostPath[PATH_MAX];
     if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
     {
@@ -909,6 +924,11 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
 {
     if (fd == HAIKU_AT_FDCWD)
     {
+        if (IS_NULL_OR_EMPTY(path))
+        {
+            return HAIKU_POSIX_ENOENT;
+        }
+
         fd = AT_FDCWD;
     }
 
@@ -1104,6 +1124,11 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char *path)
         fd = AT_FDCWD;
     }
 
+    if (IS_NULL_OR_EMPTY(path))
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+
     char hostPath[PATH_MAX];
     if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
     {
@@ -1122,6 +1147,11 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char *path)
 
 status_t MONIKA_EXPORT _kern_create_dir(int fd, const char *path, int perms)
 {
+    if (IS_NULL_OR_EMPTY(path))
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+
     char hostPath[PATH_MAX];
     long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
 
