@@ -157,23 +157,19 @@ static bool IsTty(int fd);
 extern "C"
 {
 
-// If pos is not -1, seek to pos.
-// Then write bufferSize from buffer to fd.
-// Returns errno if any error occurs.
 ssize_t MONIKA_EXPORT _kern_write(int fd, haiku_off_t pos, const void* buffer, size_t bufferSize)
 {
-    // Haiku might use _kern_write to console with pos == 0.
-    // However, Linux does not support seeking for console fds.
-    if (pos != -1 && !(pos == 0 && IsTty(fd)))
+    ssize_t bytesWritten;
+
+    if (pos == -1)
     {
-        off_t result = LINUX_SYSCALL3(__NR_lseek, fd, pos, SEEK_SET);
-        if (result < 0)
-        {
-            return LinuxToB(-result);
-        }
+        bytesWritten = LINUX_SYSCALL3(__NR_write, fd, buffer, bufferSize);
+    }
+    else
+    {
+        bytesWritten = LINUX_SYSCALL4(__NR_pwrite64, fd, buffer, bufferSize, pos);
     }
 
-    ssize_t bytesWritten = LINUX_SYSCALL3(__NR_write, fd, buffer, bufferSize);
     if (bytesWritten < 0)
     {
         return LinuxToB(-bytesWritten);
@@ -182,17 +178,8 @@ ssize_t MONIKA_EXPORT _kern_write(int fd, haiku_off_t pos, const void* buffer, s
     return bytesWritten;
 }
 
-ssize_t MONIKA_EXPORT _kern_writev(int fd, off_t pos, const struct haiku_iovec *vecs, size_t count)
+ssize_t MONIKA_EXPORT _kern_writev(int fd, haiku_off_t pos, const struct haiku_iovec *vecs, size_t count)
 {
-    if (pos != -1)
-    {
-        off_t result = LINUX_SYSCALL3(__NR_lseek, fd, pos, SEEK_SET);
-        if (result < 0)
-        {
-            return LinuxToB(-result);
-        }
-    }
-
     size_t memSize = ((count * sizeof(struct iovec)) + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
     struct iovec *linuxVecs =
         (struct iovec *)
@@ -209,7 +196,17 @@ ssize_t MONIKA_EXPORT _kern_writev(int fd, off_t pos, const struct haiku_iovec *
         linuxVecs[i].iov_len = vecs[i].iov_len;
     }
 
-    long bytesWritten = LINUX_SYSCALL3(__NR_writev, fd, linuxVecs, count);
+    ssize_t bytesWritten;
+
+    if (pos == -1)
+    {
+        bytesWritten = LINUX_SYSCALL3(__NR_writev, fd, linuxVecs, count);
+    }
+    else
+    {
+        // Last two params: Low and high order bytes of pos.
+        bytesWritten = LINUX_SYSCALL5(__NR_pwritev, fd, linuxVecs, count, (uint32_t)pos, ((uint64_t)pos) >> 32);
+    }
 
     LINUX_SYSCALL2(__NR_munmap, linuxVecs, memSize);
 
@@ -223,16 +220,17 @@ ssize_t MONIKA_EXPORT _kern_writev(int fd, off_t pos, const struct haiku_iovec *
 
 ssize_t MONIKA_EXPORT _kern_read(int fd, haiku_off_t pos, void* buffer, size_t bufferSize)
 {
-    if (pos != -1 && !(pos == 0 && IsTty(fd)))
+    ssize_t bytesRead;
+
+    if (pos == -1)
     {
-        off_t result = LINUX_SYSCALL3(__NR_lseek, fd, pos, SEEK_SET);
-        if (result < 0)
-        {
-            return LinuxToB(-result);
-        }
+        bytesRead = LINUX_SYSCALL3(__NR_read, fd, buffer, bufferSize);
+    }
+    else
+    {
+        bytesRead = LINUX_SYSCALL4(__NR_pread64, fd, buffer, bufferSize, pos);
     }
 
-    ssize_t bytesRead = LINUX_SYSCALL3(__NR_read, fd, buffer, bufferSize);
     if (bytesRead < 0)
     {
         return LinuxToB(-bytesRead);
