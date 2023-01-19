@@ -68,6 +68,34 @@ int MONIKA_EXPORT _kern_getrlimit(int resource, struct haiku_rlimit *rlp)
     return B_OK;
 }
 
+int MONIKA_EXPORT _kern_setrlimit(int resource, const struct haiku_rlimit * rlp)
+{
+    switch (resource)
+    {
+#define SUPPORTED_RLIMIT(name) \
+    case HAIKU_##name: break;
+#define UNSUPPORTED_RLIMIT(name) \
+    case HAIKU_##name: trace("Unsupported rlimit: "#name); return HAIKU_POSIX_ENOSYS;
+#include "rlimit_values.h"
+#undef SUPPORTED_RLIMIT
+#undef UNSUPPORTED_RLIMIT
+        default:
+            return HAIKU_POSIX_EINVAL;
+    }
+
+    struct rlimit rl;
+    rl.rlim_cur = (rlim_t)rlp->rlim_cur;
+    rl.rlim_max = (rlim_t)rlp->rlim_max;
+
+    long status = LINUX_SYSCALL2(__NR_setrlimit, RlimitBToLinux(resource), &rl);
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 }
 
 int RlimitBToLinux(int rlimit)
