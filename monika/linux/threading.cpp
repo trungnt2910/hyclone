@@ -1,4 +1,5 @@
 #include <cstring>
+#include <time.h>
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
@@ -89,6 +90,48 @@ sem_id MONIKA_EXPORT _kern_create_sem(int count, const char *name)
 status_t MONIKA_EXPORT _kern_delete_sem(sem_id id)
 {
     return GET_SERVERCALLS()->delete_sem(id);
+}
+
+status_t MONIKA_EXPORT _kern_snooze_etc(bigtime_t time, int timebase, int32 flags, bigtime_t* _remainingTime)
+{
+    int linuxClockid;
+    switch (timebase)
+    {
+        case B_SYSTEM_TIMEBASE:
+            linuxClockid = CLOCK_REALTIME;
+        break;
+        default:
+            trace("_kern_snooze_etc: unknown timebase.");
+            return B_BAD_VALUE;
+        break;
+    }
+
+    int linuxFlags = 0;
+
+    if (flags == B_ABSOLUTE_TIMEOUT)
+    {
+        linuxFlags = TIMER_ABSTIME;
+    }
+
+    struct timespec linuxRequest;
+    struct timespec linuxRemaining;
+
+    linuxRequest.tv_sec = time / 1000000;
+    linuxRequest.tv_nsec = (time % 1000000) * 1000;
+
+    long status = LINUX_SYSCALL4(__NR_clock_nanosleep, linuxClockid, linuxFlags, &linuxRequest, &linuxRemaining);
+
+    if (_remainingTime != NULL)
+    {
+        *_remainingTime = linuxRemaining.tv_sec * 1000000 + linuxRemaining.tv_nsec / 1000;
+    }
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
 }
 
 }
