@@ -239,6 +239,46 @@ ssize_t MONIKA_EXPORT _kern_read(int fd, haiku_off_t pos, void* buffer, size_t b
     return bytesRead;
 }
 
+ssize_t MONIKA_EXPORT _kern_readv(int fd, off_t pos, const struct haiku_iovec *vecs, size_t count)
+{
+    size_t memSize = ((count * sizeof(struct iovec)) + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
+    struct iovec *linuxVecs =
+        (struct iovec *)
+            LINUX_SYSCALL6(__NR_mmap, NULL, memSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+
+    if ((void*)linuxVecs == MAP_FAILED)
+    {
+        return HAIKU_POSIX_ENOMEM;
+    }
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        linuxVecs[i].iov_base = vecs[i].iov_base;
+        linuxVecs[i].iov_len = vecs[i].iov_len;
+    }
+
+    ssize_t bytesRead;
+
+    if (pos == -1)
+    {
+        bytesRead = LINUX_SYSCALL3(__NR_readv, fd, linuxVecs, count);
+    }
+    else
+    {
+        // Last two params: Low and high order bytes of pos.
+        bytesRead = LINUX_SYSCALL5(__NR_preadv, fd, linuxVecs, count, (uint32_t)pos, ((uint64_t)pos) >> 32);
+    }
+
+    LINUX_SYSCALL2(__NR_munmap, linuxVecs, memSize);
+
+    if (bytesRead < 0)
+    {
+        return LinuxToB(-bytesRead);
+    }
+
+    return bytesRead;
+}
+
 int MONIKA_EXPORT _kern_read_link(int fd, const char* path, char *buffer, size_t *_bufferSize)
 {
     if (fd == HAIKU_AT_FDCWD)
