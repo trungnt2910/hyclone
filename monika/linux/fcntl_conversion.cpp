@@ -77,3 +77,18 @@ int SeekTypeBToLinux(int seekType)
         panic("SeekTypeBToLinux: Unknown seek type.");
     }
 }
+
+int SeekTypeLinuxToB(int seekType)
+{
+    switch (seekType)
+    {
+    case SEEK_SET:
+        return HAIKU_SEEK_SET;
+    case SEEK_CUR:
+        return HAIKU_SEEK_CUR;
+    case SEEK_END:
+        return HAIKU_SEEK_END;
+    default:
+        panic("SeekTypeLinuxToB: Unknown seek type.");
+    }
+}

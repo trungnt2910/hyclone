@@ -11,6 +11,8 @@
 
 static void FlockLinuxToB(const struct flock& linuxFlock, struct haiku_flock& haikuFlock);
 static void FlockBToLinux(const struct haiku_flock& haikuFlock, struct flock& linuxFlock);
+static short FlockLTypeLinuxToB(short type);
+static short FlockLTypeBToLinux(short type);
 
 extern "C"
 {
@@ -86,7 +88,35 @@ int MONIKA_EXPORT _kern_fcntl(int fd, int op, size_t argument)
 
 void FlockLinuxToB(const struct flock& linuxFlock, struct haiku_flock& haikuFlock)
 {
-    panic("stub: FlockLinuxToB");
+    haikuFlock.l_type = FlockLTypeLinuxToB(linuxFlock.l_type);
+    haikuFlock.l_whence = SeekTypeLinuxToB(linuxFlock.l_whence);
+    haikuFlock.l_start = linuxFlock.l_start;
+    haikuFlock.l_len = linuxFlock.l_len;
+    haikuFlock.l_pid = linuxFlock.l_pid;
+}
+
+void FlockBToLinux(const struct haiku_flock& haikuFlock, struct flock& linuxFlock)
+{
+    linuxFlock.l_type = FlockLTypeBToLinux(haikuFlock.l_type);
+    linuxFlock.l_whence = SeekTypeBToLinux(haikuFlock.l_whence);
+    linuxFlock.l_start = haikuFlock.l_start;
+    linuxFlock.l_len = haikuFlock.l_len;
+    linuxFlock.l_pid = haikuFlock.l_pid;
+}
+
+short FlockLTypeLinuxToB(short type)
+{
+    switch (type)
+    {
+        case F_RDLCK:
+            return HAIKU_F_RDLCK;
+        case F_WRLCK:
+            return HAIKU_F_WRLCK;
+        case F_UNLCK:
+            return HAIKU_F_UNLCK;
+        default:
+            return -1;
+    }
 }
 
 short FlockLTypeBToLinux(short type)
@@ -102,13 +132,4 @@ short FlockLTypeBToLinux(short type)
         default:
             return -1;
     }
-}
-
-void FlockBToLinux(const struct haiku_flock& haikuFlock, struct flock& linuxFlock)
-{
-    linuxFlock.l_type = FlockLTypeBToLinux(haikuFlock.l_type);
-    linuxFlock.l_whence = SeekTypeBToLinux(haikuFlock.l_whence);
-    linuxFlock.l_start = haikuFlock.l_start;
-    linuxFlock.l_len = haikuFlock.l_len;
-    linuxFlock.l_pid = haikuFlock.l_pid;
 }
