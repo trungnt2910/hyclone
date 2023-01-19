@@ -11,5 +11,6 @@
 void loader_opendir(int fd);
 void loader_closedir(int fd);
 int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount);
+void loader_rewinddir(int fd);
 
 #endif

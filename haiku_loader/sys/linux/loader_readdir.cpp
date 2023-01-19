@@ -136,3 +136,17 @@ int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
 
     return count;
 }
+
+void loader_rewinddir(int fd)
+{
+    std::unique_lock<std::mutex> lock(sFdMapMutex);
+
+    auto it = sFdMap.find(fd);
+    if (it == sFdMap.end())
+    {
+        return;
+    }
+
+    rewinddir(it->second.handle);
+    it->second.extendedEntryIndex = 0;
+}

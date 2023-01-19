@@ -76,6 +76,7 @@ struct hostcalls
     void (*opendir)(int fd);
     void (*closedir)(int fd);
     int (*readdir)(int fd, void* buffer, size_t bufferSize, int maxCount);
+    void (*rewinddir)(int fd);
 
     // Time
     int64_t (*system_time)();

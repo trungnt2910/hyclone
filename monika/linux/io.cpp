@@ -956,6 +956,12 @@ ssize_t MONIKA_EXPORT _kern_read_dir(int fd, struct haiku_dirent *buffer, size_t
     return GET_HOSTCALLS()->readdir(fd, buffer, bufferSize, maxCount);
 }
 
+status_t MONIKA_EXPORT _kern_rewind_dir(int fd)
+{
+    GET_HOSTCALLS()->rewinddir(fd);
+    return B_OK;
+}
+
 haiku_off_t MONIKA_EXPORT _kern_seek(int fd, off_t pos, int seekType)
 {
     if (fd == HAIKU_AT_FDCWD)
