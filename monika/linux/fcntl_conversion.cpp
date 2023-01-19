@@ -74,7 +74,8 @@ int SeekTypeBToLinux(int seekType)
     case HAIKU_SEEK_END:
         return SEEK_END;
     default:
-        panic("SeekTypeBToLinux: Unknown seek type.");
+        trace("SeekTypeBToLinux: Unknown seek type.");
+        return -1;
     }
 }
 
@@ -89,6 +90,7 @@ int SeekTypeLinuxToB(int seekType)
     case SEEK_END:
         return HAIKU_SEEK_END;
     default:
-        panic("SeekTypeLinuxToB: Unknown seek type.");
+        trace("SeekTypeBToLinux: Unknown seek type.");
+        return -1;
     }
 }
