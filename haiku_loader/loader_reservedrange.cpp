@@ -224,12 +224,19 @@ bool loader_is_in_reserved_range(void* address, size_t size)
 
 bool loader_collides_with_reserved_range(void* address, size_t size)
 {
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
+    RangeInfo collidingRange;
+#endif
+
     bool collides = false;
     auto firstRangeThatStartsAfterThisRange = sReservedRanges.upper_bound(RangeInfo { (uint8_t*)address, SIZE_MAX });
     if (firstRangeThatStartsAfterThisRange != sReservedRanges.end())
     {
         if ((uint8_t*)address + size > firstRangeThatStartsAfterThisRange->first.address)
         {
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
+            collidingRange = firstRangeThatStartsAfterThisRange->first;
+#endif
             collides = true;
         }
     }
@@ -239,15 +246,19 @@ bool loader_collides_with_reserved_range(void* address, size_t size)
         auto rangeThatStartsBeforeOrAtThisRange = std::prev(firstRangeThatStartsAfterThisRange);
         if ((uint8_t*)address < rangeThatStartsBeforeOrAtThisRange->first.address + rangeThatStartsBeforeOrAtThisRange->first.size)
         {
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
+            collidingRange = rangeThatStartsBeforeOrAtThisRange->first;
+#endif
             collides = true;
         }
     }
 
 #ifdef HYCLONE_DEBUG_RESERVED_RANGE
     bool reallyCollides = false;
-    for (auto& range : sReservedRanges)
+    for (const auto& range : sReservedRanges)
     {
-        if ((range.first.address + range.first.size > (uint8_t*)address) || (range.first.address < (uint8_t*)address + size))
+        if (((range.first.address <= (uint8_t*)address) && (range.first.address + range.first.size > (uint8_t*)address))
+            || (((uint8_t*)address <= range.first.address) && ((uint8_t*)address + size > range.first.address)))
         {
             reallyCollides = true;
             break;
@@ -258,11 +269,16 @@ bool loader_collides_with_reserved_range(void* address, size_t size)
     {
         std::stringstream ss;
         ss << "collides_with_reserved_range: " << address << " " << (void*)((uint8_t*)address + size) << std::endl;
+        if (collides)
+        {
+            ss << "seems to collide with " << collidingRange.address << " " << (void*)(collidingRange.address + collidingRange.size);
+            ss << " but it doesn't" << std::endl;
+        }
         std::cerr << ss.str() << std::flush;
 
         loader_reserved_range_debug();
     }
-    assert(collides = reallyCollides);
+    assert(collides == reallyCollides);
 #endif
 
     return collides;

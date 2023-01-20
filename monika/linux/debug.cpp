@@ -42,6 +42,7 @@ void MONIKA_EXPORT _kern_debugger(const char* userString)
         const char prefix[] = "_kern_debugger: ";
         LINUX_SYSCALL3(__NR_write, 2, prefix, sizeof(prefix));
         LINUX_SYSCALL3(__NR_write, 2, userString, len);
+        LINUX_SYSCALL3(__NR_write, 2, "\n", 1);
     }
 
     debug_break();
