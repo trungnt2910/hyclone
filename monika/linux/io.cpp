@@ -341,19 +341,27 @@ status_t MONIKA_EXPORT _kern_create_symlink(int fd, const char *path, const char
         return HAIKU_POSIX_ENAMETOOLONG;
     }
 
-    char hostToPath[PATH_MAX];
-    status = GET_HOSTCALLS()->vchroot_expand(toPath, hostToPath, sizeof(hostToPath));
-
-    if (status < 0)
+    // Absolute path symlink. We want to expand the target path.
+    if (toPath[0] == '/')
     {
-        return HAIKU_POSIX_ENOENT;
-    }
-    else if (status > sizeof(hostToPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
-    }
+        char hostToPath[PATH_MAX];
 
-    status = LINUX_SYSCALL2(__NR_symlink, hostToPath, hostPath);
+        status = GET_HOSTCALLS()->vchroot_expand(toPath, hostToPath, sizeof(hostToPath));
+        if (status < 0)
+        {
+            return HAIKU_POSIX_ENOENT;
+        }
+        else if (status > sizeof(hostToPath))
+        {
+            return HAIKU_POSIX_ENAMETOOLONG;
+        }
+
+        status = LINUX_SYSCALL2(__NR_symlink, hostToPath, hostPath);
+    }
+    else
+    {
+        status = LINUX_SYSCALL2(__NR_symlink, toPath, hostPath);
+    }
 
     if (status < 0)
     {
