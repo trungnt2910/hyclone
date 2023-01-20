@@ -39,6 +39,7 @@ struct hostcalls
     void (*map_reserved_range)(void* address, size_t size);
     void (*unmap_reserved_range)(void* address, size_t size);
     bool (*is_in_reserved_range)(void* address, size_t size);
+    bool (*collides_with_reserved_range)(void* address, size_t size);
     size_t (*reserved_range_longest_mappable_from)(void* address, size_t maxSize);
     size_t (*next_reserved_range)(void* address, void** nextAddress);
 

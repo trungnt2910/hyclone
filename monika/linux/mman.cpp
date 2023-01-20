@@ -369,6 +369,69 @@ int MONIKA_EXPORT _kern_unreserve_address_range(void* address, size_t size)
     return B_OK;
 }
 
+int MONIKA_EXPORT _kern_unmap_memory(void *address, size_t size)
+{
+    MmanLock mmanLock;
+
+    char* beginAddress = (char*)address;
+    char* endAddress = beginAddress + size;
+
+    char* currentAddress = beginAddress;
+
+    if (size == 0)
+    {
+        return HAIKU_POSIX_EINVAL;
+    }
+
+    // Do the actual unmapping.
+    while (currentAddress < endAddress)
+    {
+        char* nextReservedAddress;
+        size_t nextReservedAddressSize = GET_HOSTCALLS()->next_reserved_range(currentAddress, (void**)&nextReservedAddress);
+
+        if (nextReservedAddressSize != 0)
+        {
+            if (nextReservedAddress >= endAddress)
+            {
+                nextReservedAddress = endAddress;
+                nextReservedAddressSize = 0;
+            }
+
+            if (nextReservedAddress + nextReservedAddressSize > endAddress)
+            {
+                nextReservedAddressSize = endAddress - nextReservedAddress;
+            }
+        }
+        else
+        {
+            nextReservedAddress = endAddress;
+            nextReservedAddressSize = 0;
+        }
+
+        // Unmap non-reserved addresses.
+        if (currentAddress < nextReservedAddress)
+        {
+            LINUX_SYSCALL2(__NR_munmap, currentAddress, nextReservedAddress - currentAddress);
+            currentAddress = nextReservedAddress;
+        }
+
+        // Return reserved addresses.
+        if (nextReservedAddressSize != 0)
+        {
+            LINUX_SYSCALL3(__NR_mprotect, nextReservedAddress, nextReservedAddressSize, PROT_NONE);
+            GET_HOSTCALLS()->unmap_reserved_range(nextReservedAddress, nextReservedAddressSize);
+            currentAddress = nextReservedAddress + nextReservedAddressSize;
+        }
+    }
+
+    currentAddress = beginAddress;
+
+    // Better do this in the server, where all area info is kept.
+    GET_SERVERCALLS()->unmap_memory(currentAddress, size);
+
+    return B_OK;
+}
+
 int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
 	uint32_t addressSpec, size_t size, uint32_t protection,
 	uint32_t mapping, bool unmapAddressRange, int fd,
@@ -426,20 +489,45 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
         break;
     }
 
+    MmanLock mmanLock;
+
+    // These two variables are only valid when they are needed:
+    // when unmapAddressRange is true, or when addressSpec is B_EXACT_ADDRESS.
+    bool collidesWithReservedRange = false;
+    bool isInReservedRange = false;
+
+    if ((unmapAddressRange || addressSpec == B_EXACT_ADDRESS))
+    {
+        collidesWithReservedRange = GET_HOSTCALLS()->collides_with_reserved_range(hintAddr, size);
+        isInReservedRange = GET_HOSTCALLS()->is_in_reserved_range(hintAddr, size);
+
+        if (collidesWithReservedRange && !isInReservedRange)
+        {
+            // The address range is not reserved, but it collides with a reserved range.
+            // We can't unmap the address range, neither can we map it to a new file.
+            return B_BAD_VALUE;
+        }
+    }
+
     if (unmapAddressRange)
     {
         // Attempt to unmap the address range first.
-        // To-do: Invalidate any area that is mapped there.
-        LINUX_SYSCALL2(__NR_munmap, hintAddr, size);
+
+        // _kern_unmap_memory also acquires a lock.
+        GET_HOSTCALLS()->unlock_reserved_range_data();
+        result = _kern_unmap_memory(*address, size);
+        GET_HOSTCALLS()->lock_reserved_range_data();
+        if (result != B_OK)
+        {
+            return result;
+        }
     }
 
-    MmanLock mmanLock;
-
-    if (addressSpec == B_EXACT_ADDRESS && GET_HOSTCALLS()->is_in_reserved_range(hintAddr, size))
+    if (addressSpec == B_EXACT_ADDRESS && isInReservedRange)
     {
         if (GET_HOSTCALLS()->reserved_range_longest_mappable_from(hintAddr, size) < size)
         {
-            return HAIKU_POSIX_ENOMEM;
+            return B_BAD_VALUE;
         }
 
         result = LINUX_SYSCALL2(__NR_munmap, hintAddr, size);
@@ -456,8 +544,9 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
 
         GET_HOSTCALLS()->map_reserved_range(hintAddr, size);
     }
-    // For B_EXACT_ADDRESS and the mapped area collides with an existing
-    // reserved area, mmap's error will handle this case.
+    // As for B_EXACT_ADDRESS and the mapped area collides with an existing
+    // reserved area, this scenario cannot happen, as the code above has
+    // already handled this case.
     else
     {
         result = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, fd, offset);
@@ -501,6 +590,8 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
     info.in_count = 0;
     info.out_count = 0;
 
+    // TODO: What happens when B_EXACT_ADDRESS is specified and
+    // the mapped area collides with an existing one?
     int area_id = GET_SERVERCALLS()->register_area(&info);
 
     if (area_id < 0)
@@ -606,69 +697,6 @@ int MONIKA_EXPORT _kern_area_for(void *address)
 int MONIKA_EXPORT _kern_get_area_info(int area, void* info)
 {
     return GET_SERVERCALLS()->get_area_info(area, info);
-}
-
-int MONIKA_EXPORT _kern_unmap_memory(void *address, size_t size)
-{
-    MmanLock mmanLock;
-
-    char* beginAddress = (char*)address;
-    char* endAddress = beginAddress + size;
-
-    char* currentAddress = beginAddress;
-
-    if (size == 0)
-    {
-        return HAIKU_POSIX_EINVAL;
-    }
-
-    // Do the actual unmapping.
-    while (currentAddress < endAddress)
-    {
-        char* nextReservedAddress;
-        size_t nextReservedAddressSize = GET_HOSTCALLS()->next_reserved_range(currentAddress, (void**)&nextReservedAddress);
-
-        if (nextReservedAddressSize != 0)
-        {
-            if (nextReservedAddress >= endAddress)
-            {
-                nextReservedAddress = endAddress;
-                nextReservedAddressSize = 0;
-            }
-
-            if (nextReservedAddress + nextReservedAddressSize > endAddress)
-            {
-                nextReservedAddressSize = endAddress - nextReservedAddress;
-            }
-        }
-        else
-        {
-            nextReservedAddress = endAddress;
-            nextReservedAddressSize = 0;
-        }
-
-        // Unmap non-reserved addresses.
-        if (currentAddress < nextReservedAddress)
-        {
-            LINUX_SYSCALL2(__NR_munmap, currentAddress, nextReservedAddress - currentAddress);
-            currentAddress = nextReservedAddress;
-        }
-
-        // Return reserved addresses.
-        if (nextReservedAddressSize != 0)
-        {
-            LINUX_SYSCALL3(__NR_mprotect, nextReservedAddress, nextReservedAddressSize, PROT_NONE);
-            GET_HOSTCALLS()->unmap_reserved_range(nextReservedAddress, nextReservedAddressSize);
-            currentAddress = nextReservedAddress + nextReservedAddressSize;
-        }
-    }
-
-    currentAddress = beginAddress;
-
-    // Better do this in the server, where all area info is kept.
-    GET_SERVERCALLS()->unmap_memory(currentAddress, size);
-
-    return B_OK;
 }
 
 }

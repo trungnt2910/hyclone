@@ -10,6 +10,7 @@ void loader_unregister_reserved_range(void* address, size_t size);
 void loader_map_reserved_range(void* address, size_t size);
 void loader_unmap_reserved_range(void* address, size_t size);
 bool loader_is_in_reserved_range(void* address, size_t size);
+bool loader_collides_with_reserved_range(void* address, size_t size);
 size_t loader_reserved_range_longest_mappable_from(void* address, size_t size);
 size_t loader_next_reserved_range(void* address, void** nextAddress);
 

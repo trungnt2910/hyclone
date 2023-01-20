@@ -1,9 +1,13 @@
 #include <cassert>
 #include <cstdint>
-#include <cstdio>
 #include <map>
 #include <mutex>
 #include <set>
+
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
+#include <iostream>
+#include <sstream>
+#endif
 
 #include "loader_reservedrange.h"
 
@@ -167,6 +171,9 @@ void loader_unmap_reserved_range(void* address, size_t size)
 {
 #ifdef HYCLONE_DEBUG_RESERVED_RANGE
     loader_reserved_range_debug();
+    std::stringstream ss;
+    ss << "unmap_reserved_range: " << address << " " << (void*)((uint8_t*)address + size) << std::endl;
+    std::cerr << ss.str() << std::flush;
 #endif
 
     assert(loader_is_in_reserved_range(address, size));
@@ -175,6 +182,14 @@ void loader_unmap_reserved_range(void* address, size_t size)
     auto& rangeMappings = it->second;
 
     auto mappingsIt = rangeMappings.upper_bound(RangeInfo { (uint8_t*)address, SIZE_MAX });
+
+    if (mappingsIt == rangeMappings.begin())
+    {
+        // The reserved range exists, but the current area is not mapped.
+        // Similar to POSIX mmap, this should be a no-op.
+        return;
+    }
+
     assert(mappingsIt != rangeMappings.begin());
     --mappingsIt;
 
@@ -205,6 +220,52 @@ bool loader_is_in_reserved_range(void* address, size_t size)
     --it;
 
     return (it->first.address <= (uint8_t*)address) && ((uint8_t*)address + size <= it->first.address + it->first.size);
+}
+
+bool loader_collides_with_reserved_range(void* address, size_t size)
+{
+    bool collides = false;
+    auto firstRangeThatStartsAfterThisRange = sReservedRanges.upper_bound(RangeInfo { (uint8_t*)address, SIZE_MAX });
+    if (firstRangeThatStartsAfterThisRange != sReservedRanges.end())
+    {
+        if ((uint8_t*)address + size > firstRangeThatStartsAfterThisRange->first.address)
+        {
+            collides = true;
+        }
+    }
+
+    if (firstRangeThatStartsAfterThisRange != sReservedRanges.begin())
+    {
+        auto rangeThatStartsBeforeOrAtThisRange = std::prev(firstRangeThatStartsAfterThisRange);
+        if ((uint8_t*)address < rangeThatStartsBeforeOrAtThisRange->first.address + rangeThatStartsBeforeOrAtThisRange->first.size)
+        {
+            collides = true;
+        }
+    }
+
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
+    bool reallyCollides = false;
+    for (auto& range : sReservedRanges)
+    {
+        if ((range.first.address + range.first.size > (uint8_t*)address) || (range.first.address < (uint8_t*)address + size))
+        {
+            reallyCollides = true;
+            break;
+        }
+    }
+
+    if (collides != reallyCollides)
+    {
+        std::stringstream ss;
+        ss << "collides_with_reserved_range: " << address << " " << (void*)((uint8_t*)address + size) << std::endl;
+        std::cerr << ss.str() << std::flush;
+
+        loader_reserved_range_debug();
+    }
+    assert(collides = reallyCollides);
+#endif
+
+    return collides;
 }
 
 size_t loader_reserved_range_longest_mappable_from(void* address, size_t maxSize)
@@ -262,11 +323,16 @@ static void loader_reserved_range_debug()
 #ifdef HYCLONE_DEBUG_RESERVED_RANGE
     for (auto& range : sReservedRanges)
     {
-        printf("Reserved range: %p - %p\n", range.first.address, range.first.address + range.first.size);
+        std::stringstream ss;
+        ss << "Reserved range: " << (void*)range.first.address << " " << (void*)(range.first.address + range.first.size)
+           << std::endl;
+
         for (auto& mapping : range.second)
         {
-            printf("\tMapping: %p - %p\n", mapping.address, mapping.address + mapping.size);
+            ss << "\tMapping: " << (void*)mapping.address << " " << (void*)(mapping.address + mapping.size) << std::endl;
         }
+
+        std::cerr << ss.str() << std::flush;
     }
 #endif
 }

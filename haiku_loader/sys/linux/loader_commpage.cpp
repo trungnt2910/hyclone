@@ -76,6 +76,7 @@ void* loader_allocate_commpage()
     hostcalls_ptr->map_reserved_range = loader_map_reserved_range;
     hostcalls_ptr->unmap_reserved_range = loader_unmap_reserved_range;
     hostcalls_ptr->is_in_reserved_range = loader_is_in_reserved_range;
+    hostcalls_ptr->collides_with_reserved_range = loader_collides_with_reserved_range;
     hostcalls_ptr->reserved_range_longest_mappable_from = loader_reserved_range_longest_mappable_from;
     hostcalls_ptr->next_reserved_range = loader_next_reserved_range;
 
