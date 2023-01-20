@@ -255,6 +255,101 @@ status_t MONIKA_EXPORT _kern_set_memory_protection(void *address, size_t size, u
     if (protection & B_EXECUTE_AREA)
         mprotect_prot |= PROT_EXEC;
 
+    char* beginAddress = (char*)address;
+    char* endAddress = beginAddress + size;
+
+    char* currentAddress = beginAddress;
+
+    if (size == 0)
+    {
+        return HAIKU_POSIX_EINVAL;
+    }
+
+    {
+        MmanLock mmanLock;
+        bool validMemoryRange = true;
+
+        while (currentAddress < endAddress)
+        {
+            char* nextReservedAddress;
+            size_t nextReservedAddressSize = GET_HOSTCALLS()->next_reserved_range(currentAddress, (void**)&nextReservedAddress);
+
+            if (nextReservedAddressSize != 0)
+            {
+                if (nextReservedAddress >= endAddress)
+                {
+                    nextReservedAddress = endAddress;
+                    nextReservedAddressSize = 0;
+                }
+
+                if (nextReservedAddress + nextReservedAddressSize > endAddress)
+                {
+                    nextReservedAddressSize = endAddress - nextReservedAddress;
+                }
+            }
+            else
+            {
+                nextReservedAddress = endAddress;
+                nextReservedAddressSize = 0;
+            }
+
+            // Ignore non-reserved addresses.
+            if (currentAddress < nextReservedAddress)
+            {
+                currentAddress = nextReservedAddress;
+            }
+
+            // Checks all reserved addresses to see if they are mapped.
+            if (nextReservedAddressSize != 0)
+            {
+                char* nextReservedAddressRangeEnd = nextReservedAddress + nextReservedAddressSize;
+                while (currentAddress < nextReservedAddressRangeEnd)
+                {
+                    char* nextReservedRangeMappedAddress;
+                    size_t nextReservedRangeMappedAddressSize = GET_HOSTCALLS()
+                        ->next_reserved_range_mapping(currentAddress, (void**)&nextReservedRangeMappedAddress);
+
+                    if (nextReservedRangeMappedAddressSize != 0)
+                    {
+                        if (nextReservedRangeMappedAddress >= nextReservedAddressRangeEnd)
+                        {
+                            nextReservedRangeMappedAddress = nextReservedAddressRangeEnd;
+                            nextReservedRangeMappedAddressSize = 0;
+                        }
+
+                        if (nextReservedRangeMappedAddress + nextReservedRangeMappedAddressSize > nextReservedAddressRangeEnd)
+                        {
+                            nextReservedRangeMappedAddressSize = nextReservedAddressRangeEnd - nextReservedRangeMappedAddress;
+                        }
+                    }
+                    else
+                    {
+                        nextReservedRangeMappedAddress = nextReservedAddressRangeEnd;
+                        nextReservedRangeMappedAddressSize = 0;
+                    }
+
+                    // If the next mapped address is larger, the current address should collide
+                    // with a reserved range, and that page hasn't been mapped.
+                    if (nextReservedRangeMappedAddress > currentAddress)
+                    {
+                        validMemoryRange = false;
+                        goto check_done;
+                    }
+
+                    currentAddress = nextReservedRangeMappedAddress + nextReservedRangeMappedAddressSize;
+                }
+            }
+        }
+
+    check_done:
+        if (!validMemoryRange)
+        {
+            // Very weird, ENOMEM for a mprotect. But that's what Haiku does.
+            return HAIKU_POSIX_ENOMEM;
+        }
+    }
+
+    // Proceed as normal.
     long status = GET_SERVERCALLS()->set_memory_protection(address, size, protection);
 
     if (status != B_OK)
@@ -413,6 +508,13 @@ int MONIKA_EXPORT _kern_unmap_memory(void *address, size_t size)
         {
             LINUX_SYSCALL2(__NR_munmap, currentAddress, nextReservedAddress - currentAddress);
             currentAddress = nextReservedAddress;
+        }
+
+        // Ignore reserved addresses before currentAddress
+        if (nextReservedAddress < currentAddress)
+        {
+            nextReservedAddressSize -= currentAddress - nextReservedAddress;
+            nextReservedAddress = currentAddress;
         }
 
         // Return reserved addresses.

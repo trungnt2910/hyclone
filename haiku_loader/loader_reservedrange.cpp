@@ -309,13 +309,60 @@ size_t loader_reserved_range_longest_mappable_from(void* address, size_t maxSize
 
 size_t loader_next_reserved_range(void* address, void** nextAddress)
 {
-    auto it = sReservedRanges.lower_bound(RangeInfo { (uint8_t*)address, 0 });
-    if (it == sReservedRanges.end())
+    auto it = sReservedRanges.upper_bound(RangeInfo { (uint8_t*)address, SIZE_MAX });
+    if (it == sReservedRanges.begin())
     {
         return 0;
     }
+
+    --it;
+
+    if (it->first.address + it->first.size <= (uint8_t*)address)
+    {
+        ++it;
+    }
+
     *nextAddress = it->first.address;
     return it->first.size;
+}
+
+size_t loader_next_reserved_range_mapping(void* address, void** nextAddress)
+{
+    assert(loader_is_in_reserved_range(address, 0));
+
+    auto it = sReservedRanges.upper_bound(RangeInfo { (uint8_t*)address, SIZE_MAX });
+    if (it == sReservedRanges.begin())
+    {
+        return 0;
+    }
+
+    --it;
+
+    const auto& rangeMappings = it->second;
+    auto mappingsIt = rangeMappings.upper_bound(RangeInfo { (uint8_t*)address, SIZE_MAX });
+    if (mappingsIt == rangeMappings.begin())
+    {
+        return 0;
+    }
+
+    --mappingsIt;
+
+    if (mappingsIt->address + mappingsIt->size <= (uint8_t*)address)
+    {
+        ++mappingsIt;
+    }
+
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
+    loader_reserved_range_debug();
+    std::stringstream ss;
+    ss << "next_reserved_range_mapping(" << address << "): " << (void*)mappingsIt->address << " "
+       << (void*)(mappingsIt->address + mappingsIt->size) << std::endl;
+
+    std::cerr << ss.str() << std::flush;
+#endif
+
+    *nextAddress = mappingsIt->address;
+    return mappingsIt->size;
 }
 
 static void loader_reserved_range_debug()

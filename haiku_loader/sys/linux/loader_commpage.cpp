@@ -79,6 +79,7 @@ void* loader_allocate_commpage()
     hostcalls_ptr->collides_with_reserved_range = loader_collides_with_reserved_range;
     hostcalls_ptr->reserved_range_longest_mappable_from = loader_reserved_range_longest_mappable_from;
     hostcalls_ptr->next_reserved_range = loader_next_reserved_range;
+    hostcalls_ptr->next_reserved_range_mapping = loader_next_reserved_range_mapping;
 
     hostcalls_ptr->lock_subsystem = loader_lock_subsystem;
     hostcalls_ptr->unlock_subsystem = loader_unlock_subsystem;
