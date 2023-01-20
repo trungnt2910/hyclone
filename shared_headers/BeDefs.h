@@ -45,6 +45,7 @@ typedef long signed int     haiku_ssize_t;
 
 #ifdef __x86_64__
 #define B_PAGE_SIZE         4096
+#define B_HAIKU_64_BIT      1
 #endif
 
 struct user_space_program_args

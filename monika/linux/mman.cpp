@@ -16,6 +16,12 @@
 #include "linux_syscall.h"
 #include "stringutils.h"
 
+#ifdef B_HAIKU_64_BIT
+const addr_t kMaxRandomize = 0x8000000000ul;
+#else
+const addr_t kMaxRandomize = 0x800000ul;
+#endif
+
 static int ProtBToLinux(int protection);
 
 class MmanLock
@@ -47,6 +53,7 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
     long result;
 
     void* hintAddr = *address;
+    void* baseAddr = hintAddr;
     int mmap_flags = MAP_PRIVATE | MAP_ANON;
     int mmap_prot = 0;
 
@@ -70,6 +77,18 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
         break;
         case B_EXACT_ADDRESS:
             mmap_flags |= MAP_FIXED;
+        break;
+        case B_RANDOMIZED_BASE_ADDRESS:
+        {
+            addr_t randnum;
+            result = LINUX_SYSCALL3(__NR_getrandom, &randnum, sizeof(addr_t), 0);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            randnum %= kMaxRandomize;
+            hintAddr = (void*)((addr_t)hintAddr + randnum);
+        }
         break;
     }
 
@@ -108,7 +127,7 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
     {
         case B_BASE_ADDRESS:
         case B_RANDOMIZED_BASE_ADDRESS:
-            if (result < (long)hintAddr)
+            if (result < (long)baseAddr)
             {
                 // Success, but not greater than base.
                 LINUX_SYSCALL2(__NR_munmap, result, size);
@@ -388,7 +407,9 @@ int MONIKA_EXPORT _kern_reserve_address_range(void **address, uint32_t addressSp
     // The function requires hostcalls.
     CHECK_COMMPAGE();
 
+    long result;
     void* hintAddr = *address;
+    void* baseAddr = hintAddr;
     int mmap_flags = MAP_PRIVATE | MAP_ANON;
     int mmap_prot = PROT_NONE;
 
@@ -403,10 +424,22 @@ int MONIKA_EXPORT _kern_reserve_address_range(void **address, uint32_t addressSp
         case B_EXACT_ADDRESS:
             mmap_flags |= MAP_FIXED;
         break;
+        case B_RANDOMIZED_BASE_ADDRESS:
+        {
+            addr_t randnum;
+            result = LINUX_SYSCALL3(__NR_getrandom, &randnum, sizeof(addr_t), 0);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            randnum %= kMaxRandomize;
+            hintAddr = (void*)((addr_t)hintAddr + randnum);
+        }
+        break;
     }
 
     // A mmap would do the job.
-    long result = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, -1, 0);
+    result = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, -1, 0);
     if (result < 0)
     {
         return LinuxToB(-result);
@@ -416,7 +449,7 @@ int MONIKA_EXPORT _kern_reserve_address_range(void **address, uint32_t addressSp
     {
         case B_BASE_ADDRESS:
         case B_RANDOMIZED_BASE_ADDRESS:
-            if (result < (long)hintAddr)
+            if (result < (long)baseAddr)
             {
                 // Success, but not greater than base.
                 LINUX_SYSCALL2(__NR_munmap, result, size);
