@@ -21,6 +21,7 @@
 #include "haiku_fcntl.h"
 #include "haiku_poll.h"
 #include "haiku_signal.h"
+#include "haiku_stat.h"
 #include "haiku_uio.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
@@ -34,33 +35,6 @@
 #define HAIKU_W_OK          2
 #define HAIKU_X_OK          1
 #define HAIKU_F_OK          0
-
-struct haiku_timespec
-{
-    time_t  tv_sec;        /* seconds */
-    long    tv_nsec;    /* and nanoseconds */
-};
-
-// Be careful! Some of these types (dev_t, ino_t)
-// may be different on Haiku and Linux.
-struct haiku_stat
-{
-    haiku_dev_t              st_dev;            /* device ID that this file resides on */
-    haiku_ino_t              st_ino;            /* this file's serial inode ID */
-    haiku_mode_t             st_mode;           /* file mode (rwx for user, group, etc) */
-    haiku_nlink_t            st_nlink;          /* number of hard links to this file */
-    haiku_uid_t              st_uid;            /* user ID of the owner of this file */
-    haiku_gid_t              st_gid;            /* group ID of the owner of this file */
-    haiku_off_t              st_size;           /* size in bytes of this file */
-    haiku_dev_t              st_rdev;           /* device type (not used) */
-    haiku_blksize_t          st_blksize;        /* preferred block size for I/O */
-    struct haiku_timespec    st_atim;           /* last access time */
-    struct haiku_timespec    st_mtim;           /* last modification time */
-    struct haiku_timespec    st_ctim;           /* last change time, not creation time */
-    struct haiku_timespec    st_crtim;          /* creation time */
-    uint32_t                 st_type;           /* attribute/index type */
-    haiku_blkcnt_t           st_blocks;         /* number of blocks allocated for object */
-};
 
 typedef struct haiku_dirent
 {
@@ -396,7 +370,7 @@ status_t MONIKA_EXPORT _kern_create_link(int pathFD, const char *path, int toFD,
     }
 
     char hostToPath[PATH_MAX];
-    status = GET_HOSTCALLS()->vchroot_expandat(toFD, path, hostToPath, sizeof(hostToPath));
+    status = GET_HOSTCALLS()->vchroot_expandat(toFD, toPath, hostToPath, sizeof(hostToPath));
 
     if (status < 0)
     {
@@ -408,7 +382,7 @@ status_t MONIKA_EXPORT _kern_create_link(int pathFD, const char *path, int toFD,
     }
 
 
-    status = LINUX_SYSCALL5(__NR_linkat, AT_FDCWD, hostPath, AT_FDCWD, hostToPath, traverseLeafLink ? AT_SYMLINK_FOLLOW : 0);
+    status = LINUX_SYSCALL5(__NR_linkat, AT_FDCWD, hostToPath, AT_FDCWD, hostPath, traverseLeafLink ? AT_SYMLINK_FOLLOW : 0);
 
     if (status < 0)
     {
@@ -516,7 +490,12 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
         return B_BAD_VALUE;
     }
 
-    if (fd >= 0)
+    if (fd == HAIKU_AT_FDCWD)
+    {
+        fd = AT_FDCWD;
+    }
+
+    if (fd >= 0 && IS_NULL_OR_EMPTY(path))
     {
         if (statMask & B_STAT_MODE)
         {
@@ -552,26 +531,32 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
         }
         if (statMask & (B_STAT_ACCESS_TIME | B_STAT_MODIFICATION_TIME))
         {
-            struct stat oldStat;
-            result = LINUX_SYSCALL2(__NR_fstat, fd, &oldStat);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
             struct timespec linuxTimespecs[2];
-            linuxTimespecs[0].tv_sec = oldStat.st_atim.tv_sec;
-            linuxTimespecs[0].tv_nsec = oldStat.st_atim.tv_nsec;
-            linuxTimespecs[1].tv_sec = oldStat.st_mtim.tv_sec;
-            linuxTimespecs[1].tv_nsec = oldStat.st_mtim.tv_nsec;
+            linuxTimespecs[0].tv_nsec = UTIME_OMIT;
+            linuxTimespecs[1].tv_nsec = UTIME_OMIT;
             if (statMask & B_STAT_ACCESS_TIME)
             {
-                linuxTimespecs[0].tv_sec = stat->st_atim.tv_sec;
-                linuxTimespecs[0].tv_nsec = stat->st_atim.tv_nsec;
+                if (stat->st_atim.tv_nsec == HAIKU_UTIME_NOW)
+                {
+                    linuxTimespecs[0].tv_nsec = UTIME_NOW;
+                }
+                else
+                {
+                    linuxTimespecs[0].tv_sec = stat->st_atim.tv_sec;
+                    linuxTimespecs[0].tv_nsec = stat->st_atim.tv_nsec;
+                }
             }
             if (statMask & B_STAT_MODIFICATION_TIME)
             {
-                linuxTimespecs[1].tv_sec = stat->st_mtim.tv_sec;
-                linuxTimespecs[1].tv_nsec = stat->st_mtim.tv_nsec;
+                if (stat->st_mtim.tv_nsec == HAIKU_UTIME_NOW)
+                {
+                    linuxTimespecs[1].tv_nsec = UTIME_NOW;
+                }
+                else
+                {
+                    linuxTimespecs[1].tv_sec = stat->st_mtim.tv_sec;
+                    linuxTimespecs[1].tv_nsec = stat->st_mtim.tv_nsec;
+                }
             }
             result = LINUX_SYSCALL4(__NR_utimensat, fd, NULL, &linuxTimespecs, traverseLink ? 0 : AT_SYMLINK_NOFOLLOW);
             if (result < 0)
@@ -586,11 +571,11 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
         long expandStatus;
         if (!traverseLink)
         {
-            expandStatus = GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath));
+            expandStatus = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
         }
         else
         {
-            expandStatus = GET_HOSTCALLS()->vchroot_expandlink(path, hostPath, sizeof(hostPath));
+            expandStatus = GET_HOSTCALLS()->vchroot_expandlinkat(fd, path, hostPath, sizeof(hostPath));
         }
 
         if (expandStatus < 0)
@@ -653,19 +638,31 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
         if (statMask & (B_STAT_ACCESS_TIME | B_STAT_MODIFICATION_TIME))
         {
             struct timespec linuxTimespecs[2];
-            linuxTimespecs[0].tv_sec = stat->st_atim.tv_sec;
-            linuxTimespecs[0].tv_nsec = stat->st_atim.tv_nsec;
-            linuxTimespecs[1].tv_sec = stat->st_mtim.tv_sec;
-            linuxTimespecs[1].tv_nsec = stat->st_mtim.tv_nsec;
+            linuxTimespecs[0].tv_nsec = UTIME_OMIT;
+            linuxTimespecs[1].tv_nsec = UTIME_OMIT;
             if (statMask & B_STAT_ACCESS_TIME)
             {
-                linuxTimespecs[0].tv_sec = stat->st_atim.tv_sec;
-                linuxTimespecs[0].tv_nsec = stat->st_atim.tv_nsec;
+                if (stat->st_atim.tv_nsec == HAIKU_UTIME_NOW)
+                {
+                    linuxTimespecs[0].tv_nsec = UTIME_NOW;
+                }
+                else
+                {
+                    linuxTimespecs[0].tv_sec = stat->st_atim.tv_sec;
+                    linuxTimespecs[0].tv_nsec = stat->st_atim.tv_nsec;
+                }
             }
             if (statMask & B_STAT_MODIFICATION_TIME)
             {
-                linuxTimespecs[1].tv_sec = stat->st_mtim.tv_sec;
-                linuxTimespecs[1].tv_nsec = stat->st_mtim.tv_nsec;
+                if (stat->st_mtim.tv_nsec == HAIKU_UTIME_NOW)
+                {
+                    linuxTimespecs[1].tv_nsec = UTIME_NOW;
+                }
+                else
+                {
+                    linuxTimespecs[1].tv_sec = stat->st_mtim.tv_sec;
+                    linuxTimespecs[1].tv_nsec = stat->st_mtim.tv_nsec;
+                }
             }
             result = LINUX_SYSCALL4(__NR_utimensat, AT_FDCWD, hostPath, &linuxTimespecs, traverseLink ? 0 : AT_SYMLINK_NOFOLLOW);
             if (result < 0)
