@@ -16,7 +16,7 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
     argv[0] = loaderPath.c_str();
     argv[1] = "--umask";
     argv[2] = umaskValue.c_str();
-    
+
     std::copy(flatArgs, flatArgs + argc, argv + 3);
     argv[argc + 3] = NULL;
 
@@ -26,5 +26,14 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
 
     // std::cerr << "execve: " << path << std::endl;
 
-    return execve(loaderPath.c_str(), (char* const*)argv, (char* const*)envp);
+    int status = execve(loaderPath.c_str(), (char* const*)argv, (char* const*)envp);
+
+    if (status == -1)
+    {
+        return -errno;
+    }
+
+    std::cerr << "loader_exec: execve returned without an error status!" << std::endl;
+
+    return 0;
 }
