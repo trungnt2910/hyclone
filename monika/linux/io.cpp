@@ -371,6 +371,53 @@ status_t MONIKA_EXPORT _kern_create_symlink(int fd, const char *path, const char
     return B_OK;
 }
 
+status_t MONIKA_EXPORT _kern_create_link(int pathFD, const char *path, int toFD, const char *toPath, bool traverseLeafLink)
+{
+    if (pathFD == HAIKU_AT_FDCWD)
+    {
+        pathFD = AT_FDCWD;
+    }
+
+    char hostPath[PATH_MAX];
+    long status = GET_HOSTCALLS()->vchroot_expandat(pathFD, path, hostPath, sizeof(hostPath));
+
+    if (status < 0)
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+    else if (status > sizeof(hostPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
+    }
+
+    if (toFD == HAIKU_AT_FDCWD)
+    {
+        toFD = AT_FDCWD;
+    }
+
+    char hostToPath[PATH_MAX];
+    status = GET_HOSTCALLS()->vchroot_expandat(toFD, path, hostToPath, sizeof(hostToPath));
+
+    if (status < 0)
+    {
+        return HAIKU_POSIX_ENOENT;
+    }
+    else if (status > sizeof(hostToPath))
+    {
+        return HAIKU_POSIX_ENAMETOOLONG;
+    }
+
+
+    status = LINUX_SYSCALL5(__NR_linkat, AT_FDCWD, hostPath, AT_FDCWD, hostToPath, traverseLeafLink ? AT_SYMLINK_FOLLOW : 0);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, haiku_stat* st, size_t statSize)
 {
     struct stat linuxstat;
