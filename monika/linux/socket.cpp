@@ -12,6 +12,7 @@
 #include "haiku_netinet_in.h"
 #include "haiku_netinet_tcp.h"
 #include "haiku_socket.h"
+#include "haiku_time.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
 
@@ -328,6 +329,34 @@ status_t MONIKA_EXPORT _kern_getsockopt(int socket, int level, int option,
                     }
                     return B_OK;
                 }
+                case SO_SNDTIMEO:
+                case SO_RCVTIMEO:
+                {
+                    if (_length == NULL || *_length < sizeof(struct haiku_timeval))
+                    {
+                        return B_BAD_VALUE;
+                    }
+
+                    struct timeval linuxTime;
+                    linuxLength = sizeof(linuxTime);
+
+                    long status = LINUX_SYSCALL5(__NR_getsockopt, socket, linuxLevel, linuxOption, &linuxTime, &linuxLength);
+                    if (status < 0)
+                    {
+                        return LinuxToB(-status);
+                    }
+
+                    struct haiku_timeval haikuTime;
+                    haikuTime.tv_sec = linuxTime.tv_sec;
+                    haikuTime.tv_usec = linuxTime.tv_usec;
+                    memcpy(value, &haikuTime, sizeof(haikuTime));
+
+                    if (_length != NULL)
+                    {
+                        *_length = sizeof(haikuTime);
+                    }
+                    return B_OK;
+                }
                 default:
                     trace("_kern_getsockopt: Unimplemented SOL_SOCKET option.");
                     return HAIKU_POSIX_ENOSYS;
@@ -407,6 +436,26 @@ status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
                 // case SO_TYPE:
                 {
                     long status = LINUX_SYSCALL5(__NR_setsockopt, socket, linuxLevel, linuxOption, value, length);
+                    if (status < 0)
+                    {
+                        return LinuxToB(-status);
+                    }
+                    return B_OK;
+                }
+                case SO_SNDTIMEO:
+                case SO_RCVTIMEO:
+                {
+                    if (length != sizeof(struct haiku_timeval))
+                    {
+                        return B_BAD_VALUE;
+                    }
+
+                    struct timeval linuxTime;
+                    linuxTime.tv_sec = ((struct haiku_timeval *)value)->tv_sec;
+                    linuxTime.tv_usec = ((struct haiku_timeval *)value)->tv_usec;
+
+                    long status = LINUX_SYSCALL5(__NR_setsockopt, socket, linuxLevel, linuxOption, &linuxTime, length);
+
                     if (status < 0)
                     {
                         return LinuxToB(-status);

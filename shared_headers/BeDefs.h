@@ -34,6 +34,16 @@ typedef uintptr_t addr_t;
 typedef uint64 haiku_sigset_t;
 typedef uint64 bigtime_t;
 
+typedef int32 haiku_clock_t;
+typedef int32 haiku_suseconds_t;
+typedef uint32 haiku_useconds_t;
+
+#if defined(__i386__) && !defined(__x86_64__)
+typedef int32 haiku_time_t;
+#else
+typedef int64 haiku_time_t;
+#endif
+
 typedef int64 haiku_off_t;
 
 typedef long signed int     haiku_ssize_t;
