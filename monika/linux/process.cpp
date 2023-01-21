@@ -210,7 +210,7 @@ status_t MONIKA_EXPORT _kern_get_team_usage_info(team_id team, int32 who, team_u
     return GET_HOSTCALLS()->get_process_usage(team, info);
 }
 
-haiku_pid_t _kern_process_info(haiku_pid_t process, int32 which)
+haiku_pid_t MONIKA_EXPORT _kern_process_info(haiku_pid_t process, int32 which)
 {
     long status;
     switch (which)
@@ -238,7 +238,7 @@ haiku_pid_t _kern_process_info(haiku_pid_t process, int32 which)
 }
 
 
-haiku_pid_t _kern_setpgid(haiku_pid_t process, haiku_pid_t group)
+haiku_pid_t MONIKA_EXPORT _kern_setpgid(haiku_pid_t process, haiku_pid_t group)
 {
     long result = LINUX_SYSCALL2(__NR_setpgid, process, group);
     if (result < 0)
@@ -247,6 +247,17 @@ haiku_pid_t _kern_setpgid(haiku_pid_t process, haiku_pid_t group)
     }
 
     result = LINUX_SYSCALL1(__NR_getpgid, process);
+    if (result < 0)
+    {
+        return LinuxToB(-result);
+    }
+
+    return result;
+}
+
+haiku_pid_t MONIKA_EXPORT _kern_setsid()
+{
+    long result = LINUX_SYSCALL0(__NR_setsid);
     if (result < 0)
     {
         return LinuxToB(-result);
