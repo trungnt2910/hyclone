@@ -44,7 +44,7 @@ static struct dirent* loader_readdir_extended(int fd, LoaderDirectoryInfo& info)
 {
     char rootPath[4];
     // Not root.
-    if (loader_vchroot_unexpandat(fd, "", rootPath, sizeof(rootPath)) != 1 || rootPath[0] != '/')
+    if (loader_vchroot_unexpandat(fd, NULL, rootPath, sizeof(rootPath)) != 1 || rootPath[0] != '/')
     {
         return NULL;
     }
@@ -57,7 +57,7 @@ static struct dirent* loader_readdir_extended(int fd, LoaderDirectoryInfo& info)
         // SystemRoot
         case 0:
         {
-            if (stat(gHaikuPrefix.c_str(), &st))
+            if (stat("/", &st))
             {
                 return NULL;
             }

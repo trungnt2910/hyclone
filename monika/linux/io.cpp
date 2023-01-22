@@ -1220,7 +1220,14 @@ ssize_t MONIKA_EXPORT _kern_poll(struct haiku_pollfd *fds, int numFDs,
 
 status_t MONIKA_EXPORT _kern_setcwd(int fd, const char *path)
 {
-    CHECK_FD_AND_PATH(fd, path);
+    // path can be null with a positive fd, this happens
+    // in the implementation of fchdir.
+    if (fd == HAIKU_AT_FDCWD)
+    {
+        fd = AT_FDCWD;
+        CHECK_NULL_AND_RETURN_BAD_ADDRESS(path);
+        CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, B_ENTRY_NOT_FOUND);
+    }
 
     char hostPath[PATH_MAX];
     if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)

@@ -15,6 +15,7 @@ static std::vector<std::string> sHaikuPrefixParts;
 
 static std::vector<std::string> GetParts(const std::string& path);
 static std::string HaikuPathFromFdAndPath(int fd, const char* path);
+static std::string HostPathFromFd(int fd);
 
 bool loader_init_vchroot(const char* hprefix)
 {
@@ -54,7 +55,7 @@ size_t loader_vchroot_expand(const char* path, char* hostPath, size_t size)
     std::string hostRealPath = "/";
 
     std::vector<std::string> haikuRealPathParts = GetParts(haikuRealPath);
-    if (haikuRealPathParts[0] == "SystemRoot")
+    if (haikuRealPathParts.size() > 0 && haikuRealPathParts[0] == "SystemRoot")
     {
         for (size_t i = 1; i < haikuRealPathParts.size(); ++i)
         {
@@ -66,7 +67,7 @@ size_t loader_vchroot_expand(const char* path, char* hostPath, size_t size)
         }
     }
     // Reflect the whole Linux devfs to Haiku.
-    else if (haikuRealPathParts[0] == "dev")
+    else if (haikuRealPathParts.size() > 0 && haikuRealPathParts[0] == "dev")
     {
         hostRealPath = haikuRealPath;
     }
@@ -118,7 +119,7 @@ size_t loader_vchroot_unexpand(const char* hostPath, char* path, size_t size)
             }
         }
     }
-    else if (hostParts[0] == "dev")
+    else if (hostParts.size() > 0 && hostParts[0] == "dev")
     {
         haikuPath = hostRealPath;
     }
@@ -152,15 +153,17 @@ size_t loader_vchroot_expandat(int fd, const char* path, char* hostPath, size_t 
 size_t loader_vchroot_unexpandat(int fd, const char* hostPath, char* path, size_t size)
 {
     std::string hostRealPath;
+    if (hostPath == NULL)
+    {
+        hostPath = "";
+    }
     if (hostPath[0] == '/')
     {
         hostRealPath = hostPath;
     }
     else if (fd >= 0)
     {
-        char fdPath[PATH_MAX];
-        readlink(("/proc/self/fd/" + std::to_string(fd)).c_str(), fdPath, sizeof(fdPath));
-        hostRealPath = fdPath;
+        hostRealPath += HostPathFromFd(fd);
         if (hostRealPath.back() != '/')
         {
             hostRealPath += "/";
@@ -298,17 +301,10 @@ std::string HaikuPathFromFdAndPath(int fd, const char* path)
     }
     else if (fd >= 0)
     {
-        // For some reasons, std::canonical() does not work.
-        char fdPath[PATH_MAX];
-        ssize_t linkLength = readlink(("/proc/self/fd/" + std::to_string(fd)).c_str(), fdPath, sizeof(fdPath));
-        if (linkLength > 0 && linkLength < PATH_MAX)
-        {
-            // readlink does not append a null character for us.
-            fdPath[linkLength] = '\0';
-        }
-        size_t length = loader_vchroot_unexpand(fdPath, NULL, 0);
+        std::string fdPath = HostPathFromFd(fd);
+        size_t length = loader_vchroot_unexpand(fdPath.c_str(), NULL, 0);
         haikuPath = std::string(length, '\0');
-        loader_vchroot_unexpand(fdPath, haikuPath.data(), length);
+        loader_vchroot_unexpand(fdPath.c_str(), haikuPath.data(), length);
         if (haikuPath.back() != '/')
         {
             haikuPath += "/";
@@ -322,4 +318,16 @@ std::string HaikuPathFromFdAndPath(int fd, const char* path)
     }
 
     return haikuPath;
+}
+
+static std::string HostPathFromFd(int fd)
+{
+    char fdPath[PATH_MAX];
+    ssize_t linkLength = readlink(("/proc/self/fd/" + std::to_string(fd)).c_str(), fdPath, sizeof(fdPath));
+    if (linkLength > 0 && linkLength < PATH_MAX)
+    {
+        // readlink does not append a null character for us.
+        fdPath[linkLength] = '\0';
+    }
+    return fdPath;
 }
