@@ -121,6 +121,29 @@ typedef struct haiku_fd_set
 #define HAIKU_FD_ISSET(fd, set) ((set)->bits[_HAIKU_FD_BITSINDEX(fd)] & _HAIKU_FD_BIT(fd))
 #define HAIKU_FD_COPY(source, target) (*(target) = *(source))
 
+#define CHECK_NULL_AND_RETURN_BAD_ADDRESS(str)                  \
+    if (str == NULL)                                            \
+    {                                                           \
+        return B_BAD_ADDRESS;                                   \
+    }
+
+#define CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(str, haikuError) \
+    if (str != NULL && str[0] == '\0')                          \
+    {                                                           \
+        return haikuError;                                      \
+    }
+
+#define CHECK_FD_AND_PATH(fd, str)                              \
+    if (fd == HAIKU_AT_FDCWD)                                   \
+    {                                                           \
+        CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(str, B_ENTRY_NOT_FOUND);  \
+        fd = AT_FDCWD;                                          \
+    }                                                           \
+    else                                                        \
+    {                                                           \
+        CHECK_NULL_AND_RETURN_BAD_ADDRESS(str);                 \
+    }
+
 static int ModeBToLinux(int mode);
 static int ModeLinuxToB(int mode);
 static void FdSetBToLinux(const haiku_fd_set& fdSet, fd_set& linuxFdSet);
@@ -484,18 +507,25 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
     size_t statSize, int statMask)
 {
     long result;
+    struct haiku_stat completeStat;
+
+    if (stat == NULL)
+    {
+        return B_BAD_ADDRESS;
+    }
 
     if (statSize > sizeof(haiku_stat))
     {
         return B_BAD_VALUE;
     }
 
-    if (fd == HAIKU_AT_FDCWD)
+    if (statSize < sizeof(haiku_stat))
     {
-        fd = AT_FDCWD;
+        memcpy(&completeStat, stat, statSize);
+        stat = &completeStat;
     }
 
-    if (fd >= 0 && IS_NULL_OR_EMPTY(path))
+    if (fd != HAIKU_AT_FDCWD)
     {
         if (statMask & B_STAT_MODE)
         {
@@ -567,6 +597,8 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
     }
     else
     {
+        CHECK_FD_AND_PATH(fd, path);
+
         char hostPath[PATH_MAX];
         long expandStatus;
         if (!traverseLink)
@@ -679,14 +711,9 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
 {
     if (fd == HAIKU_AT_FDCWD)
     {
-        if (IS_NULL_OR_EMPTY(path))
-        {
-            return HAIKU_POSIX_ENOENT;
-        }
-
+        CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, HAIKU_POSIX_ENOENT);
         fd = AT_FDCWD;
     }
-
     bool noTraverse = (openMode & HAIKU_O_NOTRAVERSE);
 
     openMode &= ~HAIKU_O_NOTRAVERSE;
@@ -750,15 +777,7 @@ int MONIKA_EXPORT _kern_close(int fd)
 
 int MONIKA_EXPORT _kern_access(int fd, const char* path, int mode, bool effectiveUserGroup)
 {
-    if (fd == HAIKU_AT_FDCWD)
-    {
-        fd = AT_FDCWD;
-    }
-
-    if (IS_NULL_OR_EMPTY(path))
-    {
-        return HAIKU_POSIX_ENOENT;
-    }
+    CHECK_FD_AND_PATH(fd, path);
 
     int linuxMode = 0;
 
@@ -895,10 +914,8 @@ int MONIKA_EXPORT _kern_create_pipe(int *fds)
 
 int MONIKA_EXPORT _kern_rename(int oldDir, const char *oldpath, int newDir, const char *newpath)
 {
-    if (IS_NULL_OR_EMPTY(oldpath) || IS_NULL_OR_EMPTY(newpath))
-    {
-        return HAIKU_POSIX_ENOENT;
-    }
+    CHECK_FD_AND_PATH(oldDir, oldpath);
+    CHECK_FD_AND_PATH(newDir, newpath);
 
     char oldHostPath[PATH_MAX];
     char newHostPath[PATH_MAX];
@@ -935,15 +952,7 @@ int MONIKA_EXPORT _kern_rename(int oldDir, const char *oldpath, int newDir, cons
 
 int MONIKA_EXPORT _kern_unlink(int fd, const char* path)
 {
-    if (fd == HAIKU_AT_FDCWD)
-    {
-        fd = AT_FDCWD;
-    }
-
-    if (IS_NULL_OR_EMPTY(path))
-    {
-        return HAIKU_POSIX_ENOENT;
-    }
+    CHECK_FD_AND_PATH(fd, path);
 
     char hostPath[PATH_MAX];
     if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
@@ -977,11 +986,7 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
 {
     if (fd == HAIKU_AT_FDCWD)
     {
-        if (IS_NULL_OR_EMPTY(path))
-        {
-            return HAIKU_POSIX_ENOENT;
-        }
-
+        CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, HAIKU_POSIX_ENOENT);
         fd = AT_FDCWD;
     }
 
@@ -1215,15 +1220,7 @@ ssize_t MONIKA_EXPORT _kern_poll(struct haiku_pollfd *fds, int numFDs,
 
 status_t MONIKA_EXPORT _kern_setcwd(int fd, const char *path)
 {
-    if (fd == HAIKU_AT_FDCWD)
-    {
-        fd = AT_FDCWD;
-    }
-
-    if (IS_NULL_OR_EMPTY(path))
-    {
-        return HAIKU_POSIX_ENOENT;
-    }
+    CHECK_FD_AND_PATH(fd, path);
 
     char hostPath[PATH_MAX];
     if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
@@ -1243,10 +1240,7 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char *path)
 
 status_t MONIKA_EXPORT _kern_create_dir(int fd, const char *path, int perms)
 {
-    if (IS_NULL_OR_EMPTY(path))
-    {
-        return HAIKU_POSIX_ENOENT;
-    }
+    CHECK_FD_AND_PATH(fd, path);
 
     char hostPath[PATH_MAX];
     long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
@@ -1272,6 +1266,8 @@ status_t MONIKA_EXPORT _kern_create_dir(int fd, const char *path, int perms)
 
 status_t MONIKA_EXPORT _kern_remove_dir(int fd, const char *path)
 {
+    CHECK_FD_AND_PATH(fd, path);
+
     char hostPath[PATH_MAX];
     long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
 
