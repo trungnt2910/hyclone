@@ -149,6 +149,10 @@ int server_main(int argc, char **argv)
             connection_close:
                 std::cerr << "Closing: " << fd << std::endl;
                 close(fd);
+                // For process that have already been gracefully disconnected,
+                // the call should silently fail with a B_BAD_VALUE on server_dispatch
+                // before reaching server_hserver_call_disconnect.
+                server_dispatch(fd, SERVERCALL_ID_disconnect, 0, 0, 0, 0, 0, 0);
 
                 std::swap(pollfds[i], pollfds.back());
                 pollfds.pop_back();
