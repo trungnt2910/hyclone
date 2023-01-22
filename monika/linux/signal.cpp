@@ -204,6 +204,46 @@ status_t MONIKA_EXPORT _kern_send_signal(int32 id, uint32 signal, const union ha
     return B_OK;
 }
 
+status_t MONIKA_EXPORT _kern_set_signal_stack(const haiku_stack_t *newStack, haiku_stack_t *oldStack)
+{
+    stack_t linuxNewStackStorage;
+    stack_t linuxOldStackStorage;
+
+    stack_t *linuxNewStack = NULL;
+    stack_t *linuxOldStack = NULL;
+
+    // TODO: Implement ss_flags marshalling. Haiku does not use ss_flags,
+    // so this should always be 0.
+    if (newStack != NULL)
+    {
+        linuxNewStack = &linuxNewStackStorage;
+        linuxNewStack->ss_sp = newStack->ss_sp;
+        linuxNewStack->ss_size = newStack->ss_size;
+        linuxNewStack->ss_flags = newStack->ss_flags;
+    }
+
+    if (oldStack != NULL)
+    {
+        linuxOldStack = &linuxOldStackStorage;
+    }
+
+    long result = LINUX_SYSCALL2(__NR_sigaltstack, linuxNewStack, linuxOldStack);
+
+    if (result < 0)
+    {
+        return LinuxToB(-result);
+    }
+
+    if (oldStack != NULL)
+    {
+        oldStack->ss_sp = linuxOldStack->ss_sp;
+        oldStack->ss_size = linuxOldStack->ss_size;
+        oldStack->ss_flags = linuxOldStack->ss_flags;
+    }
+
+    return B_OK;
+}
+
 }
 
 void SigHandlerTrampoline(int signal)
