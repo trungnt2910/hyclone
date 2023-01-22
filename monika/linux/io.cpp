@@ -19,6 +19,7 @@
 #include "fcntl_conversion.h"
 #include "haiku_errors.h"
 #include "haiku_fcntl.h"
+#include "haiku_file.h"
 #include "haiku_poll.h"
 #include "haiku_signal.h"
 #include "haiku_stat.h"
@@ -150,6 +151,7 @@ static void FdSetBToLinux(const haiku_fd_set& fdSet, fd_set& linuxFdSet);
 static void FdSetLinuxToB(const fd_set& linuxFdSet, haiku_fd_set& fdSet);
 static int PollEventsBToLinux(int pollEvents);
 static int PollEventsLinuxToB(int pollEvents);
+static int FlockFlagsBToLinux(int flockFlags);
 static bool IsTty(int fd);
 
 extern "C"
@@ -1313,6 +1315,17 @@ status_t MONIKA_EXPORT _kern_fsync(int fd)
     return B_OK;
 }
 
+status_t MONIKA_EXPORT _kern_flock(int fd, int op)
+{
+    int status = LINUX_SYSCALL2(__NR_flock, fd, FlockFlagsBToLinux(op));
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 // The functions below are clearly impossible
 // to be cleanly implemented in Hyclone, so
 // ENOSYS is directly returned and no logging is provided.
@@ -1404,4 +1417,26 @@ int PollEventsLinuxToB(int pollEvents)
 #include "poll_values.h"
 #undef SUPPORTED_POLL_FLAG
     return haikuEvents;
+}
+
+int FlockFlagsBToLinux(int flockFlags)
+{
+    int linuxFlags = 0;
+    if (flockFlags & HAIKU_LOCK_SH)
+    {
+        linuxFlags |= LOCK_SH;
+    }
+    if (flockFlags & HAIKU_LOCK_EX)
+    {
+        linuxFlags |= LOCK_EX;
+    }
+    if (flockFlags & HAIKU_LOCK_NB)
+    {
+        linuxFlags |= LOCK_NB;
+    }
+    if (flockFlags & HAIKU_LOCK_UN)
+    {
+        linuxFlags |= LOCK_UN;
+    }
+    return linuxFlags;
 }
