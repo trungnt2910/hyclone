@@ -972,6 +972,13 @@ int MONIKA_EXPORT _kern_unlink(int fd, const char* path)
     return B_OK;
 }
 
+int MONIKA_EXPORT _kern_open_attr_dir(int fd, const char *path, bool traverseLeafLink)
+{
+   trace("attribute directories are not implemented yet.");
+   // This is returned on most Haiku filesystems.
+   return B_UNSUPPORTED;
+}
+
 int MONIKA_EXPORT _kern_stat_attr(int fd, const char *attribute, struct attr_info *attrInfo)
 {
     long result = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, NULL, 0);
