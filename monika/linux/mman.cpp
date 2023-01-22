@@ -824,14 +824,19 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
     return status;
 }
 
-int MONIKA_EXPORT _kern_area_for(void *address)
+area_id MONIKA_EXPORT _kern_area_for(void *address)
 {
     return GET_SERVERCALLS()->area_for(address);
 }
 
-int MONIKA_EXPORT _kern_get_area_info(int area, void* info)
+status_t MONIKA_EXPORT _kern_get_area_info(area_id area, void* info)
 {
     return GET_SERVERCALLS()->get_area_info(area, info);
+}
+
+status_t MONIKA_EXPORT _kern_get_next_area_info(team_id team, ssize_t *cookie, void* info)
+{
+    return GET_SERVERCALLS()->get_next_area_info(team, cookie, info);
 }
 
 }

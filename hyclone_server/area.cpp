@@ -1,6 +1,7 @@
 #include <array>
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 #include <vector>
 #include <utility>
 
@@ -8,6 +9,7 @@
 #include "haiku_errors.h"
 #include "process.h"
 #include "server_servercalls.h"
+#include "system.h"
 
 intptr_t server_hserver_call_register_area(hserver_context& context, void* user_area_info)
 {
@@ -39,6 +41,73 @@ intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id
     }
 
     if (context.process->WriteMemory(uesr_area_info, &area_info, sizeof(area_info)) != sizeof(area_info))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_get_next_area_info(hserver_context& context, int target_pid, void* user_cookie, void* user_info)
+{
+    if (target_pid == 0)
+    {
+        target_pid = context.pid;
+    }
+
+    std::shared_ptr<Process> targetProcess;
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        targetProcess = system.GetProcess(target_pid).lock();
+    }
+
+    if (!targetProcess)
+    {
+        // Probably this means that it's a Linux process.
+        std::cerr << "Process " << target_pid << " not found" << std::endl;
+        std::cerr << "get_next_area_info for host processes is currently not supported." << std::endl;
+        return B_BAD_VALUE;
+    }
+
+    intptr_t areaId;
+
+    if (context.process->ReadMemory(user_cookie, &areaId, sizeof(areaId)) != sizeof(areaId))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    if (areaId < 0)
+    {
+        return B_BAD_VALUE;
+    }
+
+    haiku_area_info info;
+
+    // TODO: Haiku stores the end of the last area in the cookie, while we store area IDs.
+    // What problems can this cause?
+
+    {
+        auto lock = targetProcess->Lock();
+        if (!targetProcess->IsValidAreaId(areaId))
+        {
+            areaId = targetProcess->NextAreaId(areaId);
+        }
+        // It may pass the end.
+        if (areaId < 0)
+        {
+            return B_BAD_VALUE;
+        }
+        info = targetProcess->GetArea(areaId);
+        areaId = targetProcess->NextAreaId(areaId);
+    }
+
+    if (context.process->WriteMemory(user_info, &info, sizeof(info)) != sizeof(info))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    if (context.process->WriteMemory(user_cookie, &areaId, sizeof(areaId)) != sizeof(areaId))
     {
         return B_BAD_ADDRESS;
     }
