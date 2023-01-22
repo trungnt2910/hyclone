@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <sys/types.h>
 
 #include "BeDefs.h"
 #include "export.h"
@@ -23,6 +24,7 @@ size_t MONIKA_EXPORT _kern_read_port_etc(port_id port, int32 *msgCode,
     void *msgBuffer, size_t bufferSize, uint32 flags,
     bigtime_t timeout)
 {
+    GET_HOSTCALLS()->printf("read_port_etc(%d, %p, %p, %d, %d, %lld)", port, msgCode, msgBuffer, bufferSize, flags, timeout);
     return GET_SERVERCALLS()->read_port_etc(port, msgCode, msgBuffer, bufferSize, flags, timeout);
 }
 
@@ -40,6 +42,14 @@ port_id MONIKA_EXPORT _kern_find_port(const char *port_name)
 status_t MONIKA_EXPORT _kern_get_port_info(port_id id, struct haiku_port_info *info)
 {
     return GET_SERVERCALLS()->get_port_info(id, info);
+}
+
+ssize_t MONIKA_EXPORT _kern_port_buffer_size_etc(port_id port, uint32 flags, bigtime_t timeout)
+{
+    GET_HOSTCALLS()->printf("port_buffer_size_etc(%d, %d, %lld)\n", port, flags, timeout);
+    ssize_t result = GET_SERVERCALLS()->port_buffer_size_etc(port, flags, timeout);
+    GET_HOSTCALLS()->printf("port_buffer_size_etc(%d, %d, %lld) = %d\n", port, flags, timeout, result);
+    return result;
 }
 
 status_t MONIKA_EXPORT _kern_set_port_owner(port_id port, team_id team)

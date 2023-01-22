@@ -29,6 +29,7 @@ public:
 
     std::string GetName() const { return _info.name; }
     const haiku_port_info& GetInfo() const { return _info; }
+    std::size_t GetBufferSize() const { return _messages.front().second.size(); }
 
     void SetOwner(int team) { _info.team = team; }
 };
