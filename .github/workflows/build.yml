@@ -1,0 +1,67 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - "master"
+      - "dev/**"
+      - "ga"
+  pull_request:
+    branches:
+      - "master"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Haiku build dependencies
+        run: |
+          sudo apt install -y git nasm bc autoconf automake texinfo flex bison gawk build-essential unzip wget zip less zlib1g-dev libzstd-dev xorriso libtool python3
+
+      - name: Fetch cached Haiku build
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: 'haiku-build'
+          key: 'haiku-build'
+
+      - name: Build Haiku
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir haiku-build
+          cd haiku-build
+          git clone https://review.haiku-os.org/buildtools
+          git clone https://review.haiku-os.org/haiku
+          cd haiku
+          mkdir generated.x86_64; cd generated.x86_64
+          ../configure --cross-tools-source ../../buildtools --build-cross-tools x86_64
+          cd ../../buildtools/jam
+          make
+          sudo ./jam0 install
+          cd ../../haiku/generated.x86_64
+          jam -q -j$(nproc) libroot.so runtime_loader
+          cd ..
+
+      - name: Install HyClone build dependencies
+        run: |
+          sudo apt install -y cmake libgmp-dev libmpfr-dev zlib1g-dev
+
+      - name: Build HyClone
+        run: |
+          export HAIKU_BUILD_OUTPUT_ROOT=$GITHUB_WORKSPACE/haiku-build/haiku/generated.x86_64
+          ./copy_objects.sh
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=.
+          make install
+          cd ..
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: hyclone
+          path: build
