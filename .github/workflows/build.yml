@@ -32,19 +32,8 @@ jobs:
       - name: Build Haiku
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          mkdir haiku-build
-          cd haiku-build
-          git clone https://review.haiku-os.org/buildtools
-          git clone https://review.haiku-os.org/haiku
-          cd haiku
-          mkdir generated.x86_64; cd generated.x86_64
-          ../configure --cross-tools-source ../../buildtools --build-cross-tools x86_64
-          cd ../../buildtools/jam
-          make
-          sudo ./jam0 install
-          cd ../../haiku/generated.x86_64
-          jam -q -j$(nproc) libroot.so runtime_loader
-          cd ..
+          export HAIKU_BUILD_ENVIRONMENT_ROOT=$GITHUB_WORKSPACE/haiku-build
+          ./copy_objects.sh
 
       - name: Install HyClone build dependencies
         run: |
@@ -52,7 +41,7 @@ jobs:
 
       - name: Build HyClone
         run: |
-          export HAIKU_BUILD_OUTPUT_ROOT=$GITHUB_WORKSPACE/haiku-build/haiku/generated.x86_64
+          export HAIKU_BUILD_ENVIRONMENT_ROOT=$GITHUB_WORKSPACE/haiku-build
           ./copy_objects.sh
           mkdir build
           cd build
