@@ -32,7 +32,7 @@ if [ ! -d "$HAIKU_BUILD_OUTPUT_ROOT" ]; then
     cd $HAIKU_BUILD_TOOLS_DIRECTORY/jam
     make -j$(nproc)
     cd $HAIKU_BUILD_OUTPUT_ROOT
-    $HAIKU_BUILD_TOOLS_DIRECTORY/jam/jam0 -q -j$(nproc) libroot.so runtime_loader
+    $HAIKU_BUILD_TOOLS_DIRECTORY/jam/jam0 -q -j$(nproc) libroot.so runtime_loader <build>fs_shell.a
     popd
 fi
 
@@ -40,6 +40,9 @@ fi
 # They'll be handled by CMake.
 
 mkdir -p $SCRIPT_DIR/libroot/os/arch/$HAIKU_ARCH
+mkdir -p $SCRIPT_DIR/libhyclonefs/haiku_include/fs_shell
+mkdir -p $SCRIPT_DIR/libhyclonefs/haiku_include/private/fs_shell
+mkdir -p $SCRIPT_DIR/libhyclonefs/fs_shell
 
 cp -fv $HAIKU_RUNTIME_LOADER_ARCH/*.a $SCRIPT_DIR/runtime_loader
 cp -fv $HAIKU_RUNTIME_LOADER/*.a $SCRIPT_DIR/runtime_loader
@@ -61,3 +64,7 @@ cp -fv $HAIKU_GLUE_ARCH/crti.o $SCRIPT_DIR/libroot
 cp -fv $HAIKU_GLUE_ARCH/crtn.o $SCRIPT_DIR/libroot
 cp -fv $HAIKU_GLUE_GCC/crtbeginS.o $SCRIPT_DIR/libroot
 cp -fv $HAIKU_GLUE_GCC/crtendS.o $SCRIPT_DIR/libroot
+cp -fv $HAIKU_BUILD_SOURCE_DIRECTORY/src/tools/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/fs_shell
+cp -fv $HAIKU_BUILD_SOURCE_DIRECTORY/headers/private/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/private/fs_shell
+cp -fv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/build/libroot/*.o $SCRIPT_DIR/libhyclonefs/fs_shell
+cp -fv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/tools/fs_shell/*.o $SCRIPT_DIR/libhyclonefs/fs_shell
