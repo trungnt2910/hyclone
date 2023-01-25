@@ -32,7 +32,7 @@ if [ ! -d "$HAIKU_BUILD_OUTPUT_ROOT" ]; then
     cd $HAIKU_BUILD_TOOLS_DIRECTORY/jam
     make -j$(nproc)
     cd $HAIKU_BUILD_OUTPUT_ROOT
-    $HAIKU_BUILD_TOOLS_DIRECTORY/jam/jam0 -q -j$(nproc) libroot.so runtime_loader <build>fs_shell.a
+    $HAIKU_BUILD_TOOLS_DIRECTORY/jam/jam0 -q -j$(nproc) libroot.so runtime_loader "<build>fs_shell.a"
     popd
 fi
 
