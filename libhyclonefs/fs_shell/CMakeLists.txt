@@ -5,5 +5,6 @@ set(fs_shell_objects
 )
 
 add_library(fs_shell STATIC ${fs_shell_objects})
+add_dependencies(fs_shell CopyHaikuObjects)
 target_link_libraries(fs_shell PUBLIC libroot_host)
 set_target_properties(fs_shell PROPERTIES LINKER_LANGUAGE CXX)

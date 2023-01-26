@@ -21,7 +21,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     add_compile_definitions(HYCLONE_HOST_LINUX)
 endif()
 
-if(HYCLONE_ARCH MATCHES "x86_64")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     add_compile_definitions(HAIKU_HOST_PLATFORM_64_BIT)
 endif()
 

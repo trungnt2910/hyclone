@@ -2,14 +2,9 @@
 
 #include <iostream>
 
-fssh_ino_t VNode::GetID() const
+VNode::VNode(Volume* volume, fssh_ino_t id, fssh_ino_t parentID)
+    : fVolume(volume)
+    , fID(id)
+    , fParentID(parentID)
 {
-    std::cerr << "VNode::GetID() not implemented." << std::endl;
-    return 0;
-}
-
-const StatData* VNode::GetStatData() const
-{
-    std::cerr << "VNode::GetStatData() not implemented." << std::endl;
-    return NULL;
 }

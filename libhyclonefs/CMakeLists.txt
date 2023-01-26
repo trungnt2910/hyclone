@@ -13,6 +13,8 @@ set(hyclonefs_sources
 
 set(devfs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/devfs/kernel_interface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/devfs/RandomVNode.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/devfs/RootVNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/devfs/Volume.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/devfs/VNode.cpp
 )

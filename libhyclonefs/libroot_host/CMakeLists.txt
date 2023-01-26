@@ -13,4 +13,5 @@ set(libroot_host_objects
 )
 
 add_library(libroot_host STATIC ${libroot_host_objects})
+add_dependencies(libroot_host CopyHaikuObjects)
 set_target_properties(libroot_host PROPERTIES LINKER_LANGUAGE CXX)

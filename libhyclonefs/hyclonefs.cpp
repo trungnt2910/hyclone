@@ -89,7 +89,7 @@ int hyclonefs_system_init(const HycloneFSArgs* args)
         return error;
     }
     error = _kern_mount("/dev", NULL, "devfs", FSSH_B_MOUNT_VIRTUAL_DEVICE, NULL, 0);
-    if (error != FSSH_B_OK)
+    if (error < 0)
     {
         fprintf(stderr, "mounting devfs failed: %s\n", fssh_strerror(error));
         return error;
