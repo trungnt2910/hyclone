@@ -1,5 +1,6 @@
 project(libhyclonefs)
 
+add_subdirectory(libroot_host)
 add_subdirectory(fs_shell)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/haiku_include/fs_shell)
