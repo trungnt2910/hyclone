@@ -10,6 +10,7 @@ file(GLOB_RECURSE LOADER_SYSTEM_SPECIFIC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/sys
 
 add_executable(haiku_loader
     main.cpp
+    loader_elf.cpp
     loader_idmap.cpp
     loader_lock.cpp
     loader_mutex.cpp
