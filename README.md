@@ -82,6 +82,9 @@ export HPATH=/boot/system/bin:/boot/system/non-packaged/bin
 
 # Set up a few links:
 ln -s /dev $HPREFIX/dev
+
+# Copy Haiku-specific bash profiles to $HPREFIX to get a Haiku shell experience
+cp -rf /path/to/the/source/code/of/haiku/data/etc $HPREFIX/boot/system
 ```
 
 Now, assuming that you're at `$CMAKE_INSTALL_PREFIX`, run:
