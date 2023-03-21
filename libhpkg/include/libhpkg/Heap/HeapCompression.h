@@ -7,6 +7,7 @@ namespace LibHpkg::Heap
     {
         NONE = 0,
         ZLIB = 1,
+        ZSTD = 2,
     };
 }
 

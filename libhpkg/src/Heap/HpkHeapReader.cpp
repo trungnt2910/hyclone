@@ -5,13 +5,15 @@
 
 #include <magic_enum.hpp>
 #include <zlib.h>
+#include <zstd.h>
 
 #include <libhpkg/Heap/HpkHeapReader.h>
 #include <libhpkg/HpkException.h>
 
 namespace LibHpkg::Heap
 {
-    static size_t Inflate(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsInput = nullptr, bool* needsDictionary = nullptr);
+    static size_t InflateZlib(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsInput = nullptr, bool* needsDictionary = nullptr);
+    static size_t InflateZstd(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsInput = nullptr, bool* needsDictionary = nullptr);
 
     HpkHeapReader::HpkHeapReader(
                 const std::filesystem::path& file,
@@ -163,6 +165,7 @@ namespace LibHpkg::Heap
                     throw std::runtime_error("Compressed chunk without compression.");
 
                 case HeapCompression::ZLIB:
+                case HeapCompression::ZSTD:
                     {
                         std::vector<uint8_t> deflatedBuffer(GetHeapChunkCompressedLength(index));
                         ReadFully(deflatedBuffer);
@@ -174,8 +177,10 @@ namespace LibHpkg::Heap
                             bool needsDictionary = false;
                             bool needsInput = false;
 
+                            auto inflate = compression == HeapCompression::ZLIB ? InflateZlib : InflateZstd;
+
                             if (chunkUncompressedLength !=
-                                (read = Inflate(deflatedBuffer.data(), deflatedBuffer.size(), buffer.data(), buffer.size(), &needsInput, &needsDictionary)))
+                                (read = inflate(deflatedBuffer.data(), deflatedBuffer.size(), buffer.data(), buffer.size(), &needsInput, &needsDictionary)))
                             {
                                 // the last chunk size uncompressed may be smaller than the chunk size,
                                 // so don't throw an exception if this happens.
@@ -235,7 +240,7 @@ namespace LibHpkg::Heap
         }
     }
 
-    size_t Inflate(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsInput, bool* needsDictionary)
+    size_t InflateZlib(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsInput, bool* needsDictionary)
     {
         uLongf bytesUsed = dstLen;
         int err = uncompress((Bytef*)dst, (uLongf*)&bytesUsed, (const Bytef*)src, (uLongf)srcLen);
@@ -262,6 +267,16 @@ namespace LibHpkg::Heap
         }
 
         return (size_t)bytesUsed;
+    }
+
+    size_t InflateZstd(const void *src, size_t srcLen, void *dst, size_t dstLen, bool* needsInput, bool* needsDictionary)
+    {
+        size_t err = ZSTD_decompress(dst, dstLen, src, srcLen);
+        if (ZSTD_isError(err))
+        {
+            return (size_t)-1;
+        }
+        return err;
     }
 
     int HpkHeapReader::ReadHeap(size_t offset)

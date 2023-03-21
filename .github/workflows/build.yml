@@ -37,7 +37,7 @@ jobs:
 
       - name: Install HyClone build dependencies
         run: |
-          sudo apt install -y cmake libgmp-dev libmpfr-dev zlib1g-dev
+          sudo apt install -y cmake libgmp-dev libmpfr-dev zlib1g-dev libzstd-dev
 
       - name: Build HyClone
         run: |
