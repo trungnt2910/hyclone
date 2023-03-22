@@ -7,11 +7,10 @@
 #include "loader_servercalls.h"
 #include "loader_tls.h"
 
+extern bool loader_hserver_child_atfork();
+
 // This function handles the forking of process states
 // (runtime_loader, commpage, kernel connections,...)
-//
-// Monika will use an additional servercall to copy
-// hyclone_server process states.
 int loader_fork()
 {
     // Kernel connections are handled by pthread_atfork.
@@ -25,6 +24,7 @@ int loader_fork()
         // Set the thread_id slot.
         // libroot's getpid() function depends on it.
         tls_set(TLS_THREAD_ID_SLOT, (void*)(uintptr_t)gettid());
+        loader_hserver_child_atfork();
     }
     return status;
 }

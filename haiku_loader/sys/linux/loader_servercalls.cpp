@@ -228,19 +228,18 @@ intptr_t loader_hserver_call(servercall_id id, intptr_t a1, intptr_t a2, intptr_
     return result;
 }
 
-static void loader_hserver_child_atfork()
+bool loader_hserver_child_atfork()
 {
-    gServerConnection.Connect(/* forceReconnect: */true);
+    if (!gServerConnection.Connect(/* forceReconnect: */true))
+    {
+        return false;
+    }
+    return loader_hserver_call(SERVERCALL_ID_wait_for_fork_unlock, 0, 0, 0, 0, 0, 0) == 0;
 }
 
 static bool loader_hserver_thread_init()
 {
-    if (!gServerConnection.Connect())
-    {
-        return false;
-    }
-
-    return pthread_atfork(NULL, NULL, loader_hserver_child_atfork) == 0;
+    return gServerConnection.Connect();
 }
 
 bool loader_init_servercalls()
