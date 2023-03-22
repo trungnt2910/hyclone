@@ -65,6 +65,12 @@ status_t MONIKA_EXPORT _kern_get_thread_info(thread_id id, haiku_thread_info *in
     return GET_SERVERCALLS()->get_thread_info(id, info);
 }
 
+status_t MONIKA_EXPORT _kern_set_thread_priority(thread_id id, int32 newPriority)
+{
+    // This is a privileged syscall so we'll have to rely on the server.
+    return GET_SERVERCALLS()->set_thread_priority(id, newPriority);
+}
+
 status_t MONIKA_EXPORT _kern_mutex_lock(int32* mutex, const char* name,
     uint32 flags, bigtime_t timeout)
 {

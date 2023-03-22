@@ -1,6 +1,7 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <sched.h>
 
 #include "haiku_errors.h"
 #include "haiku_thread.h"
@@ -8,6 +9,16 @@
 #include "server_servercalls.h"
 #include "system.h"
 #include "thread.h"
+
+#define B_IDLE_PRIORITY              0
+#define B_LOWEST_ACTIVE_PRIORITY     1
+#define B_LOW_PRIORITY               5
+#define B_NORMAL_PRIORITY            10
+#define B_DISPLAY_PRIORITY           15
+#define B_URGENT_DISPLAY_PRIORITY    20
+#define B_REAL_TIME_DISPLAY_PRIORITY 100
+#define B_URGENT_PRIORITY            110
+#define B_REAL_TIME_PRIORITY         120
 
 Thread::Thread(int pid, int tid) : _tid(tid)
 {
@@ -112,6 +123,53 @@ intptr_t server_hserver_call_register_thread_info(hserver_context& context, void
     {
         thread->SetSuspended(true);
     }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_set_thread_priority(hserver_context& context, int thread_id, int newPriority)
+{
+    auto& system = System::GetInstance();
+
+    std::shared_ptr<Thread> thread;
+
+    {
+        auto lock = system.Lock();
+        thread = system.GetThread(thread_id).lock();
+    }
+
+    if (!thread)
+    {
+        return B_BAD_THREAD_ID;
+    }
+
+    auto threadLock = thread->Lock();
+
+    if (newPriority < B_IDLE_PRIORITY || newPriority > B_REAL_TIME_PRIORITY)
+    {
+        return B_BAD_VALUE;
+    }
+
+    sched_param param;
+    int policy;
+
+    if (newPriority <= B_URGENT_DISPLAY_PRIORITY)
+    {
+        param.sched_priority = 0;
+        policy = SCHED_OTHER;
+    }
+    else
+    {
+        param.sched_priority = newPriority - B_URGENT_DISPLAY_PRIORITY;
+        policy = SCHED_RR;
+    }
+
+    if (sched_setscheduler(thread_id, policy, &param) == -1)
+    {
+        return B_NOT_ALLOWED;
+    }
+
+    thread->GetInfo().priority = newPriority;
 
     return B_OK;
 }

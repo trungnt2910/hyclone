@@ -34,6 +34,6 @@ target_link_libraries(hyclone_server hpkgvfs)
 install(TARGETS hyclone_server DESTINATION bin)
 if(HYCLONE_HOST_LINUX)
     install(CODE "
-        message(STATUS \"Setting cap_sys_ptrace capability for hyclone_server\")
-        execute_process(COMMAND sudo setcap cap_sys_ptrace+eip ${CMAKE_INSTALL_PREFIX}/bin/hyclone_server)")
+        message(STATUS \"Setting capabilities for hyclone_server\")
+        execute_process(COMMAND sudo setcap cap_sys_ptrace,cap_sys_nice+eip ${CMAKE_INSTALL_PREFIX}/bin/hyclone_server)")
 endif()
