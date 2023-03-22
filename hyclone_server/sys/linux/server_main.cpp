@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <signal.h>
 #include <string>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
@@ -32,6 +33,10 @@ int server_main(int argc, char **argv)
     std::string hycloneSocketPath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SOCKET_NAME;
 
     // daemon(0, 0);
+
+    // Prevent SIGPIPE from crashing the whole kernel server.
+    signal(SIGPIPE, SIG_IGN);
+
     unlink(hycloneSocketPath.c_str());
 
     int listen_socket = socket(AF_UNIX, SOCK_STREAM, 0);
