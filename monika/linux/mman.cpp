@@ -839,6 +839,19 @@ status_t MONIKA_EXPORT _kern_get_next_area_info(team_id team, ssize_t *cookie, v
     return GET_SERVERCALLS()->get_next_area_info(team, cookie, info);
 }
 
+status_t MONIKA_EXPORT _kern_mlock(const void* address, size_t size)
+{
+    long status = LINUX_SYSCALL2(__NR_mlock, address, size);
+    // TODO: Update area lock information.
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 }
 
 int ProtBToLinux(int protection)
