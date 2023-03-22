@@ -10,6 +10,7 @@
 #include "linux_debug.h"
 #include "linux_subsystemlock.h"
 #include "linux_syscall.h"
+#include "servercalls.h"
 #include "thread_defs.h"
 
 static bool sIsProcessDebugged = false;
@@ -28,10 +29,7 @@ extern size_t _kern_read_port_etc(port_id port, int32 *msgCode,
 
 void MONIKA_EXPORT _kern_debug_output(const char* userString)
 {
-    size_t len = strlen(userString);
-    const char prefix[] = "kern_debug_output: ";
-    LINUX_SYSCALL3(__NR_write, 2, prefix, sizeof(prefix));
-    LINUX_SYSCALL3(__NR_write, 2, userString, len);
+    GET_SERVERCALLS()->debug_output(userString, strlen(userString));
 }
 
 void MONIKA_EXPORT _kern_debugger(const char* userString)
