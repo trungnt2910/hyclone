@@ -225,6 +225,16 @@ typedef struct haiku_stack_t
 
 typedef struct vregs vregs;
 
+typedef struct vregs haiku_mcontext_t;
+
+typedef struct _haiku_ucontext_t
+{
+    struct _haiku_ucontext_t* uc_link;
+    haiku_sigset_t            uc_sigmask;
+    haiku_stack_t             uc_stack;
+    haiku_mcontext_t          uc_mcontext;
+} haiku_ucontext_t;
+
 typedef decltype(haiku_sigaction::sa_handler) haiku_sighandler_t;
 typedef decltype(haiku_sigaction::sa_sigaction) haiku_sigaction_t;
 

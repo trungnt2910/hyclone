@@ -212,14 +212,10 @@ status_t MONIKA_EXPORT _kern_set_signal_stack(const haiku_stack_t *newStack, hai
     stack_t *linuxNewStack = NULL;
     stack_t *linuxOldStack = NULL;
 
-    // TODO: Implement ss_flags marshalling. Haiku does not use ss_flags,
-    // so this should always be 0.
     if (newStack != NULL)
     {
         linuxNewStack = &linuxNewStackStorage;
-        linuxNewStack->ss_sp = newStack->ss_sp;
-        linuxNewStack->ss_size = newStack->ss_size;
-        linuxNewStack->ss_flags = newStack->ss_flags;
+        StackBToLinux(*newStack, *linuxNewStack);        
     }
 
     if (oldStack != NULL)
@@ -236,9 +232,7 @@ status_t MONIKA_EXPORT _kern_set_signal_stack(const haiku_stack_t *newStack, hai
 
     if (oldStack != NULL)
     {
-        oldStack->ss_sp = linuxOldStack->ss_sp;
-        oldStack->ss_size = linuxOldStack->ss_size;
-        oldStack->ss_flags = linuxOldStack->ss_flags;
+        StackLinuxToB(*linuxOldStack, *oldStack);
     }
 
     return B_OK;
@@ -263,8 +257,14 @@ void SigHandlerTrampoline(int signal)
     handler(signal, sHaikuSignalHandlers[signal].sa_userdata, &regs);
 }
 
-void SigActionTrampoline(int signal, siginfo_t *siginfo, void *context)
+void SigActionTrampoline(int signal, siginfo_t* siginfo, void* context)
 {
+    // This uselss buffer somehow prevents apps like .NET from overwriting
+    // the haikuSiginfo variable. WHY?????
+    char buffer[1024];
+    buffer[0] = '/';
+
+    const ucontext_t* linuxContext = (const ucontext_t*)context;
     signal = SignalLinuxToB(signal);
 
     haiku_sigaction_t handler = (haiku_sigaction_t)
@@ -273,7 +273,19 @@ void SigActionTrampoline(int signal, siginfo_t *siginfo, void *context)
     haiku_siginfo_t haikuSiginfo;
     SiginfoLinuxToB(*siginfo, haikuSiginfo);
 
-    // TODO: Marshal context to Haiku's context type.
+    haiku_ucontext_t haikuContext;
+    ContextLinuxToB(*linuxContext, haikuContext);
 
-    handler(signal, &haikuSiginfo, context);
+    haiku_ucontext_t *haikuCurrentContext = &haikuContext;
+    const ucontext_t *linuxCurrentContext = linuxContext->uc_link;
+
+    while (linuxCurrentContext != NULL)
+    {
+        haikuCurrentContext->uc_link = (haiku_ucontext_t *)__builtin_alloca(sizeof(haiku_ucontext_t));
+        haikuCurrentContext = haikuCurrentContext->uc_link;
+        ContextLinuxToB(*linuxCurrentContext, *haikuCurrentContext);
+        linuxCurrentContext = linuxCurrentContext->uc_link;
+    }
+
+    handler(signal, &haikuSiginfo, &haikuContext);
 }

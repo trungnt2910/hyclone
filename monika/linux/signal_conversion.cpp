@@ -339,3 +339,66 @@ void SiginfoLinuxToB(const siginfo_t &linuxSiginfo, haiku_siginfo_t &siginfo)
     // The union should be the same.
     haiku_siginfo_set_si_value(siginfo, (const haiku_sigval&)linuxSiginfo.si_value);
 }
+
+void StackBToLinux(const haiku_stack_t& stack, stack_t& linuxStack)
+{
+    linuxStack.ss_sp = stack.ss_sp;
+    linuxStack.ss_size = stack.ss_size;
+    if (stack.ss_flags & HAIKU_SS_ONSTACK)
+    {
+        linuxStack.ss_flags |= SS_ONSTACK;
+    }
+    if (stack.ss_flags & HAIKU_SS_DISABLE)
+    {
+        linuxStack.ss_flags |= SS_DISABLE;
+    }
+}
+
+void StackLinuxToB(const stack_t& linuxStack, haiku_stack_t& stack)
+{
+    stack.ss_sp = linuxStack.ss_sp;
+    stack.ss_size = linuxStack.ss_size;
+    if (linuxStack.ss_flags & SS_ONSTACK)
+    {
+        stack.ss_flags |= HAIKU_SS_ONSTACK;
+    }
+    if (linuxStack.ss_flags & SS_DISABLE)
+    {
+        stack.ss_flags |= HAIKU_SS_DISABLE;
+    }
+}
+
+void ContextLinuxToB(const ucontext_t& linuxContext, haiku_ucontext_t& context)
+{
+    linux_sigset_t linuxSigmask;
+    memcpy(&linuxSigmask, &linuxContext.uc_sigmask, sizeof(linux_sigset_t));
+
+    context.uc_sigmask = SigSetLinuxToB(linuxSigmask);
+    StackLinuxToB(linuxContext.uc_stack, context.uc_stack);
+
+#ifdef __x86_64__
+    context.uc_mcontext.rax = linuxContext.uc_mcontext.gregs[REG_RAX];
+    context.uc_mcontext.rbx = linuxContext.uc_mcontext.gregs[REG_RBX];
+    context.uc_mcontext.rcx = linuxContext.uc_mcontext.gregs[REG_RCX];
+    context.uc_mcontext.rdx = linuxContext.uc_mcontext.gregs[REG_RDX];
+    context.uc_mcontext.rdi = linuxContext.uc_mcontext.gregs[REG_RDI];
+    context.uc_mcontext.rsi = linuxContext.uc_mcontext.gregs[REG_RSI];
+    context.uc_mcontext.rbp = linuxContext.uc_mcontext.gregs[REG_RBP];
+    context.uc_mcontext.r8 = linuxContext.uc_mcontext.gregs[REG_R8];
+    context.uc_mcontext.r9 = linuxContext.uc_mcontext.gregs[REG_R9];
+    context.uc_mcontext.r10 = linuxContext.uc_mcontext.gregs[REG_R10];
+    context.uc_mcontext.r11 = linuxContext.uc_mcontext.gregs[REG_R11];
+    context.uc_mcontext.r12 = linuxContext.uc_mcontext.gregs[REG_R12];
+    context.uc_mcontext.r13 = linuxContext.uc_mcontext.gregs[REG_R13];
+    context.uc_mcontext.r14 = linuxContext.uc_mcontext.gregs[REG_R14];
+    context.uc_mcontext.r15 = linuxContext.uc_mcontext.gregs[REG_R15];
+    context.uc_mcontext.rsp = linuxContext.uc_mcontext.gregs[REG_RSP];
+    context.uc_mcontext.rip = linuxContext.uc_mcontext.gregs[REG_RIP];
+    context.uc_mcontext.rflags = linuxContext.uc_mcontext.gregs[REG_EFL];
+
+    // TODO: floating point registers.
+    memset(&context.uc_mcontext.fpu, 0, sizeof(context.uc_mcontext.fpu));
+#else
+# error Implement mcontext_t marshalling on this platform!
+#endif
+}

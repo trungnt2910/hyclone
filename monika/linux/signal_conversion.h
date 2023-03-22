@@ -18,8 +18,11 @@ int SignalLinuxToB(int signal);
 void SigactionBToLinux(const struct haiku_sigaction &sigaction, struct linux_sigaction &linuxSigaction);
 void SigactionLinuxToB(const struct linux_sigaction &linuxSigaction, struct haiku_sigaction &sigaction);
 void SiginfoLinuxToB(const siginfo_t &linuxSiginfo, haiku_siginfo_t &siginfo);
+void StackBToLinux(const haiku_stack_t& stack, stack_t& linuxStack);
+void StackLinuxToB(const stack_t& linuxStack, haiku_stack_t& stack);
 linux_sigset_t SigSetBToLinux(haiku_sigset_t sigset);
 haiku_sigset_t SigSetLinuxToB(linux_sigset_t sigset);
+void ContextLinuxToB(const ucontext_t& linuxContext, haiku_ucontext_t& context);
 
 struct linux_sigset_t
 {
