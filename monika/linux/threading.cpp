@@ -98,7 +98,7 @@ status_t MONIKA_EXPORT _kern_snooze_etc(bigtime_t time, int timebase, int32 flag
     switch (timebase)
     {
         case B_SYSTEM_TIMEBASE:
-            linuxClockid = CLOCK_REALTIME;
+            linuxClockid = CLOCK_MONOTONIC;
         break;
         default:
             trace("_kern_snooze_etc: unknown timebase.");

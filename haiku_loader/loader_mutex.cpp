@@ -246,7 +246,7 @@ static int loader_condvar_wait(std::condition_variable &cond, std::unique_lock<s
     else if (absolute)
     {
         status = cond.wait_until(lock,
-            std::chrono::system_clock::time_point(std::chrono::microseconds(timeout)));
+            std::chrono::steady_clock::time_point(std::chrono::microseconds(timeout)));
     }
     else if (relative)
     {
