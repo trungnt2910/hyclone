@@ -5,6 +5,7 @@
 #include "BeDefs.h"
 #include "debugbreak.h"
 #include "export.h"
+#include "extended_commpage.h"
 #include "haiku_debugger.h"
 #include "haiku_errors.h"
 #include "linux_debug.h"
@@ -43,7 +44,10 @@ void MONIKA_EXPORT _kern_debugger(const char* userString)
         LINUX_SYSCALL3(__NR_write, 2, "\n", 1);
     }
 
-    debug_break();
+    if (sIsProcessDebugged || GET_HOSTCALLS()->is_debugger_present())
+    {
+        debug_break();
+    }
 }
 
 status_t MONIKA_EXPORT __monika_spawn_nub_thread(port_id id)

@@ -9,6 +9,7 @@
 #include "extended_commpage.h"
 #include "haiku_image.h"
 #include "haiku_tls.h"
+#include "loader_debugger.h"
 #include "loader_exec.h"
 #include "loader_fork.h"
 #include "loader_idmap.h"
@@ -104,6 +105,8 @@ void* loader_allocate_commpage()
 
     hostcalls_ptr->get_sigrtmin = loader_get_sigrtmin;
     hostcalls_ptr->get_sigrtmax = loader_get_sigrtmax;
+
+    hostcalls_ptr->is_debugger_present = loader_is_debugger_present;
 
     hostcalls_ptr->opendir = loader_opendir;
     hostcalls_ptr->closedir = loader_closedir;

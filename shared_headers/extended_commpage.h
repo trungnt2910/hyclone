@@ -74,6 +74,9 @@ struct hostcalls
     int (*get_sigrtmin)();
     int (*get_sigrtmax)();
 
+    // Debugger
+    bool (*is_debugger_present)();
+
     // Readdir
     void (*opendir)(int fd);
     void (*closedir)(int fd);
