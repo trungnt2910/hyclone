@@ -22,9 +22,9 @@
 
 Thread::Thread(int pid, int tid) : _tid(tid)
 {
+    memset(&_info, 0, sizeof(_info));
     _info.thread = tid;
     _info.team = pid;
-    _info.name[0] = '\0';
 }
 
 void Thread::SuspendSelf()

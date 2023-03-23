@@ -36,7 +36,7 @@ void server_close_connection(intptr_t conn_id)
 
 void server_fill_thread_info(haiku_thread_info* info)
 {
-    std::ifstream fin(("/proc/" + std::to_string(info->thread)) + "/status");
+    std::ifstream fin(("/proc/" + std::to_string(info->thread)) + "/stat");
 
     std::string ignore;
 
@@ -91,8 +91,14 @@ void server_fill_thread_info(haiku_thread_info* info)
     uint64_t startstack, kstkesp;
     fin >> startstack >> kstkesp;
 
-    info->stack_base = (void*)startstack;
-    info->stack_end = (void*)kstkesp;
+    if (startstack != 0)
+    {
+        info->stack_base = (void*)startstack;
+    }
+    if (kstkesp != 0)
+    {
+        info->stack_end = (void*)kstkesp;
+    }
 
     // 30 -> 39
     for (int i = 0; i < 10; ++i)

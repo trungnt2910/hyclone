@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 #include "haiku_area.h"
+#include "haiku_errors.h"
 #include "haiku_tls.h"
 #include "haiku_thread.h"
 #include "loader_servercalls.h"
@@ -133,6 +134,48 @@ int loader_wait_for_thread(int thread_id, int* retVal)
     return 0;
 }
 
+bool loader_register_thread(int tid, const thread_creation_attributes* attributes, bool suspended)
+{
+    haiku_thread_info thread_info;
+    memset(&thread_info, 0, sizeof(thread_info));
+
+    thread_info.team = getpid();
+    thread_info.thread = (tid == -1) ? getpid() : tid;
+
+    if (attributes != NULL)
+    {
+        strncpy(thread_info.name, attributes->name, sizeof(thread_info.name));
+        thread_info.name[sizeof(thread_info.name) - 1] = '\0';
+        thread_info.stack_base = attributes->stack_address;
+        // Stack grows down.
+        thread_info.stack_end = (uint8_t*)attributes->stack_address + attributes->stack_size;
+        thread_info.priority = attributes->priority;
+    }
+    else
+    {
+        size_t stack_size;
+        thread_info.name[0] = '\0';
+        pthread_attr_t attr;
+        pthread_getattr_np(pthread_self(), &attr);
+        pthread_attr_getstack(&attr, &thread_info.stack_base, &stack_size);
+        thread_info.stack_end = (uint8_t*)thread_info.stack_base + stack_size;
+        sched_param sched;
+        pthread_attr_getschedparam(&attr, &sched);
+        thread_info.priority = sched.sched_priority;
+    }
+
+    if (suspended)
+    {
+        thread_info.state = B_THREAD_SUSPENDED;
+    }
+    else
+    {
+        thread_info.state = B_THREAD_RUNNING;
+    }
+
+    return loader_hserver_call_register_thread_info(&thread_info) == B_OK;
+}
+
 void* loader_pthread_entry_trampoline(void* arg)
 {
     auto trampoline_args = (loader_trampoline_args*)arg;
@@ -147,25 +190,13 @@ void* loader_pthread_entry_trampoline(void* arg)
     user_thread->pthread = attributes->pthread;
 
     loader_init_servercalls();
-    haiku_thread_info thread_info;
-    memset(&thread_info, 0, sizeof(thread_info));
 
     if (attributes->name == NULL)
     {
         attributes->name = "user thread";
     }
 
-    thread_info.team = getpid();
-    thread_info.thread = tid;
-    strncpy(thread_info.name, attributes->name, sizeof(thread_info.name));
-    thread_info.name[sizeof(thread_info.name) - 1] = '\0';
-    thread_info.stack_base = attributes->stack_address;
-    // Stack grows down.
-    thread_info.stack_end = (uint8_t*)attributes->stack_address + attributes->stack_size;
-    thread_info.priority = attributes->priority;
-    thread_info.state = B_THREAD_SUSPENDED;
-
-    loader_hserver_call_register_thread_info(&thread_info);
+    loader_register_thread(tid, attributes, true);
 
     haiku_area_info stack_area_info, guard_area_info;
     stack_area_info.address = (void*)((uintptr_t)attributes->stack_address - attributes->stack_size);
@@ -173,7 +204,7 @@ void* loader_pthread_entry_trampoline(void* arg)
     stack_area_info.protection = B_READ_AREA | B_WRITE_AREA | B_STACK_AREA;
     stack_area_info.lock = 0;
     {
-        std::string area_name = std::string(thread_info.name) + "_" + std::to_string(tid) + "_stack";
+        std::string area_name = std::string(attributes->name) + "_" + std::to_string(tid) + "_stack";
         strncpy(stack_area_info.name, area_name.c_str(), sizeof(stack_area_info.name));
     }
     stack_area_info.area = loader_hserver_call_register_area(&stack_area_info);
@@ -185,7 +216,7 @@ void* loader_pthread_entry_trampoline(void* arg)
         guard_area_info.protection = 0;
         guard_area_info.lock = 0;
         {
-            std::string area_name = std::string(thread_info.name) + "_" + std::to_string(tid) + "_stack_guard";
+            std::string area_name = std::string(attributes->name) + "_" + std::to_string(tid) + "_stack_guard";
             strncpy(guard_area_info.name, area_name.c_str(), sizeof(guard_area_info.name));
         }
         guard_area_info.area = loader_hserver_call_register_area(&guard_area_info);

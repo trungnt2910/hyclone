@@ -4,9 +4,11 @@
 #include "loader_commpage.h"
 #include "loader_loadruntime.h"
 #include "loader_servercalls.h"
+#include "loader_spawn_thread.h"
 #include "loader_tls.h"
 #include "loader_vchroot.h"
 #include "runtime_loader.h"
+#include "thread_defs.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -281,6 +283,8 @@ int main(int argc, char** argv, char** envp)
 
     loader_build_args(user_args_memory, args, argv, envp);
 	loader_init_tls();
+
+	loader_register_thread(-1, NULL, false);
 
 	((hostcalls*)(((uint8_t*)commpage) + EXTENDED_COMMPAGE_HOSTCALLS_OFFSET))
 		->at_exit = &loader_at_exit;
