@@ -6,6 +6,7 @@
 #include "export.h"
 #include "extended_commpage.h"
 #include "haiku_errors.h"
+#include "haiku_semaphore.h"
 #include "haiku_thread.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
@@ -96,6 +97,17 @@ sem_id MONIKA_EXPORT _kern_create_sem(int count, const char *name)
 status_t MONIKA_EXPORT _kern_delete_sem(sem_id id)
 {
     return GET_SERVERCALLS()->delete_sem(id);
+}
+
+status_t MONIKA_EXPORT _kern_realtime_sem_open(const char* name, int openFlagsOrShared,
+    haiku_mode_t mode, uint32 semCount, haiku_sem_t* userSem, haiku_sem_t** _usedUserSem)
+{
+    long status = GET_HOSTCALLS()->realtime_sem_open(name, openFlagsOrShared, mode, semCount, userSem, _usedUserSem);
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+    return 0;
 }
 
 status_t MONIKA_EXPORT _kern_snooze_etc(bigtime_t time, int timebase, int32 flags, bigtime_t* _remainingTime)

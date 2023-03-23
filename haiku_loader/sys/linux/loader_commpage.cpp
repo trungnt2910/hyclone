@@ -17,6 +17,7 @@
 #include "loader_mutex.h"
 #include "loader_readdir.h"
 #include "loader_reservedrange.h"
+#include "loader_semaphore.h"
 #include "loader_servercalls.h"
 #include "loader_signal.h"
 #include "loader_spawn.h"
@@ -102,6 +103,8 @@ void* loader_allocate_commpage()
     hostcalls_ptr->mutex_lock = loader_mutex_lock;
     hostcalls_ptr->mutex_unlock = loader_mutex_unlock;
     hostcalls_ptr->mutex_switch_lock = loader_mutex_switch_lock;
+
+    hostcalls_ptr->realtime_sem_open = loader_realtime_sem_open;
 
     hostcalls_ptr->get_sigrtmin = loader_get_sigrtmin;
     hostcalls_ptr->get_sigrtmax = loader_get_sigrtmax;

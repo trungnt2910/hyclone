@@ -6,6 +6,7 @@
 #include "BeDefs.h"
 #include "commpage_defs.h"
 #include "haiku_errors.h"
+#include "haiku_semaphore.h"
 #include "haiku_sysinfo.h"
 #include "servercalls.h"
 
@@ -69,6 +70,9 @@ struct hostcalls
     int (*mutex_lock)(int32_t* mutex, const char* name, uint32_t flags, int64_t timeout);
     int (*mutex_unlock)(int32_t* mutex, uint32_t flags);
     int (*mutex_switch_lock)(int32_t* fromMutex, int32_t* toMutex, const char* name, uint32_t flags, int64_t timeout);
+
+    // Semaphore
+    int (*realtime_sem_open)(const char *name, int openFlagsOrShared, haiku_mode_t mode, uint32_t semCount, haiku_sem_t* sem, haiku_sem_t** usedSem);
 
     // Signals
     int (*get_sigrtmin)();
