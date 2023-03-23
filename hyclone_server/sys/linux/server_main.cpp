@@ -32,8 +32,6 @@ int server_main(int argc, char **argv)
 
     std::string hycloneSocketPath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SOCKET_NAME;
 
-    // daemon(0, 0);
-
     // Prevent SIGPIPE from crashing the whole kernel server.
     signal(SIGPIPE, SIG_IGN);
 
@@ -64,6 +62,11 @@ int server_main(int argc, char **argv)
         perror("listen");
         return 1;
     }
+
+    std::cerr << "HyClone server listening on " << gHaikuPrefix << std::endl;
+
+    daemon(0, 0);
+    freopen((std::filesystem::path(gHaikuPrefix) / ".hyclone.log").c_str(), "w", stderr);
 
     std::vector<pollfd> pollfds;
     pollfds.push_back({listen_socket, POLLIN, 0});

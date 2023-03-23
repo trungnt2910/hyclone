@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "haiku_errors.h"
@@ -250,8 +251,34 @@ bool loader_init_servercalls()
         return true;
     }
 
-    std::cerr << "Attempting to launch Hyclone Server..." << std::endl;
-    std::cerr << "Not implemented. Sorry." << std::endl;
+    std::cerr << "Attempting to launch HyClone server..." << std::endl;
 
-    return false;
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+        std::filesystem::path server_path = std::filesystem::canonical("/proc/self/exe").parent_path() / "hyclone_server";
+
+        const char* argv[] = { server_path.c_str(), "--parent-pipe=3", NULL };
+        execv(argv[0], (char* const*)argv);
+        _exit(1);
+    }
+
+    if (pid == -1)
+    {
+        return false;
+    }
+
+    if (waitpid(pid, NULL, 0) == -1)
+    {
+        return false;
+    }
+
+    // Here, the server should have daemonized and is listening to the socket.
+
+    if (!gServerConnection.Connect())
+    {
+        return false;
+    }
+
+    return true;
 }
