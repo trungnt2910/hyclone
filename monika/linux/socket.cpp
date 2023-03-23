@@ -8,6 +8,7 @@
 
 #include "errno_conversion.h"
 #include "export.h"
+#include "extended_commpage.h"
 #include "haiku_errors.h"
 #include "haiku_netinet_in.h"
 #include "haiku_netinet_tcp.h"
@@ -613,8 +614,20 @@ static int SocketAddressBToLinux(const struct haiku_sockaddr *addr, haiku_sockle
         {
             struct sockaddr_un *un = (struct sockaddr_un *)storage;
             struct haiku_sockaddr_un *haiku_un = (struct haiku_sockaddr_un *)addr;
+            char path[PATH_MAX], hostPath[PATH_MAX];
+            size_t pathlen = addrlen - offsetof(struct haiku_sockaddr_un, sun_path);
+            if (pathlen + 1 >= sizeof(path))
+            {
+                return -1;
+            }
+            memcpy(path, haiku_un->sun_path, pathlen);
+            path[pathlen] = '\0';
+            if (GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath)) >= sizeof(hostPath))
+            {
+                return -1;
+            }
             un->sun_family = AF_UNIX;
-            strncpy(un->sun_path, haiku_un->sun_path, std::min(sizeof(un->sun_path), sizeof(haiku_un->sun_path)));
+            strncpy(un->sun_path, hostPath, std::min(sizeof(un->sun_path), sizeof(hostPath)));
             return sizeof(struct sockaddr_un);
         }
         case HAIKU_AF_INET:
@@ -663,8 +676,23 @@ static int SocketAddressLinuxToB(const struct sockaddr *addr, struct haiku_socka
         {
             struct sockaddr_un *linux_un = (struct sockaddr_un *)addr;
             struct haiku_sockaddr_un *haiku_un = (struct haiku_sockaddr_un *)storage;
+            char path[PATH_MAX], hostPath[PATH_MAX];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overread"
+            size_t pathlen = strnlen(linux_un->sun_path, sizeof(sockaddr_storage) - offsetof(struct sockaddr_un, sun_path));
+#pragma GCC diagnostic pop
+            if (pathlen + 1 >= sizeof(path))
+            {
+                return -1;
+            }
+            memcpy(hostPath, haiku_un->sun_path, pathlen);
+            hostPath[pathlen] = '\0';
+            if (GET_HOSTCALLS()->vchroot_unexpand(hostPath, path, sizeof(path)) >= sizeof(path))
+            {
+                return -1;
+            }
             haiku_un->sun_family = HAIKU_AF_UNIX;
-            strncpy(haiku_un->sun_path, linux_un->sun_path, std::min(sizeof(linux_un->sun_path), sizeof(haiku_un->sun_path)));
+            strncpy(haiku_un->sun_path, path, std::min(sizeof(path), sizeof(haiku_un->sun_path)));
             return sizeof(struct haiku_sockaddr_un);
         }
         case AF_INET:
