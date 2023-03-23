@@ -39,6 +39,7 @@ typedef int32 haiku_suseconds_t;
 typedef uint32 haiku_useconds_t;
 
 typedef int32 clockid_t;
+typedef int32 haiku_clockid_t;
 
 #if defined(__i386__) && !defined(__x86_64__)
 typedef int32 haiku_time_t;
