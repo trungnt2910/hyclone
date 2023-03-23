@@ -45,27 +45,27 @@ mkdir -p $SCRIPT_DIR/libhyclonefs/haiku_include/private/fs_shell
 mkdir -p $SCRIPT_DIR/libhyclonefs/fs_shell
 mkdir -p $SCRIPT_DIR/libhyclonefs/libroot_host
 
-cp -fv $HAIKU_RUNTIME_LOADER_ARCH/*.a $SCRIPT_DIR/runtime_loader
-cp -fv $HAIKU_RUNTIME_LOADER/*.a $SCRIPT_DIR/runtime_loader
-cp -fv $HAIKU_RUNTIME_LOADER/*.o $SCRIPT_DIR/runtime_loader
-cp -fv $HAIKU_SYSLIBS_DEVEL/*-kernel.a $SCRIPT_DIR/runtime_loader
-cp -fv $HAIKU_LIBROOT/posix/posix*.o $SCRIPT_DIR/libroot/posix
-cp -fv $HAIKU_LIBROOT/posix/**/posix*.o $SCRIPT_DIR/libroot/posix
-cp -fv $HAIKU_LIBROOT/posix/glibc/**/posix*.o $SCRIPT_DIR/libroot/posix
-cp -fv $HAIKU_LIBROOT/posix/arch/$HAIKU_ARCH/posix*.o $SCRIPT_DIR/libroot/posix
-cp -fv $HAIKU_LIBROOT/posix/**/arch/$HAIKU_ARCH/posix*.o $SCRIPT_DIR/libroot/posix
-cp -fv $HAIKU_LIBROOT/posix/signal/*.o $SCRIPT_DIR/libroot/posix/signal
-cp -fv $HAIKU_LIBROOT/os/arch/$HAIKU_ARCH/*.o $SCRIPT_DIR/libroot/os/arch/$HAIKU_ARCH
-cp -fv $HAIKU_LIBROOT/os/*.o $SCRIPT_DIR/libroot/os
-cp -fv $HAIKU_LIBROOT/libroot_init.o $SCRIPT_DIR/libroot
-cp -fv $HAIKU_SYSLIBS_DEVEL/*.a $SCRIPT_DIR/libroot
-cp -fv $HAIKU_SYSLIBS/libgcc_s.so.1 $SCRIPT_DIR/libroot
-cp -fv $HAIKU_GLUE/init_term_dyn.o $SCRIPT_DIR/libroot
-cp -fv $HAIKU_GLUE_ARCH/crti.o $SCRIPT_DIR/libroot
-cp -fv $HAIKU_GLUE_ARCH/crtn.o $SCRIPT_DIR/libroot
-cp -fv $HAIKU_GLUE_GCC/crtbeginS.o $SCRIPT_DIR/libroot
-cp -fv $HAIKU_GLUE_GCC/crtendS.o $SCRIPT_DIR/libroot
-cp -fv $HAIKU_BUILD_SOURCE_DIRECTORY/src/tools/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/fs_shell
-cp -fv $HAIKU_BUILD_SOURCE_DIRECTORY/headers/private/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/private/fs_shell
-cp -fv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/tools/fs_shell/*.o $SCRIPT_DIR/libhyclonefs/fs_shell
-cp -fv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/build/libroot/*.o $SCRIPT_DIR/libhyclonefs/libroot_host
+cp -fpv $HAIKU_RUNTIME_LOADER_ARCH/*.a $SCRIPT_DIR/runtime_loader
+cp -fpv $HAIKU_RUNTIME_LOADER/*.a $SCRIPT_DIR/runtime_loader
+cp -fpv $HAIKU_RUNTIME_LOADER/*.o $SCRIPT_DIR/runtime_loader
+cp -fpv $HAIKU_SYSLIBS_DEVEL/*-kernel.a $SCRIPT_DIR/runtime_loader
+cp -fpv $HAIKU_LIBROOT/posix/posix*.o $SCRIPT_DIR/libroot/posix
+cp -fpv $HAIKU_LIBROOT/posix/**/posix*.o $SCRIPT_DIR/libroot/posix
+cp -fpv $HAIKU_LIBROOT/posix/glibc/**/posix*.o $SCRIPT_DIR/libroot/posix
+cp -fpv $HAIKU_LIBROOT/posix/arch/$HAIKU_ARCH/posix*.o $SCRIPT_DIR/libroot/posix
+cp -fpv $HAIKU_LIBROOT/posix/**/arch/$HAIKU_ARCH/posix*.o $SCRIPT_DIR/libroot/posix
+cp -fpv $HAIKU_LIBROOT/posix/signal/*.o $SCRIPT_DIR/libroot/posix/signal
+cp -fpv $HAIKU_LIBROOT/os/arch/$HAIKU_ARCH/*.o $SCRIPT_DIR/libroot/os/arch/$HAIKU_ARCH
+cp -fpv $HAIKU_LIBROOT/os/*.o $SCRIPT_DIR/libroot/os
+cp -fpv $HAIKU_LIBROOT/libroot_init.o $SCRIPT_DIR/libroot
+cp -fpv $HAIKU_SYSLIBS_DEVEL/*.a $SCRIPT_DIR/libroot
+cp -fpv $HAIKU_SYSLIBS/libgcc_s.so.1 $SCRIPT_DIR/libroot
+cp -fpv $HAIKU_GLUE/init_term_dyn.o $SCRIPT_DIR/libroot
+cp -fpv $HAIKU_GLUE_ARCH/crti.o $SCRIPT_DIR/libroot
+cp -fpv $HAIKU_GLUE_ARCH/crtn.o $SCRIPT_DIR/libroot
+cp -fpv $HAIKU_GLUE_GCC/crtbeginS.o $SCRIPT_DIR/libroot
+cp -fpv $HAIKU_GLUE_GCC/crtendS.o $SCRIPT_DIR/libroot
+cp -fpv $HAIKU_BUILD_SOURCE_DIRECTORY/src/tools/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/fs_shell
+cp -fpv $HAIKU_BUILD_SOURCE_DIRECTORY/headers/private/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/private/fs_shell
+cp -fpv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/tools/fs_shell/*.o $SCRIPT_DIR/libhyclonefs/fs_shell
+cp -fpv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/build/libroot/*.o $SCRIPT_DIR/libhyclonefs/libroot_host
