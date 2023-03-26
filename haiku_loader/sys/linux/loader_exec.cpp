@@ -56,7 +56,7 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
                 }
                 else
                 {
-                    isHaikuExecutable = true;
+                    isHaikuExecutable = false;
                 }
                 munmap(tmp, statbuf.st_size);
             }

@@ -28,7 +28,7 @@ if [ ! -d "$HAIKU_BUILD_OUTPUT_ROOT" ]; then
     cd haiku
     mkdir -p $HAIKU_BUILD_OUTPUT_ROOT
     cd $HAIKU_BUILD_OUTPUT_ROOT
-    $HAIKU_BUILD_SOURCE_DIRECTORY/configure --cross-tools-source $HAIKU_BUILD_TOOLS_DIRECTORY --build-cross-tools $HAIKU_ARCH
+    $HAIKU_BUILD_SOURCE_DIRECTORY/configure --cross-tools-source $HAIKU_BUILD_TOOLS_DIRECTORY --build-cross-tools $HAIKU_ARCH -j$(nproc)
     cd $HAIKU_BUILD_TOOLS_DIRECTORY/jam
     make -j$(nproc)
     cd $HAIKU_BUILD_OUTPUT_ROOT

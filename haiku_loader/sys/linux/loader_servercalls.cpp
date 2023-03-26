@@ -258,7 +258,7 @@ bool loader_init_servercalls()
     {
         std::filesystem::path server_path = std::filesystem::canonical("/proc/self/exe").parent_path() / "hyclone_server";
 
-        const char* argv[] = { server_path.c_str(), "--parent-pipe=3", NULL };
+        const char* argv[] = { server_path.c_str(), NULL };
         execv(argv[0], (char* const*)argv);
         _exit(1);
     }
