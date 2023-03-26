@@ -22,12 +22,17 @@ jobs:
         run: |
           sudo apt install -y git nasm bc autoconf automake texinfo flex bison gawk build-essential unzip wget zip less zlib1g-dev libzstd-dev xorriso libtool python3
 
+      - name: Check latest Haiku hrev
+        id: get_hrev
+        run: |
+          echo "hrev=$(curl -s https://git.haiku-os.org/haiku/refs/tags | sed -n 's/^.*>\(hrev[^<]*\).*$/\1/p' | head -n 1)" >> "$GITHUB_OUTPUT"
+
       - name: Fetch cached Haiku build
         id: cache
         uses: actions/cache@v3
         with:
           path: 'haiku-build'
-          key: 'haiku-build'
+          key: 'haiku-${{ steps.get_hrev.outputs.hrev }}-build'
 
       - name: Build Haiku
         if: steps.cache.outputs.cache-hit != 'true'
@@ -49,8 +54,22 @@ jobs:
           make install
           cd ..
 
+      - name: Build HPREFIX
+        run: |
+          export HAIKU_BUILD_ENVIRONMENT_ROOT=$GITHUB_WORKSPACE/haiku-build
+          export HPREFIX=$GITHUB_WORKSPACE/hprefix
+          ./build_hprefix.sh
+          rm -rf $HPREFIX/.hyclone.*
+          pushd $HPREFIX; tar cvf ../hprefix.tar *; popd
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: hyclone
           path: build
+
+      - name: Upload HPREFIX
+        uses: actions/upload-artifact@v3
+        with:
+          name: hprefix
+          path: hprefix.tar

@@ -276,7 +276,8 @@ bool server_setup_packagefs(haiku_fs_info& info)
 
 bool server_setup_settings()
 {
-    std::filesystem::path settingsPath = std::filesystem::path(gHaikuPrefix) / "boot" / "system" / "settings";
+    std::filesystem::path systemPath = std::filesystem::path(gHaikuPrefix) / "boot" / "system";
+    std::filesystem::path settingsPath = systemPath / "settings";
     std::filesystem::path networkSettingsPath = settingsPath / "network";
 
     std::filesystem::create_directories(networkSettingsPath);
@@ -286,6 +287,15 @@ bool server_setup_settings()
     std::filesystem::copy_file("/etc/hosts", networkSettingsPath / "hosts",
         std::filesystem::copy_options::overwrite_existing);
     std::filesystem::copy_file("/etc/resolv.conf", networkSettingsPath / "resolv.conf",
+        std::filesystem::copy_options::overwrite_existing);
+
+    std::filesystem::path etcPath = systemPath / "etc";
+    auto oldSystemPerms = std::filesystem::status(systemPath).permissions();
+    std::filesystem::permissions(systemPath, oldSystemPerms | std::filesystem::perms::owner_write);
+    std::filesystem::create_directories(etcPath);
+    std::filesystem::permissions(systemPath, oldSystemPerms);
+
+    std::filesystem::copy_file("/etc/passwd", etcPath / "passwd",
         std::filesystem::copy_options::overwrite_existing);
 
     return true;

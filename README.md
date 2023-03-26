@@ -54,6 +54,7 @@ cmake ..
 # For test builds, do this to install everything to the build directory:
 # cmake .. -DCMAKE_INSTALL_PREFIX=.
 sudo make install
+cd ..
 ```
 
 The Hyclone source directory must be placed in the same directory as Haiku, so that it could detect and copy the required object files.
@@ -62,44 +63,34 @@ The Hyclone source directory must be placed in the same directory as Haiku, so t
 
 In order to get Haiku apps running (`bash`, `gcc`,...), we need a Haiku installation with basic system directories, libraries, and configuration files.
 
-Hyclone does not come with a way to set up a Haiku installation prefix yet, but you can set up one using [this](https://github.com/jessicah/cross-compiler/blob/main/build-rootfs.sh)
-script by **@jessicah**:
+To build this environment, Hyclone comes with a `build_hprefix.sh` script.
+The script assumes that a copy of Haiku source code is available at `$HAIKU_BUILD_SOURCE_DIRECTORY`
 
 ```
-export HPREFIX=/path/to/haiku/installation/that/you/choose
-./build-rootfs.sh x86_64 --rootfsdir $HPREFIX --jobs $(nproc)
+# Set this to the path where you want to store your Haiku root.
+export HPREFIX=~/.hprefix
+# Assuming you're at the root of the Hyclone source tree
+./build_hprefix.sh
 ```
 
-This can take quite a while.
-
-Then, set up our environment a little bit:
+`build_hprefix.sh` installs just enough packages to start a `bash` shell. To install other packages, use the `-A` option, or the `-S` option if
+the packages belong to the system repository.
 
 ```
-# Path to modified libroot is usually at $CMAKE_INSTALL_PREFIX/lib
-export LIBRARY_PATH=/SystemRoot/path/to/modified/libroot:/boot/system/lib
-# This will be prepended to PATH by haiku_loader
-export HPATH=/boot/system/bin:/boot/system/non-packaged/bin
-
-# Set up a few links:
-ln -s /dev $HPREFIX/dev
-
-# Copy Haiku-specific bash profiles to $HPREFIX to get a Haiku shell experience
-cp -rf /path/to/the/source/code/of/haiku/data/etc $HPREFIX/boot/system
+# Strings are comma-separated.
+./build_hprefix.sh \
+    -A "gcc,binutils,gmp,mpc,mpfr,zlib" \
+    -S "haiku_devel"
 ```
 
 Now, assuming that you're at `$CMAKE_INSTALL_PREFIX`, run:
 
 ```
 cd bin
-./hyclone_server
-```
 
-This starts the Hyclone kernel server, a process that manages some system states that should have been handled by the Haiku kernel.
-
-After that, you can run Haiku binaries by:
-
-```
-./haiku_loader <binary name> <args>
+# This will be appended to $PATH by haiku_loader
+export HPATH=/boot/system/bin:/boot/system/non-packaged/bin
+./haiku_loader bash --login
 ```
 
 A screenshot of Hyclone on WSL1:
