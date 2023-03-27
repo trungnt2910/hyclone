@@ -79,8 +79,8 @@ the packages belong to the system repository.
 ```
 # Strings are comma-separated.
 ./build_hprefix.sh \
-    -A "gcc,binutils,gmp,mpc,mpfr,zlib" \
-    -S "haiku_devel"
+    -A="gcc,binutils,gmp,mpc,mpfr,zlib" \
+    -S="haiku_devel"
 ```
 
 Now, assuming that you're at `$CMAKE_INSTALL_PREFIX`, run:

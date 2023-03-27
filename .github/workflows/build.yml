@@ -71,5 +71,5 @@ jobs:
       - name: Upload HPREFIX
         uses: actions/upload-artifact@v3
         with:
-          name: hprefix
+          name: hprefix.tar
           path: hprefix.tar

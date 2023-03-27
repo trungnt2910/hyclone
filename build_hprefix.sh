@@ -61,11 +61,11 @@ HAIKU_ARCH=${HAIKU_ARCH:-"x86_64"}
 HAIKU_BUILD_ENVIRONMENT_ROOT=${HAIKU_BUILD_ENVIRONMENT_ROOT:-"$SCRIPT_DIR/.."}
 HAIKU_BUILD_SOURCE_DIRECTORY=${HAIKU_BUILD_SOURCE_DIRECTORY:-"$HAIKU_BUILD_ENVIRONMENT_ROOT/haiku"}
 HPREFIX=${HPREFIX:-"$HOME/.hprefix"}
-HPREFIX_PACAKGES=$"$HPREFIX/boot/system/packages"
+HPREFIX_PACKAGES=$"$HPREFIX/boot/system/packages"
 HAIKU_DEPOT_BASE_URL="https://depot.haiku-os.org/__api/v2/pkg/get-pkg"
 HAIKU_HPKG_BASE_URL="https://eu.hpkg.haiku-os.org/haiku/master/$HAIKU_ARCH/current"
 HAIKU_SYSPACKAGES="haiku"
-HAIKU_PACKAGES="bash coreutils gawk gcc_syslibs gettext_libintl icu66 libiconv ncurses6 readline zstd"
+HAIKU_PACKAGES="bash coreutils gawk gcc_syslibs gettext_libintl icu66 libiconv ncurses6 openssl readline zlib zstd"
 HPKG_FORCE=${HPKG_FORCE:-"0"}
 
 HAIKU_ADDITIONAL_SYSPACKAGES=${HAIKU_ADDITIONAL_SYSPACKAGES//,/ }
@@ -74,7 +74,7 @@ HAIKU_ADDITIONAL_PACKAGES=${HAIKU_ADDITIONAL_PACKAGES//,/ }
 HAIKU_SYSPACKAGES+=" $HAIKU_ADDITIONAL_SYSPACKAGES"
 HAIKU_PACKAGES+=" $HAIKU_ADDITIONAL_PACKAGES"
 
-mkdir -p $HPREFIX_PACAKGES
+mkdir -p $HPREFIX_PACKAGES
 
 if pidof -q hyclone_server; then
     echo "hyclone_server is running."
@@ -87,7 +87,7 @@ read -ra array <<<"$HAIKU_SYSPACKAGES"
 HAIKU_SYSPACKAGES_HREV=$(curl -Ls $HAIKU_HPKG_BASE_URL | sed -n 's/^.*version: "\([^"]*\)".*$/\1/p')
 for package in "${array[@]}"; do
     # Check if package already exists
-    if [ "$HPKG_FORCE" == "0" ] && [ -f "$HPREFIX_PACAKGES/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg" ]; then
+    if [ "$HPKG_FORCE" == "0" ] && [ -f "$HPREFIX_PACKAGES/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg" ]; then
         echo "$package already exists"
     else
         if ls $HPREFIX_PACKAGES/$package-*-$HAIKU_ARCH.hpkg 1> /dev/null 2>&1; then
@@ -95,7 +95,7 @@ for package in "${array[@]}"; do
             rm -fv $HPREFIX_PACKAGES/$package-*-$HAIKU_ARCH.hpkg
         fi
         echo "Downloading $package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg"
-        curl -Lo "$HPREFIX_PACAKGES/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg" "$HAIKU_HPKG_BASE_URL/packages/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg"
+        curl -Lo "$HPREFIX_PACKAGES/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg" "$HAIKU_HPKG_BASE_URL/packages/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg"
     fi
 done
 read -ra array <<<"$HAIKU_PACKAGES"
@@ -105,7 +105,7 @@ for package in "${array[@]}"; do
     hpkgDownloadUrl="$(curl -Ls --request POST --data '{"name":"'"$package"'","repositorySourceCode":"haikuports_'$HAIKU_ARCH'","versionType":"LATEST","naturalLanguageCode":"en"}' \
         --header 'Content-Type:application/json' "$HAIKU_DEPOT_BASE_URL" | sed -n 's/^.*hpkgDownloadURL":"\([^"]*\)".*$/\1/p')"
     hpkgVersion="$(echo "$hpkgDownloadUrl" | sed -n 's/^.*\/[^\/]*-\([^-]*\-[^-]*\)-[^-]*\.hpkg$/\1/p')"
-    if [ "$HPKG_FORCE" == "0" ] && [ -f "$HPREFIX_PACAKGES/$package-$hpkgVersion-$HAIKU_ARCH.hpkg" ]; then
+    if [ "$HPKG_FORCE" == "0" ] && [ -f "$HPREFIX_PACKAGES/$package-$hpkgVersion-$HAIKU_ARCH.hpkg" ]; then
         echo "$package already exists"
     else
         if ls $HPREFIX_PACKAGES/$package-*-$HAIKU_ARCH.hpkg 1> /dev/null 2>&1; then
@@ -113,7 +113,7 @@ for package in "${array[@]}"; do
             rm -fv $HPREFIX_PACKAGES/$package-*-$HAIKU_ARCH.hpkg
         fi
         echo "Downloading $package-$hpkgVersion-$HAIKU_ARCH.hpkg"
-        curl -Lo "$HPREFIX_PACAKGES/$package-$hpkgVersion-$HAIKU_ARCH.hpkg" "$hpkgDownloadUrl"
+        curl -Lo "$HPREFIX_PACKAGES/$package-$hpkgVersion-$HAIKU_ARCH.hpkg" "$hpkgDownloadUrl"
     fi
 done
 
