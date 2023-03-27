@@ -65,7 +65,7 @@ HPREFIX_PACKAGES=$"$HPREFIX/boot/system/packages"
 HAIKU_DEPOT_BASE_URL="https://depot.haiku-os.org/__api/v2/pkg/get-pkg"
 HAIKU_HPKG_BASE_URL="https://eu.hpkg.haiku-os.org/haiku/master/$HAIKU_ARCH/current"
 HAIKU_SYSPACKAGES="haiku"
-HAIKU_PACKAGES="bash coreutils gawk gcc_syslibs gettext_libintl icu66 libiconv ncurses6 openssl readline zlib zstd"
+HAIKU_PACKAGES="bash coreutils gawk gcc_syslibs gettext_libintl icu66 libiconv libsolv ncurses6 openssl readline zlib zstd"
 HPKG_FORCE=${HPKG_FORCE:-"0"}
 
 HAIKU_ADDITIONAL_SYSPACKAGES=${HAIKU_ADDITIONAL_SYSPACKAGES//,/ }
