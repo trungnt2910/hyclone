@@ -99,9 +99,20 @@ status_t MONIKA_EXPORT _kern_acquire_sem(sem_id id)
     return GET_SERVERCALLS()->acquire_sem(id);
 }
 
+status_t MONIKA_EXPORT _kern_acquire_sem_etc(sem_id id, uint32 count, uint32 flags,
+    bigtime_t timeout)
+{
+    return GET_SERVERCALLS()->acquire_sem_etc(id, count, flags, timeout);
+}
+
 status_t MONIKA_EXPORT _kern_release_sem(sem_id id)
 {
     return GET_SERVERCALLS()->release_sem(id);
+}
+
+status_t MONIKA_EXPORT _kern_release_sem_etc(sem_id id, uint32 count, uint32 flags)
+{
+    return GET_SERVERCALLS()->release_sem_etc(id, count, flags);
 }
 
 status_t MONIKA_EXPORT _kern_delete_sem(sem_id id)
