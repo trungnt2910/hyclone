@@ -1,6 +1,8 @@
 #include <cstddef>
+#include <cstring>
 #include <iostream>
 
+#include "entry_ref.h"
 #include "haiku_errors.h"
 #include "haiku_fs_info.h"
 #include "hsemaphore.h"
@@ -184,6 +186,32 @@ std::weak_ptr<haiku_fs_info> System::FindFSInfoByDevId(int devId)
 int System::NextFSInfoId(int id) const
 {
     return _fsInfos.NextId(id);
+}
+
+int System::RegisterEntryRef(const EntryRef& ref, const std::string& path)
+{
+    std::string tmpPath = path;
+    tmpPath.shrink_to_fit();
+    return RegisterEntryRef(ref, std::move(tmpPath));
+}
+
+int System::RegisterEntryRef(const EntryRef& ref, std::string&& path)
+{
+    // TODO: Limit the total number of entryRefs stored.
+    _entryRefs[ref] = path;
+    return 0;
+}
+
+int System::GetEntryRef(const EntryRef& ref, std::string& path) const
+{
+    auto it = _entryRefs.find(ref);
+    if (it != _entryRefs.end())
+    {
+        path.resize(it->second.size());
+        memcpy(path.data(), it->second.c_str(), it->second.size() + 1);
+        return 0;
+    }
+    return -1;
 }
 
 void System::Shutdown()

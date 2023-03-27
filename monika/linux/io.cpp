@@ -755,9 +755,11 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
         return LinuxToB(-result);
     }
 
-    if (linuxFlags & O_DIRECTORY)
+    struct stat linuxStat;
+    if (LINUX_SYSCALL2(__NR_fstat, result, &linuxStat) == 0 && S_ISDIR(linuxStat.st_mode))
     {
         GET_HOSTCALLS()->opendir(result);
+        GET_SERVERCALLS()->register_entry_ref(linuxStat.st_dev, linuxStat.st_ino, hostPath, sizeof(hostPath));
     }
 
     return result;
@@ -1038,6 +1040,12 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
 
     // Registers the file descriptor as a directory.
     GET_HOSTCALLS()->opendir(result);
+
+    struct stat linuxStat;
+    if (LINUX_SYSCALL2(__NR_fstat, result, &linuxStat) == 0)
+    {
+        GET_SERVERCALLS()->register_entry_ref(linuxStat.st_dev, linuxStat.st_ino, hostPath, sizeof(hostPath));
+    }
 
     return result;
 }
@@ -1357,6 +1365,115 @@ status_t MONIKA_EXPORT _kern_flock(int fd, int op)
     return B_OK;
 }
 
+status_t MONIKA_EXPORT _kern_open_dir_entry_ref(dev_t device, ino_t inode, const char *name)
+{
+    char hostPath[PATH_MAX];
+    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, hostPath, sizeof(hostPath));
+    if (status < 0)
+    {
+        if (status == B_BUFFER_OVERFLOW)
+        {
+            return B_NAME_TOO_LONG;
+        }
+        return status;
+    }
+
+    if (name)
+    {
+        size_t hostPathLen = status;
+        if (hostPath[hostPathLen - 1] != '/')
+        {
+            hostPath[hostPathLen - 1] = '/';
+        }
+        else
+        {
+            --hostPathLen;
+        }
+        if (hostPathLen == sizeof(hostPath))
+        {
+            return B_NAME_TOO_LONG;
+        }
+        size_t nameLen = strlen(name);
+        if (nameLen + hostPathLen >= sizeof(hostPath))
+        {
+            return B_NAME_TOO_LONG;
+        }
+        memcpy(hostPath + hostPathLen, name, nameLen + 1);
+    }
+
+    // TODO: Invoke realpath or vchroot or whatever to
+    // get rid of potential symlinks that can break our current vchroot
+    // mechanism.
+
+    status = LINUX_SYSCALL2(__NR_open, hostPath, O_DIRECTORY);
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    GET_HOSTCALLS()->opendir(status);
+
+    return status;
+}
+
+status_t MONIKA_EXPORT _kern_open_entry_ref(dev_t device, ino_t inode, const char *name,
+    int openMode, int perms)
+{
+    char hostPath[PATH_MAX];
+    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, hostPath, sizeof(hostPath));
+    if (status < 0)
+    {
+        if (status == B_BUFFER_OVERFLOW)
+        {
+            return B_NAME_TOO_LONG;
+        }
+        return status;
+    }
+
+    if (name)
+    {
+        size_t hostPathLen = status;
+        if (hostPath[hostPathLen - 1] != '/')
+        {
+            hostPath[hostPathLen - 1] = '/';
+        }
+        else
+        {
+            --hostPathLen;
+        }
+        if (hostPathLen == sizeof(hostPath))
+        {
+            return B_NAME_TOO_LONG;
+        }
+        size_t nameLen = strlen(name);
+        if (nameLen + hostPathLen >= sizeof(hostPath))
+        {
+            return B_NAME_TOO_LONG;
+        }
+        memcpy(hostPath + hostPathLen, name, nameLen + 1);
+    }
+
+    bool noTraverse = (openMode & HAIKU_O_NOTRAVERSE);
+
+    openMode &= ~HAIKU_O_NOTRAVERSE;
+    int linuxFlags = OFlagsBToLinux(openMode);
+    int linuxMode = ModeBToLinux(perms);
+
+    if (noTraverse)
+    {
+        linuxFlags |= O_PATH | O_NOFOLLOW;
+    }
+
+    status = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags, linuxMode);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return status;
+}
+
 // The functions below are clearly impossible
 // to be cleanly implemented in Hyclone, so
 // ENOSYS is directly returned and no logging is provided.
@@ -1369,18 +1486,6 @@ status_t MONIKA_EXPORT _kern_read_index_stat(dev_t device, const char *name, str
 status_t MONIKA_EXPORT _kern_create_index(dev_t device, const char *name, uint32 type, uint32 flags)
 {
     // No support for indexing.
-    return HAIKU_POSIX_ENOSYS;
-}
-
-status_t MONIKA_EXPORT _kern_open_dir_entry_ref()
-{
-    //trace("stub: _kern_open_dir_entry_ref");
-    return HAIKU_POSIX_ENOSYS;
-}
-
-status_t MONIKA_EXPORT _kern_open_entry_ref()
-{
-    //trace("stub: _kern_open_entry_ref");
     return HAIKU_POSIX_ENOSYS;
 }
 

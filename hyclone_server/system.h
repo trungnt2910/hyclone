@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include "entry_ref.h"
 #include "id_map.h"
 #include "server_apploadnotification.h"
 
@@ -27,6 +28,7 @@ private:
     std::unordered_map<std::string, int> _portNames;
     IdMap<std::shared_ptr<Semaphore>, int> _semaphores;
     IdMap<std::shared_ptr<haiku_fs_info>, int> _fsInfos;
+    std::unordered_map<EntryRef, std::string> _entryRefs;
     std::mutex _lock;
     AppLoadNotificationService _appLoadNotificationService;
     System() = default;
@@ -61,6 +63,10 @@ public:
     std::weak_ptr<haiku_fs_info> FindFSInfoByDevId(int devId);
     int NextFSInfoId(int id) const;
     size_t UnregisterFSInfo(int id);
+
+    int RegisterEntryRef(const EntryRef& ref, const std::string& path);
+    int RegisterEntryRef(const EntryRef& ref, std::string&& path);
+    int GetEntryRef(const EntryRef& ref, std::string& path) const;
 
     void Shutdown();
     bool IsShuttingDown() const { return _isShuttingDown; }

@@ -14,6 +14,7 @@ add_executable(hyclone_server
 
     area.cpp
     debug.cpp
+    entry_ref.cpp
     hsemaphore.cpp
     image.cpp
     port.cpp
