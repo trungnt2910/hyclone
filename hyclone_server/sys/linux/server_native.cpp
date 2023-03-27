@@ -1,11 +1,15 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <sys/stat.h>
 #include <sys/uio.h>
 #include <signal.h>
 #include <unistd.h>
+#include <unordered_set>
 
 #include "server_native.h"
 
@@ -32,6 +36,93 @@ void server_kill_process(int pid)
 void server_close_connection(intptr_t conn_id)
 {
     close((int)conn_id);
+}
+
+void server_fill_team_info(haiku_team_info* info)
+{
+    if (info->team == 0)
+    {
+        info->team = getpid();
+    }
+
+    if (info->thread_count == 0)
+    {
+        info->thread_count = 
+            std::distance(std::filesystem::directory_iterator("/proc/" + std::to_string(info->team) + "/task"),
+                std::filesystem::directory_iterator());
+    }
+
+    if (info->image_count == 0)
+    {
+        std::ifstream fin("/proc/" + std::to_string(info->team) + "/maps");
+        std::string line;
+        std::unordered_set<std::string> images;
+        while (std::getline(fin, line))
+        {
+            std::stringstream ss(line);
+            // address
+            ss >> line;
+            // permissions
+            ss >> line;
+            if (line.find('x') == std::string::npos)
+            {
+                continue;
+            }
+            // offset
+            ss >> line;
+            // device
+            ss >> line;
+            // inode
+            ss >> line;
+            // pathname
+            ss >> line;
+
+            // Probably. To make sure we can also check the headers
+            // for the ELF magic.
+            if (line.find(".so") != std::string::npos)
+            {
+                images.insert(line);
+            }
+        }
+
+        // One for the main binary.
+        info->image_count = images.size() + 1;
+    }
+
+    if (info->area_count == 0)
+    {
+        std::ifstream fin("/proc/" + std::to_string(info->team) + "/maps");
+        info->area_count = std::count(std::istreambuf_iterator<char>(fin), 
+            std::istreambuf_iterator<char>(), '\n');
+    }
+
+    if (info->argc == 0)
+    {
+        std::ifstream fin("/proc/" + std::to_string(info->team) + "/cmdline");
+        std::string arg;
+        std::string args;
+        while (std::getline(fin, arg, '\0'))
+        {
+            ++info->argc;
+            if (args.size() < sizeof(info->args))
+            {
+                args += arg;
+                args += ' ';
+            }
+        }
+        memcpy(info->args, args.c_str(), std::min(sizeof(info->args), args.size() + 1));
+    }
+
+    // TODO: Init UID to something else, as 0 is a valid UID.
+    if (info->uid == 0)
+    {
+        struct stat st;
+        if (stat(("/proc/" + std::to_string(info->team)).c_str(), &st) != -1)
+        {
+            info->uid = st.st_uid;
+            info->gid = st.st_gid;
+        }
+    }
 }
 
 void server_fill_thread_info(haiku_thread_info* info)

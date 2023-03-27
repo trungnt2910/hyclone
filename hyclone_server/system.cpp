@@ -35,6 +35,14 @@ std::weak_ptr<Process> System::GetProcess(int pid)
     return it->second;
 }
 
+int System::NextProcessId(int pid) const
+{
+    auto it = _processes.upper_bound(pid);
+    if (it == _processes.end())
+        return -1;
+    return it->first;
+}
+
 size_t System::UnregisterProcess(int pid)
 {
     _processes.erase(pid);

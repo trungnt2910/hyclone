@@ -8,6 +8,7 @@
 
 #include "haiku_area.h"
 #include "haiku_image.h"
+#include "haiku_team.h"
 #include "id_map.h"
 
 class Thread;
@@ -15,6 +16,7 @@ class Thread;
 class Process
 {
 private:
+    haiku_team_info _info;
     int _pid;
     bool _forkUnlocked;
 
@@ -25,7 +27,7 @@ private:
     std::unordered_set<int> _owningSemaphores;
     std::unordered_set<int> _owningPorts;
 public:
-    Process(int pid): _pid(pid), _forkUnlocked(false) {}
+    Process(int pid);
     ~Process() = default;
 
     std::unique_lock<std::mutex> Lock() { return std::unique_lock(_lock); }
@@ -49,6 +51,8 @@ public:
     size_t UnregisterArea(int area_id);
 
     int GetPid() const { return _pid; }
+    haiku_team_info& GetInfo() { return _info; }
+    const haiku_team_info& GetInfo() const { return _info; }
 
     // Copies managed information to child.
     void Fork(Process& child);

@@ -3,6 +3,7 @@
 #include "haiku_loader.h"
 #include "loader_commpage.h"
 #include "loader_loadruntime.h"
+#include "loader_process.h"
 #include "loader_servercalls.h"
 #include "loader_spawn_thread.h"
 #include "loader_tls.h"
@@ -284,6 +285,7 @@ int main(int argc, char** argv, char** envp)
     loader_build_args(user_args_memory, args, argv, envp);
 	loader_init_tls();
 
+	loader_register_process(args.arg_count, args.args);
 	loader_register_thread(-1, NULL, false);
 
 	((hostcalls*)(((uint8_t*)commpage) + EXTENDED_COMMPAGE_HOSTCALLS_OFFSET))

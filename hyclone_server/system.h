@@ -1,6 +1,7 @@
 #ifndef __HYCLONE_SYSTEM_H__
 #define __HYCLONE_SYSTEM_H__
 
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -21,7 +22,7 @@ class System
 {
 private:
     bool _isShuttingDown = false;
-    std::unordered_map<int, std::shared_ptr<Process>> _processes;
+    std::map<int, std::shared_ptr<Process>> _processes;
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     std::unordered_map<intptr_t, std::pair<int, int>> _connections;
     IdMap<std::shared_ptr<Port>, int> _ports;
@@ -38,6 +39,7 @@ public:
     System(System&&) = delete;
     std::weak_ptr<Process> RegisterProcess(int pid);
     std::weak_ptr<Process> GetProcess(int pid);
+    int NextProcessId(int pid) const;
     size_t UnregisterProcess(int pid);
 
     std::weak_ptr<Thread> RegisterThread(int pid, int tid);

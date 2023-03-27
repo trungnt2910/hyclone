@@ -11,6 +11,7 @@
 #include "errno_conversion.h"
 #include "export.h"
 #include "extended_commpage.h"
+#include "haiku_team.h"
 #include "linux_syscall.h"
 #include "signal_conversion.h"
 #include "syscall_load_image.h"
@@ -206,6 +207,16 @@ status_t MONIKA_EXPORT _kern_get_team_usage_info(team_id team, int32 who, team_u
     return GET_HOSTCALLS()->get_process_usage(team, info);
 }
 
+status_t MONIKA_EXPORT _kern_get_team_info(team_id id, haiku_team_info* info)
+{
+    return GET_SERVERCALLS()->get_team_info(id, info);
+}
+
+status_t MONIKA_EXPORT _kern_get_next_team_info(int32 *cookie, haiku_team_info* info)
+{
+    return GET_SERVERCALLS()->get_next_team_info(cookie, info);
+}
+
 haiku_pid_t MONIKA_EXPORT _kern_process_info(haiku_pid_t process, int32 which)
 {
     long status;
@@ -232,7 +243,6 @@ haiku_pid_t MONIKA_EXPORT _kern_process_info(haiku_pid_t process, int32 which)
 
     return status;
 }
-
 
 haiku_pid_t MONIKA_EXPORT _kern_setpgid(haiku_pid_t process, haiku_pid_t group)
 {
