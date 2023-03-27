@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 
 #include <fcntl.h>
+#include <linux/xattr.h>
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -1569,6 +1571,128 @@ status_t MONIKA_EXPORT _kern_entry_ref_to_path(dev_t device, ino_t inode,
     }
 
     return B_OK;
+}
+
+ssize_t MONIKA_EXPORT _kern_read_attr(int fd, const char* attribute, off_t pos,
+    void* buffer, size_t readBytes)
+{
+    if (buffer == NULL)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    if (attribute == NULL)
+    {
+        return B_BAD_VALUE;
+    }
+
+    long status = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, buffer, 0);
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    size_t attrSize = status;
+
+    if (pos >= attrSize)
+    {
+        return 0;
+    }
+
+    size_t memSize = (attrSize + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
+    status = LINUX_SYSCALL6(__NR_mmap, NULL, memSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    void* mem = (void*)status;
+
+    status = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, mem, memSize);
+    if (status < 0)
+    {
+        LINUX_SYSCALL2(__NR_munmap, mem, memSize);
+        return LinuxToB(-status);
+    }
+
+    if (readBytes > attrSize - pos)
+    {
+        readBytes = attrSize - pos;
+    }
+
+    memcpy(buffer, (char*)mem + pos, readBytes);
+    LINUX_SYSCALL2(__NR_munmap, mem, memSize);
+
+    return readBytes;
+}
+
+ssize_t MONIKA_EXPORT _kern_write_attr(int fd, const char* attribute, uint32 type,
+    off_t pos, const void* buffer, size_t readBytes)
+{
+    if (buffer == NULL)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    if (attribute == NULL)
+    {
+        return B_BAD_VALUE;
+    }
+
+    // According to Haiku:
+    // The implementation of this function tries to stay compatible with
+	// BeOS in that it clobbers the existing attribute when you write at offset
+	// 0, but it also tries to support programs which continue to write more
+	// chunks.
+    if (pos == 0)
+    {
+        long status = LINUX_SYSCALL5(__NR_fsetxattr, fd, attribute, buffer, readBytes, 0);
+        if (status < 0)
+        {
+            return LinuxToB(-status);
+        }
+        return readBytes;
+    }
+    else
+    {
+        long status = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, NULL, 0);
+        if (status < 0)
+        {
+            return LinuxToB(-status);
+        }
+
+        size_t attrSize = std::max((size_t)status, (size_t)pos + readBytes);
+
+        size_t memSize = (attrSize + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
+        status = LINUX_SYSCALL6(__NR_mmap, NULL, memSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+        if (status < 0)
+        {
+            return LinuxToB(-status);
+        }
+
+        void* mem = (void*)status;
+
+        status = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, mem, memSize);
+        if (status < 0)
+        {
+            LINUX_SYSCALL2(__NR_munmap, mem, memSize);
+            return LinuxToB(-status);
+        }
+
+        memcpy((char*)mem + pos, buffer, readBytes);
+        status = LINUX_SYSCALL5(__NR_fsetxattr, fd, attribute, mem, attrSize, 0);
+        if (status < 0)
+        {
+            LINUX_SYSCALL2(__NR_munmap, mem, memSize);
+            return LinuxToB(-status);
+        }
+
+        LINUX_SYSCALL2(__NR_munmap, mem, memSize);
+
+        return readBytes;
+    }
 }
 
 // The functions below are clearly impossible
