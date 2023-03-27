@@ -1526,6 +1526,51 @@ status_t MONIKA_EXPORT _kern_open_entry_ref(dev_t device, ino_t inode, const cha
     return status;
 }
 
+status_t MONIKA_EXPORT _kern_entry_ref_to_path(dev_t device, ino_t inode,
+    const char *leaf, char *userPath, size_t pathLength)
+{
+    char hostPath[PATH_MAX];
+    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, hostPath, sizeof(hostPath));
+    if (status < 0)
+    {
+        if (status == B_BUFFER_OVERFLOW)
+        {
+            return B_NAME_TOO_LONG;
+        }
+        return status;
+    }
+
+    if (leaf)
+    {
+        size_t hostPathLen = status;
+        if (hostPath[hostPathLen - 1] != '/')
+        {
+            hostPath[hostPathLen - 1] = '/';
+        }
+        else
+        {
+            --hostPathLen;
+        }
+        if (hostPathLen == sizeof(hostPath))
+        {
+            return B_NAME_TOO_LONG;
+        }
+        size_t nameLen = strlen(leaf);
+        if (nameLen + hostPathLen >= sizeof(hostPath))
+        {
+            return B_NAME_TOO_LONG;
+        }
+        memcpy(hostPath + hostPathLen, leaf, nameLen + 1);
+    }
+
+    if (GET_HOSTCALLS()->vchroot_unexpand(hostPath, userPath, pathLength) > pathLength)
+    {
+        return B_BUFFER_OVERFLOW;
+    }
+
+    return B_OK;
+}
+
 // The functions below are clearly impossible
 // to be cleanly implemented in Hyclone, so
 // ENOSYS is directly returned and no logging is provided.
