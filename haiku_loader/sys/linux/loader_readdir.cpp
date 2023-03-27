@@ -1,5 +1,6 @@
 #include <cstring>
 #include <dirent.h>
+#include <fcntl.h>
 #include <iostream>
 #include <mutex>
 #include <sys/stat.h>
@@ -8,11 +9,14 @@
 #include "haiku_dirent.h"
 #include "haiku_errors.h"
 #include "loader_readdir.h"
+#include "loader_servercalls.h"
 #include "loader_vchroot.h"
 
 struct LoaderDirectoryInfo
 {
     DIR* handle;
+    dev_t dev;
+    ino_t ino;
     int extendedEntryIndex;
 };
 
@@ -29,7 +33,9 @@ void loader_opendir(int fd)
     auto ptr = fdopendir(fd);
     if (ptr != nullptr)
     {
-        sFdMap[fd] = LoaderDirectoryInfo{ ptr, 0 };
+        struct stat st;
+        fstat(fd, &st);
+        sFdMap[fd] = LoaderDirectoryInfo{ ptr, st.st_dev, st.st_ino, 0 };
     }
 }
 
@@ -124,14 +130,33 @@ int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
         }
         struct haiku_dirent* haikuEntry = (struct haiku_dirent*)bufferOffset;
         haikuEntry->d_ino = entry->d_ino;
-        haikuEntry->d_pino = 0;
-        haikuEntry->d_dev = 0;
-        haikuEntry->d_pino = 0;
+        haikuEntry->d_pdev = it->second.dev;
+        haikuEntry->d_pino = it->second.ino;
         haikuEntry->d_reclen = haikuEntrySize;
         strcpy(haikuEntry->d_name, entry->d_name);
+
+        struct stat st;
+        if (fstatat(fd, entry->d_name, &st, AT_SYMLINK_NOFOLLOW) == 0)
+        {
+            haikuEntry->d_dev = st.st_dev;
+        }
+        else
+        {
+            // Best guess...
+            haikuEntry->d_dev = it->second.dev;
+        }
+
         bufferOffset += haikuEntrySize;
         bufferSizeLeft -= haikuEntrySize;
         ++count;
+
+        if (strcmp(entry->d_name, "..") && strcmp(entry->d_name, "."))
+        {
+            loader_hserver_call_register_entry_ref_child(it->second.dev, it->second.ino,
+                haikuEntry->d_dev, haikuEntry->d_ino, haikuEntry->d_name,
+                // For glibc, sizeof entry->d_name is fixed.
+                sizeof(entry->d_name));
+        }
     }
 
     return count;
