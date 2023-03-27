@@ -94,6 +94,16 @@ sem_id MONIKA_EXPORT _kern_create_sem(int count, const char *name)
     return GET_SERVERCALLS()->create_sem(count, name, (name == NULL) ? 0 : strlen(name));
 }
 
+status_t MONIKA_EXPORT _kern_acquire_sem(sem_id id)
+{
+    return GET_SERVERCALLS()->acquire_sem(id);
+}
+
+status_t MONIKA_EXPORT _kern_release_sem(sem_id id)
+{
+    return GET_SERVERCALLS()->release_sem(id);
+}
+
 status_t MONIKA_EXPORT _kern_delete_sem(sem_id id)
 {
     return GET_SERVERCALLS()->delete_sem(id);

@@ -148,6 +148,40 @@ intptr_t server_hserver_call_delete_sem(hserver_context& context, int id)
     return B_OK;
 }
 
+intptr_t server_hserver_call_acquire_sem(hserver_context& context, int id)
+{
+    auto& system = System::GetInstance();
+    auto lock = system.Lock();
+
+    auto sem = system.GetSemaphore(id).lock();
+
+    if (!sem)
+    {
+        return B_BAD_SEM_ID;
+    }
+
+    sem->Acquire(context.tid, 1);
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_release_sem(hserver_context& context, int id)
+{
+    auto& system = System::GetInstance();
+    auto lock = system.Lock();
+
+    auto sem = system.GetSemaphore(id).lock();
+
+    if (!sem)
+    {
+        return B_BAD_SEM_ID;
+    }
+
+    sem->Release(1);
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_get_system_sem_count(hserver_context& context)
 {
     auto& system = System::GetInstance();
