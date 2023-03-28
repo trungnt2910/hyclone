@@ -258,6 +258,39 @@ intptr_t server_hserver_call_set_memory_protection(hserver_context& context, voi
     return B_OK;
 }
 
+intptr_t server_hserver_call_set_memory_lock(hserver_context& context, void* address, size_t size, int type)
+{
+    switch (type)
+    {
+        case B_NO_LOCK:
+        case B_LAZY_LOCK:
+        case B_FULL_LOCK:
+        case B_32_BIT_FULL_LOCK:
+            break;
+        default:
+            return B_BAD_VALUE;
+    }
+
+    {
+        auto lock = context.process->Lock();
+        int id = -1;
+        while ((id = context.process->NextAreaId(id)) != -1)
+        {
+            auto& area = context.process->GetArea(id);
+
+            if ((uint8_t*)area.address + area.size <= (uint8_t*)address || (uint8_t*)area.address >= (uint8_t*)address + size)
+            {
+                continue;
+            }
+
+            // TODO: Does this lock affect the whole area or does it split the area into two like set_memory_protection?
+            area.lock = type;
+        }
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_unmap_memory(hserver_context& context, void* address, size_t size)
 {
     {

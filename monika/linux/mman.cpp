@@ -150,10 +150,10 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
         case B_NO_LOCK:
             break;
         case B_LAZY_LOCK:
-            result = LINUX_SYSCALL3(__NR_mlock, hintAddr, size, MLOCK_ONFAULT);
+            result = LINUX_SYSCALL3(__NR_mlock2, hintAddr, size, MLOCK_ONFAULT);
             break;
         case B_FULL_LOCK:
-            result = LINUX_SYSCALL3(__NR_mlock, hintAddr, size, 0);
+            result = LINUX_SYSCALL3(__NR_mlock2, hintAddr, size, 0);
             break;
         default:
             result = -ENOSYS;
@@ -842,11 +842,18 @@ status_t MONIKA_EXPORT _kern_get_next_area_info(team_id team, ssize_t *cookie, v
 status_t MONIKA_EXPORT _kern_mlock(const void* address, size_t size)
 {
     long status = LINUX_SYSCALL2(__NR_mlock, address, size);
-    // TODO: Update area lock information.
 
     if (status < 0)
     {
         return LinuxToB(-status);
+    }
+
+    status = GET_SERVERCALLS()->set_memory_lock((void*)address, size, B_FULL_LOCK);
+
+    if (status != B_OK)
+    {
+        LINUX_SYSCALL2(__NR_munlock, address, size);
+        return status;
     }
 
     return B_OK;
