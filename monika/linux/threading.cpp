@@ -66,6 +66,11 @@ status_t MONIKA_EXPORT _kern_get_thread_info(thread_id id, haiku_thread_info *in
     return GET_SERVERCALLS()->get_thread_info(id, info);
 }
 
+status_t MONIKA_EXPORT _kern_rename_thread(thread_id thread, const char* newName)
+{
+    return GET_SERVERCALLS()->rename_thread(thread, newName, strlen(newName));
+}
+
 status_t MONIKA_EXPORT _kern_set_thread_priority(thread_id id, int32 newPriority)
 {
     // This is a privileged syscall so we'll have to rely on the server.

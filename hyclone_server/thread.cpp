@@ -127,6 +127,38 @@ intptr_t server_hserver_call_register_thread_info(hserver_context& context, void
     return B_OK;
 }
 
+intptr_t server_hserver_call_rename_thread(hserver_context& context, int thread_id, const char* userNewName, size_t len)
+{
+    auto& system = System::GetInstance();
+
+    std::shared_ptr<Thread> thread;
+
+    {
+        auto lock = system.Lock();
+        thread = system.GetThread(thread_id).lock();
+    }
+
+    if (!thread)
+    {
+        return B_BAD_THREAD_ID;
+    }
+
+    {
+        auto lock = thread->Lock();
+        haiku_thread_info& info = thread->GetInfo();
+
+        len = std::min(len, sizeof(info.name) - 1);
+        if (server_read_process_memory(context.pid, (void*)userNewName, info.name, len) != len)
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        info.name[len] = '\0';
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_set_thread_priority(hserver_context& context, int thread_id, int newPriority)
 {
     auto& system = System::GetInstance();
