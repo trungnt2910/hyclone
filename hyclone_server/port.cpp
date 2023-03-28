@@ -150,6 +150,23 @@ intptr_t server_hserver_call_get_port_info(hserver_context& context, port_id id,
     }
 }
 
+intptr_t server_hserver_call_port_count(hserver_context& context, port_id id)
+{
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+
+        auto port = system.GetPort(id).lock();
+
+        if (!port)
+        {
+            return B_BAD_PORT_ID;
+        }
+
+        return port->GetInfo().queue_count;
+    }
+}
+
 intptr_t server_hserver_call_port_buffer_size_etc(hserver_context& context, port_id id,
     uint32 flags, unsigned long long timeout)
 {

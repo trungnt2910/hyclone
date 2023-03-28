@@ -34,6 +34,11 @@ status_t MONIKA_EXPORT _kern_write_port_etc(port_id port, int32 messageCode, con
     return GET_SERVERCALLS()->write_port_etc(port, messageCode, msgBuffer, bufferSize, flags, timeout);
 }
 
+int32 MONIKA_EXPORT _kern_port_count(port_id port)
+{
+    return GET_SERVERCALLS()->port_count(port);
+}
+
 port_id MONIKA_EXPORT _kern_find_port(const char *port_name)
 {
     return GET_SERVERCALLS()->find_port(port_name, strlen(port_name));
