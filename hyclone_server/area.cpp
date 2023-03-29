@@ -91,36 +91,28 @@ intptr_t server_hserver_call_get_next_area_info(hserver_context& context, int ta
         return B_BAD_VALUE;
     }
 
-    intptr_t areaId;
+    void* address;
 
-    if (context.process->ReadMemory(user_cookie, &areaId, sizeof(areaId)) != sizeof(areaId))
+    if (context.process->ReadMemory(user_cookie, &address, sizeof(address)) != sizeof(address))
     {
         return B_BAD_ADDRESS;
     }
 
-    if (areaId < 0)
-    {
-        return B_BAD_VALUE;
-    }
-
     haiku_area_info info;
+    area_id areaId = -1;
 
     // TODO: Haiku stores the end of the last area in the cookie, while we store area IDs.
     // What problems can this cause?
 
     {
         auto lock = targetProcess->Lock();
-        if (!targetProcess->IsValidAreaId(areaId))
-        {
-            areaId = targetProcess->NextAreaId(areaId);
-        }
-        // It may pass the end.
+        areaId = targetProcess->GetNextAreaIdFor(address);
         if (areaId < 0)
         {
             return B_BAD_VALUE;
         }
         info = targetProcess->GetArea(areaId);
-        areaId = targetProcess->NextAreaId(areaId);
+        address = info.address;
     }
 
     if (context.process->WriteMemory(user_info, &info, sizeof(info)) != sizeof(info))
@@ -128,7 +120,7 @@ intptr_t server_hserver_call_get_next_area_info(hserver_context& context, int ta
         return B_BAD_ADDRESS;
     }
 
-    if (context.process->WriteMemory(user_cookie, &areaId, sizeof(areaId)) != sizeof(areaId))
+    if (context.process->WriteMemory(user_cookie, &address, sizeof(address)) != sizeof(address))
     {
         return B_BAD_ADDRESS;
     }

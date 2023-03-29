@@ -46,6 +46,7 @@ public:
     int RegisterArea(int area_id);
     haiku_area_info& GetArea(int area_id);
     int GetAreaIdFor(void* address);
+    int GetNextAreaIdFor(void* address);
     int NextAreaId(int area_id);
     bool IsValidAreaId(int area_id);
     size_t UnregisterArea(int area_id);

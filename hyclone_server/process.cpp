@@ -106,6 +106,27 @@ int Process::GetAreaIdFor(void* address)
     return -1;
 }
 
+int Process::GetNextAreaIdFor(void* address)
+{
+    auto& system = System::GetInstance();
+    int id = -1;
+    uintptr_t min = (uintptr_t)-1;
+
+    for (const auto& areaId : _areas)
+    {
+        const auto& area = system.GetArea(areaId);
+        if ((uintptr_t)area.address > (uintptr_t)address)
+        {
+            if ((uintptr_t)area.address < min)
+            {
+                min = (uintptr_t)area.address;
+                id = area.area;
+            }
+        }
+    }
+    return id;
+}
+
 int Process::NextAreaId(int area_id)
 {
     auto it = _areas.upper_bound(area_id);

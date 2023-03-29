@@ -48,7 +48,7 @@ typedef struct haiku_area_info
     uint32 lock;
     uint32 protection;
     team_id team;
-    size_t ram_size;
+    uint32 ram_size;
     uint32 copy_count;
     uint32 in_count;
     uint32 out_count;
