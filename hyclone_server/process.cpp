@@ -76,25 +76,30 @@ size_t Process::UnregisterImage(int image_id)
     return _images.Size();
 }
 
-int Process::RegisterArea(const haiku_area_info& area)
+int Process::RegisterArea(int area_id)
 {
-    int id = _areas.Add(area);
-    auto& newArea = _areas.Get(id);
-    newArea.team = _pid;
-    newArea.area = id;
+    _areas.insert(area_id);
     _info.area_count = _areas.size();
-    return id;
+    return area_id;
 }
 
 haiku_area_info& Process::GetArea(int area_id)
 {
-    return _areas.Get(area_id);
+    auto& system = System::GetInstance();
+    if (!_areas.contains(area_id))
+        throw std::runtime_error("Invalid area id");
+    // Safe as long as we're holding a lock
+    // of the owning process.
+    return system.GetArea(area_id);
 }
 
 int Process::GetAreaIdFor(void* address)
 {
-    for (const auto& area : _areas)
+    auto& system = System::GetInstance();
+
+    for (const auto& areaId : _areas)
     {
+        const auto& area = system.GetArea(areaId);
         if ((uint8_t*)area.address <= address && address < (uint8_t*)area.address + area.size)
             return area.area;
     }
@@ -103,19 +108,22 @@ int Process::GetAreaIdFor(void* address)
 
 int Process::NextAreaId(int area_id)
 {
-    return _areas.NextId(area_id);
+    auto it = _areas.upper_bound(area_id);
+    if (it == _areas.end())
+        return -1;
+    return *it;
 }
 
 bool Process::IsValidAreaId(int area_id)
 {
-    return _areas.IsValidId(area_id);
+    return _areas.contains(area_id);
 }
 
 size_t Process::UnregisterArea(int area_id)
 {
-    _areas.Remove(area_id);
+    _areas.erase(area_id);
     _info.area_count = _areas.size();
-    return _areas.Size();
+    return _areas.size();
 }
 
 void Process::Fork(Process& child)
@@ -127,7 +135,18 @@ void Process::Fork(Process& child)
     child._info = _info;
 
     child._images = _images;
-    child._areas = _areas;
+    
+    // Fork is called in a system lock
+    // so we can safely access the areas.
+    for (const auto& areaId : _areas)
+    {
+        auto& system = System::GetInstance();
+        haiku_area_info& registeredArea = system.GetArea(
+            system.RegisterArea(
+                system.GetArea(areaId)));
+        registeredArea.team = child._pid;
+        child._areas.insert(registeredArea.area);
+    }
 
     // No, semaphores don't seem to be inherited.
     // child._owningSemaphores = _owningSemaphores;

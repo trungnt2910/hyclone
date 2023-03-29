@@ -19,20 +19,41 @@ intptr_t server_hserver_call_register_area(hserver_context& context, void* user_
         return B_BAD_ADDRESS;
     }
 
+    area_info.team = context.pid;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        area_info.area = system.RegisterArea(area_info);
+
+        if (area_info.area < 0)
+        {
+            return B_NO_MEMORY;
+        }
+    }
+
+    if (area_info.area >= 0)
     {
         auto lock = context.process->Lock();
-        return context.process->RegisterArea(area_info);
+        if (context.process->RegisterArea(area_info.area) < 0)
+        {
+            return B_NO_MEMORY;
+        }
     }
+
+    return area_info.area;
 }
 
-intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id, void* uesr_area_info)
+intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id, void* user_area_info)
 {
     haiku_area_info area_info;
+
     {
-        auto lock = context.process->Lock();
-        if (context.process->IsValidAreaId(area_id))
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        if (system.IsValidAreaId(area_id))
         {
-            area_info = context.process->GetArea(area_id);
+            area_info = system.GetArea(area_id);
         }
         else
         {
@@ -40,7 +61,7 @@ intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id
         }
     }
 
-    if (context.process->WriteMemory(uesr_area_info, &area_info, sizeof(area_info)) != sizeof(area_info))
+    if (context.process->WriteMemory(user_area_info, &area_info, sizeof(area_info)) != sizeof(area_info))
     {
         return B_BAD_ADDRESS;
     }
@@ -122,6 +143,9 @@ intptr_t server_hserver_call_unregister_area(hserver_context& context, int area_
         if (context.process->IsValidAreaId(area_id))
         {
             context.process->UnregisterArea(area_id);
+            auto& system = System::GetInstance();
+            auto sysLock = system.Lock();
+            system.UnregisterArea(area_id);
         }
         else
         {
@@ -235,12 +259,16 @@ intptr_t server_hserver_call_set_memory_protection(hserver_context& context, voi
                 area.address = unchangedRanges[0].first;
                 area.size = unchangedRanges[0].second - unchangedRanges[0].first;
 
+                auto& system = System::GetInstance();
+                auto sysLock = system.Lock();
+
                 for (size_t i = 1; i < unchangedRanges.size(); ++i)
                 {
                     haiku_area_info newArea = area;
                     newArea.address = unchangedRanges[i].first;
                     newArea.size = unchangedRanges[i].second - unchangedRanges[i].first;
-                    context.process->RegisterArea(newArea);
+                    newArea.area = system.RegisterArea(newArea);
+                    context.process->RegisterArea(newArea.area);
                 }
 
                 for (const auto& [begin, end]: changedRanges)
@@ -249,7 +277,8 @@ intptr_t server_hserver_call_set_memory_protection(hserver_context& context, voi
                     newArea.address = begin;
                     newArea.size = end - begin;
                     newArea.protection = protection;
-                    context.process->RegisterArea(newArea);
+                    newArea.area = system.RegisterArea(newArea);
+                    context.process->RegisterArea(newArea.area);
                 }
             }
         }
@@ -341,12 +370,16 @@ intptr_t server_hserver_call_unmap_memory(hserver_context& context, void* addres
                 area.address = survivingRanges[0].first;
                 area.size = survivingRanges[0].second - survivingRanges[0].first;
 
+                auto& system = System::GetInstance();
+                auto sysLock = system.Lock();
+
                 for (size_t i = 1; i < survivingRanges.size(); ++i)
                 {
                     haiku_area_info newArea = area;
                     newArea.address = survivingRanges[i].first;
                     newArea.size = survivingRanges[i].second - survivingRanges[i].first;
-                    context.process->RegisterArea(newArea);
+                    newArea.area = system.RegisterArea(newArea);
+                    context.process->RegisterArea(newArea.area);
                 }
             }
         }

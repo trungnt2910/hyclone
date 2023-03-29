@@ -22,7 +22,7 @@ private:
 
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     IdMap<haiku_extended_image_info, int> _images;
-    IdMap<haiku_area_info, int> _areas;
+    std::set<int> _areas;
     std::mutex _lock;
     std::unordered_set<int> _owningSemaphores;
     std::unordered_set<int> _owningPorts;
@@ -43,7 +43,7 @@ public:
     bool IsValidImageId(int image_id);
     size_t UnregisterImage(int image_id);
 
-    int RegisterArea(const haiku_area_info& area);
+    int RegisterArea(int area_id);
     haiku_area_info& GetArea(int area_id);
     int GetAreaIdFor(void* address);
     int NextAreaId(int area_id);

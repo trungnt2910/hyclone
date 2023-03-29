@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "entry_ref.h"
+#include "haiku_area.h"
 #include "haiku_errors.h"
 #include "haiku_fs_info.h"
 #include "hsemaphore.h"
@@ -194,6 +195,46 @@ std::weak_ptr<haiku_fs_info> System::FindFSInfoByDevId(int devId)
 int System::NextFSInfoId(int id) const
 {
     return _fsInfos.NextId(id);
+}
+
+int System::RegisterArea(const haiku_area_info& info)
+{
+    int nextId = _nextAreaId;
+    _nextAreaId = (_nextAreaId == INT_MAX) ? 1 : _nextAreaId + 1;
+
+    while (_areas.find(nextId) != _areas.end())
+    {
+        nextId = _nextAreaId;
+        _nextAreaId = (_nextAreaId == INT_MAX) ? 1 : _nextAreaId + 1;
+    }
+
+    std::cerr << "Registering area " << nextId << " with size " << info.size << " for pid " << info.team << std::endl;
+
+    _areas[nextId] = info;
+    _areas[nextId].area = nextId;
+    return nextId;
+}
+
+bool System::IsValidAreaId(int id) const
+{
+    return _areas.find(id) != _areas.end();
+}
+
+const haiku_area_info& System::GetArea(int id) const
+{
+    return _areas.at(id);
+}
+
+haiku_area_info& System::GetArea(int id)
+{
+    std::cerr << _areas.contains(id) << std::endl;
+    return _areas.at(id);
+}
+
+size_t System::UnregisterArea(int id)
+{
+    _areas.erase(id);
+    return _areas.size();
 }
 
 int System::RegisterEntryRef(const EntryRef& ref, const std::string& path)

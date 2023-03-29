@@ -16,12 +16,14 @@ class Process;
 class Port;
 class Semaphore;
 class Thread;
+struct haiku_area_info;
 struct haiku_fs_info;
 
 class System
 {
 private:
     bool _isShuttingDown = false;
+    int _nextAreaId = 1;
     std::map<int, std::shared_ptr<Process>> _processes;
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     std::unordered_map<intptr_t, std::pair<int, int>> _connections;
@@ -29,6 +31,7 @@ private:
     std::unordered_map<std::string, int> _portNames;
     IdMap<std::shared_ptr<Semaphore>, int> _semaphores;
     IdMap<std::shared_ptr<haiku_fs_info>, int> _fsInfos;
+    std::map<int, haiku_area_info> _areas;
     std::unordered_map<EntryRef, std::string> _entryRefs;
     std::mutex _lock;
     AppLoadNotificationService _appLoadNotificationService;
@@ -65,6 +68,12 @@ public:
     std::weak_ptr<haiku_fs_info> FindFSInfoByDevId(int devId);
     int NextFSInfoId(int id) const;
     size_t UnregisterFSInfo(int id);
+
+    int RegisterArea(const haiku_area_info& info);
+    bool IsValidAreaId(int id) const;
+    const haiku_area_info& GetArea(int id) const;
+    haiku_area_info& GetArea(int id);
+    size_t UnregisterArea(int id);
 
     int RegisterEntryRef(const EntryRef& ref, const std::string& path);
     int RegisterEntryRef(const EntryRef& ref, std::string&& path);
