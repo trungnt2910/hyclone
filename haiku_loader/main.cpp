@@ -2,6 +2,7 @@
 #include "extended_commpage.h"
 #include "haiku_loader.h"
 #include "loader_commpage.h"
+#include "loader_exec.h"
 #include "loader_loadruntime.h"
 #include "loader_registration.h"
 #include "loader_servercalls.h"
@@ -221,6 +222,11 @@ int main(int argc, char** argv, char** envp)
 
 	auto runtime_loader = gRuntimeLoaderInfo.entry_point;
 	__gRuntimeLoaderPtr = gRuntimeLoaderInfo.gRuntimeLoaderPtr;
+
+	// Hook test_executable as we want to also be able to execve
+	// binaries of the host system.
+	loader_haiku_test_executable = (*__gRuntimeLoaderPtr)->test_executable;
+	(*__gRuntimeLoaderPtr)->test_executable = loader_test_executable;
 
     uint8* user_args_memory = NULL;
 	user_space_program_args args;
