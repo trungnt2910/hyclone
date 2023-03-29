@@ -3,7 +3,7 @@
 #include "haiku_loader.h"
 #include "loader_commpage.h"
 #include "loader_loadruntime.h"
-#include "loader_process.h"
+#include "loader_registration.h"
 #include "loader_servercalls.h"
 #include "loader_spawn_thread.h"
 #include "loader_tls.h"
@@ -287,6 +287,7 @@ int main(int argc, char** argv, char** envp)
 
 	loader_register_process(args.arg_count, args.args);
 	loader_register_thread(-1, NULL, false);
+	loader_register_builtin_areas(commpage, args.args);
 
 	((hostcalls*)(((uint8_t*)commpage) + EXTENDED_COMMPAGE_HOSTCALLS_OFFSET))
 		->at_exit = &loader_at_exit;

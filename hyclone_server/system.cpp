@@ -324,6 +324,12 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
         {
             system.UnregisterPort(s);
         }
+
+        area_id area = -1;
+        while ((area = context.process->NextAreaId(area)) != -1)
+        {
+            system.UnregisterArea(area);
+        }
     }
     system.UnregisterThread(context.tid);
     system.UnregisterConnection(context.conn_id);
