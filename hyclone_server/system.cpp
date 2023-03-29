@@ -156,6 +156,7 @@ size_t System::UnregisterSemaphore(int id)
     {
         auto sem = _semaphores.Get(id);
         sem->_registered = false;
+        sem->_countCondVar.notify_all();
         _semaphores.Remove(id);
     }
     return _semaphores.Size();

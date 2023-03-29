@@ -19,12 +19,31 @@ Semaphore::Semaphore(int pid, int count, const char* name)
     _info.team = pid;
 }
 
-void Semaphore::Acquire(int tid, int count)
+int Semaphore::Acquire(int tid, int count)
 {
-    while (TryAcquire(tid, count))
+    std::unique_lock<std::mutex> lock(_countLock);
+    if (_count >= count)
     {
-        server_worker_sleep(kIntervalMicroseconds);
+        _count -= count;
+        return B_OK;
     }
+
+    server_worker_run_wait([&]()
+    {
+        _countCondVar.wait(lock, [&]()
+        {
+            return !_registered || _count >= count;
+        });
+    });
+
+    if (!_registered)
+    {
+        return B_BAD_SEM_ID;
+    }
+
+    _count -= count;
+
+    return B_OK;
 }
 
 int Semaphore::TryAcquire(int tid, int count)
@@ -42,54 +61,60 @@ int Semaphore::TryAcquire(int tid, int count)
 
 int Semaphore::TryAcquireFor(int tid, int count, int64_t timeout)
 {
-    if (timeout == 0)
+    std::unique_lock<std::mutex> lock(_countLock);
+    server_worker_run_wait([&]()
     {
-        return TryAcquire(tid, count);
+        _countCondVar.wait_for(lock, std::chrono::microseconds(timeout), [&]()
+        {
+            return !_registered || _count >= count;
+        });
+    });
+
+    if (!_registered)
+    {
+        return B_BAD_SEM_ID;
     }
 
-    status_t status = B_OK;
-
-    while ((status = TryAcquire(tid, count)) == B_WOULD_BLOCK)
+    if (_count < count)
     {
-        if (timeout <= 0)
-        {
-            return B_TIMED_OUT;
-        }
-        if (!_registered)
-        {
-            return B_BAD_SEM_ID;
-        }
-        server_worker_sleep(std::min(timeout, (int64_t)kIntervalMicroseconds));
-        timeout -= kIntervalMicroseconds;
+        return timeout == 0 ? B_WOULD_BLOCK : B_TIMED_OUT;
     }
 
-    return status;
+    _count -= count;
+    return B_OK;
 }
 
 int Semaphore::TryAcquireUntil(int tid, int count, int64_t timestamp)
 {
-    status_t status = B_OK;
-
-    while ((status = TryAcquire(tid, count)) == B_WOULD_BLOCK)
+    std::unique_lock<std::mutex> lock(_countLock);
+    server_worker_run_wait([&]()
     {
-        if (server_system_time() >= timestamp)
+        _countCondVar.wait_until(lock,
+            std::chrono::steady_clock::time_point(std::chrono::microseconds(timestamp)), [&]()
         {
-            return B_TIMED_OUT;
-        }
-        if (!_registered)
-        {
-            return B_BAD_SEM_ID;
-        }
-        server_worker_sleep(std::min(timestamp - server_system_time(), (int64_t)kIntervalMicroseconds));
+            return !_registered || _count >= count;
+        });
+    });
+
+    if (!_registered)
+    {
+        return B_BAD_SEM_ID;
     }
 
-    return status;
+    if (_count < count)
+    {
+        return B_TIMED_OUT;
+    }
+
+    _count -= count;
+    return B_OK;
 }
 
 void Semaphore::Release(int count)
 {
     std::unique_lock<std::mutex> lock(_countLock);
     _count += count;
+    _countCondVar.notify_all();
 }
 
 intptr_t server_hserver_call_create_sem(hserver_context& context, int count, const char* userName, size_t nameLength)
@@ -170,9 +195,7 @@ intptr_t server_hserver_call_acquire_sem(hserver_context& context, int id)
         return B_BAD_SEM_ID;
     }
 
-    sem->Acquire(context.tid, 1);
-
-    return B_OK;
+    return sem->Acquire(context.tid, 1);
 }
 
 intptr_t server_hserver_call_acquire_sem_etc(hserver_context& context, int id, unsigned int count,
@@ -218,8 +241,7 @@ intptr_t server_hserver_call_acquire_sem_etc(hserver_context& context, int id, u
     }
     else
     {
-        sem->Acquire(context.tid, count);
-        return B_OK;
+        return sem->Acquire(context.tid, count);
     }
 }
 
