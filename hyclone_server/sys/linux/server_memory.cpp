@@ -1,5 +1,7 @@
+#include <errno.h>
 #include <fcntl.h>
 #include <filesystem>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -20,6 +22,7 @@ bool server_setup_memory()
 
     if (mount("shm", shmpath.c_str(), "tmpfs", 0, "size=100%") != 0)
     {
+        std::cerr << "Failed to mount shmfs: " << strerror(errno) << std::endl;
         return false;
     }
 
