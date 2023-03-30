@@ -5,11 +5,13 @@
 #include <numeric>
 #include <set>
 #include <string>
+#include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
 #include "haiku_errors.h"
+#include "haiku_team.h"
 #include "loader_sysinfo.h"
 
 int64_t get_cpu_count()
@@ -437,8 +439,41 @@ int64_t get_max_procs()
     return pid_max;
 }
 
-int get_process_usage(int pid, team_usage_info* info)
+int get_process_usage(int pid, int who, team_usage_info* info)
 {
+    if (pid == B_CURRENT_TEAM)
+    {
+        struct rusage usage;
+        int linuxWho;
+        switch (who)
+        {
+            case B_TEAM_USAGE_SELF:
+                linuxWho = RUSAGE_SELF;
+                break;
+            case B_TEAM_USAGE_CHILDREN:
+                linuxWho = RUSAGE_CHILDREN;
+                break;
+            default:
+                return B_BAD_VALUE;
+        }
+
+        if (getrusage(RUSAGE_SELF, &usage) != 0)
+        {
+            return B_BAD_VALUE;   
+        }
+
+        info->user_time = usage.ru_utime.tv_sec * 1000000 + usage.ru_utime.tv_usec;
+        info->kernel_time = usage.ru_stime.tv_sec * 1000000 + usage.ru_stime.tv_usec;
+
+        return B_OK;
+    }
+
+    if (who != B_TEAM_USAGE_SELF)
+    {
+        // We don't support this.
+        return B_BAD_VALUE;
+    }
+
     std::string temp = "/proc/" + std::to_string(pid) + "/stat";
     std::ifstream fin(temp.c_str());
 

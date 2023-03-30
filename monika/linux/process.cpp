@@ -16,13 +16,6 @@
 #include "signal_conversion.h"
 #include "syscall_load_image.h"
 
-enum
-{
-    /* compatible to sys/resource.h RUSAGE_SELF and RUSAGE_CHILDREN */
-    B_TEAM_USAGE_SELF       = 0,
-    B_TEAM_USAGE_CHILDREN   = -1
-};
-
 /* waitpid()/waitid() options */
 #define HAIKU_WNOHANG       0x01
 #define HAIKU_WUNTRACED     0x02
@@ -204,7 +197,7 @@ status_t MONIKA_EXPORT _kern_get_team_usage_info(team_id team, int32 who, team_u
 
     CHECK_COMMPAGE();
 
-    return GET_HOSTCALLS()->get_process_usage(team, info);
+    return GET_HOSTCALLS()->get_process_usage(team, who, info);
 }
 
 status_t MONIKA_EXPORT _kern_get_team_info(team_id id, haiku_team_info* info)

@@ -22,4 +22,11 @@ typedef struct
 #define B_CURRENT_TEAM	0
 #define B_SYSTEM_TEAM	1
 
+enum
+{
+    /* compatible to sys/resource.h RUSAGE_SELF and RUSAGE_CHILDREN */
+    B_TEAM_USAGE_SELF       = 0,
+    B_TEAM_USAGE_CHILDREN   = -1
+};
+
 #endif // __HAIKU_TEAM_H__

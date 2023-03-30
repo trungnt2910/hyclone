@@ -30,7 +30,7 @@ struct hostcalls
     int64_t (*get_max_threads)();
     int64_t (*get_max_sems)();
     int64_t (*get_max_procs)();
-    int (*get_process_usage)(int pid, team_usage_info* info);
+    int (*get_process_usage)(int pid, int who, team_usage_info* info);
 
     // Memory reservation
     void (*lock_reserved_range_data)();

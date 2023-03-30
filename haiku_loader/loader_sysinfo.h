@@ -39,6 +39,6 @@ __attribute__((weak))
 extern int64_t get_max_procs();
 
 __attribute__((weak))
-extern int get_process_usage(int pid, team_usage_info* info);
+extern int get_process_usage(int pid, int who, team_usage_info* info);
 
 #endif // __LOADER_SYSINFO_H__
