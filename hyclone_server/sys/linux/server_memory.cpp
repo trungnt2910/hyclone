@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <filesystem>
+#include <iostream>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
