@@ -55,6 +55,7 @@ bool loader_register_process(int argc, char** args)
 bool loader_register_builtin_areas(void* commpage, char** args)
 {
     haiku_area_info areaInfo;
+    memset(&areaInfo, 0, sizeof(areaInfo));
     areaInfo.team = getpid();
     areaInfo.address = commpage;
     areaInfo.size = COMMPAGE_SIZE;

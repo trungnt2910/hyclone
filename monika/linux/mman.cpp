@@ -76,7 +76,8 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
             hintAddr = NULL;
         break;
         case B_EXACT_ADDRESS:
-            mmap_flags |= MAP_FIXED;
+            // B_EXACT_ADDRESS is NOT MAP_FIXED!
+            // mmap_flags |= MAP_FIXED;
         break;
         case B_RANDOMIZED_BASE_ADDRESS:
         {
@@ -101,7 +102,8 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
             return HAIKU_POSIX_ENOMEM;
         }
 
-        result = LINUX_SYSCALL3(__NR_mprotect, hintAddr, size, mmap_prot);
+        // Safe to call MAP_FIXED in this case.
+        result = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, -1, 0);
         if (result < 0)
         {
             return LinuxToB(-result);
@@ -111,8 +113,6 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
 
         GET_HOSTCALLS()->map_reserved_range(hintAddr, size);
     }
-    // For B_EXACT_ADDRESS and the mapped area collides with an existing
-    // reserved area, mmap's error will handle this case.
     else
     {
         result = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, -1, 0);
@@ -225,6 +225,11 @@ int MONIKA_EXPORT _kern_delete_area(int area)
         {
             return LinuxToB(-status);
         }
+    }
+
+    if (status == B_OK)
+    {
+        GET_SERVERCALLS()->unregister_area(area);
     }
 
     return status;
@@ -759,7 +764,8 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
     {
         if (GET_HOSTCALLS()->is_in_reserved_range(info.address, info.size))
         {
-            status = LINUX_SYSCALL3(__NR_mprotect, (uint8_t*)info.address + newSize, info.size - newSize, PROT_NONE);
+            status = LINUX_SYSCALL6(__NR_mmap, (uint8_t*)info.address + newSize, info.size - newSize, PROT_NONE,
+                MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
             if (status < 0)
             {
@@ -783,40 +789,32 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
     }
     else // if (newSize > info.size)
     {
-        if (GET_HOSTCALLS()->is_in_reserved_range(info.address, info.size))
+        bool isInReservedRange = GET_HOSTCALLS()->is_in_reserved_range(info.address, info.size);
+        size_t mappableSize;
+        if (isInReservedRange)
         {
-            auto mappableSize =
+            mappableSize =
                 GET_HOSTCALLS()->reserved_range_longest_mappable_from((uint8_t*)info.address + info.size, newSize - info.size);
 
-            status = LINUX_SYSCALL3(__NR_mprotect, (uint8_t*)info.address + info.size, mappableSize, ProtBToLinux(info.protection));
+            status = LINUX_SYSCALL2(__NR_munmap, (uint8_t*)info.address + info.size, mappableSize);
             GET_HOSTCALLS()->map_reserved_range((uint8_t*)info.address + info.size, mappableSize);
 
             if (status < 0)
             {
                 return LinuxToB(-status);
             }
-
-            // We have to allocate more memory.
-            if (info.size + mappableSize < newSize)
-            {
-                status = LINUX_SYSCALL3(__NR_mremap, info.address, info.size + mappableSize, newSize);
-                if (status < 0)
-                {
-                    LINUX_SYSCALL3(__NR_mprotect, (uint8_t*)info.address + info.size, mappableSize, PROT_NONE);
-                    GET_HOSTCALLS()->unmap_reserved_range((uint8_t*)info.address + info.size, mappableSize);
-                    return LinuxToB(-status);
-                }
-            }
-
         }
-        else
-        {
-            status = LINUX_SYSCALL3(__NR_mremap, info.address, info.size, newSize);
+        status = LINUX_SYSCALL3(__NR_mremap, info.address, info.size, newSize);
 
-            if (status < 0)
+        if (status < 0)
+        {
+            if (isInReservedRange)
             {
-                return LinuxToB(-status);
+                LINUX_SYSCALL6(__NR_mmap, (uint8_t*)info.address + info.size, mappableSize, PROT_NONE,
+                    MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+                GET_HOSTCALLS()->unmap_reserved_range((uint8_t*)info.address + info.size, newSize - info.size);
             }
+            return LinuxToB(-status);
         }
     }
 
