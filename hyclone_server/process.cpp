@@ -1,5 +1,6 @@
 #include <cstring>
 
+#include "area.h"
 #include "haiku_errors.h"
 #include "process.h"
 #include "server_native.h"
@@ -76,32 +77,28 @@ size_t Process::UnregisterImage(int image_id)
     return _images.Size();
 }
 
-int Process::RegisterArea(int area_id)
+std::weak_ptr<Area> Process::RegisterArea(const std::shared_ptr<Area>& area)
 {
-    _areas.insert(area_id);
-    _info.area_count = _areas.size();
-    return area_id;
+    return _areas[area->GetAreaId()] = area;
 }
 
-haiku_area_info& Process::GetArea(int area_id)
+std::weak_ptr<Area> Process::GetArea(int area_id)
 {
-    auto& system = System::GetInstance();
-    if (!_areas.contains(area_id))
-        throw std::runtime_error("Invalid area id");
-    // Safe as long as we're holding a lock
-    // of the owning process.
-    return system.GetArea(area_id);
+    auto it = _areas.find(area_id);
+    if (it == _areas.end())
+        return std::weak_ptr<Area>();
+    return it->second;
 }
 
 int Process::GetAreaIdFor(void* address)
 {
     auto& system = System::GetInstance();
 
-    for (const auto& areaId : _areas)
+    for (const auto& [areaId, area] : _areas)
     {
-        const auto& area = system.GetArea(areaId);
-        if ((uint8_t*)area.address <= address && address < (uint8_t*)area.address + area.size)
-            return area.area;
+        if ((uint8_t*)area->GetInfo().address <= address &&
+            address < (uint8_t*)area->GetInfo().address + area->GetInfo().size)
+            return area->GetAreaId();
     }
     return -1;
 }
@@ -112,15 +109,14 @@ int Process::GetNextAreaIdFor(void* address)
     int id = -1;
     uintptr_t min = (uintptr_t)-1;
 
-    for (const auto& areaId : _areas)
+    for (const auto& [areaId, area] : _areas)
     {
-        const auto& area = system.GetArea(areaId);
-        if ((uintptr_t)area.address > (uintptr_t)address)
+        if ((uintptr_t)area->GetInfo().address > (uintptr_t)address)
         {
-            if ((uintptr_t)area.address < min)
+            if ((uintptr_t)area->GetInfo().address < min)
             {
-                min = (uintptr_t)area.address;
-                id = area.area;
+                min = (uintptr_t)area->GetInfo().address;
+                id = area->GetAreaId();
             }
         }
     }
@@ -132,7 +128,7 @@ int Process::NextAreaId(int area_id)
     auto it = _areas.upper_bound(area_id);
     if (it == _areas.end())
         return -1;
-    return *it;
+    return it->first;
 }
 
 bool Process::IsValidAreaId(int area_id)
@@ -149,6 +145,8 @@ size_t Process::UnregisterArea(int area_id)
 
 void Process::Fork(Process& child)
 {
+    auto& system = System::GetInstance();
+
     // No, child has new PID.
     // child._pid = _pid;
     // No, child has its own threads.
@@ -156,17 +154,13 @@ void Process::Fork(Process& child)
     child._info = _info;
 
     child._images = _images;
-    
     // Fork is called in a system lock
     // so we can safely access the areas.
-    for (const auto& areaId : _areas)
+    for (const auto& [areaId, area] : _areas)
     {
-        auto& system = System::GetInstance();
-        haiku_area_info& registeredArea = system.GetArea(
-            system.RegisterArea(
-                system.GetArea(areaId)));
-        registeredArea.team = child._pid;
-        child._areas.insert(registeredArea.area);
+        auto registeredArea = system.RegisterArea(area->GetInfo()).lock();
+        registeredArea->GetInfo().team = child._pid;
+        child._areas[areaId] = registeredArea;
     }
 
     // No, semaphores don't seem to be inherited.

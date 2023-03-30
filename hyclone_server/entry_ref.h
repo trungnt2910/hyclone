@@ -10,10 +10,12 @@
 class EntryRef
 {
 private:
-    uint64_t _device;
-    uint64_t _inode;
+    uint64_t _device = 0;
+    uint64_t _inode = 0;
 public:
     EntryRef(uint64_t device, uint64_t inode): _device(device), _inode(inode) {}
+    EntryRef(const EntryRef& other) = default;
+    EntryRef() = default;
     ~EntryRef() = default;
 
     uint64_t GetDevice() const { return _device; }

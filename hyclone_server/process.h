@@ -1,6 +1,7 @@
 #ifndef __HYCLONE_PROCESS_H__
 #define __HYCLONE_PROCESS_H__
 
+#include <map>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -11,6 +12,7 @@
 #include "haiku_team.h"
 #include "id_map.h"
 
+class Area;
 class Thread;
 
 class Process
@@ -22,7 +24,7 @@ private:
 
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     IdMap<haiku_extended_image_info, int> _images;
-    std::set<int> _areas;
+    std::map<int, std::shared_ptr<Area>> _areas;
     std::mutex _lock;
     std::unordered_set<int> _owningSemaphores;
     std::unordered_set<int> _owningPorts;
@@ -43,8 +45,8 @@ public:
     bool IsValidImageId(int image_id);
     size_t UnregisterImage(int image_id);
 
-    int RegisterArea(int area_id);
-    haiku_area_info& GetArea(int area_id);
+    std::weak_ptr<Area> RegisterArea(const std::shared_ptr<Area>& area);
+    std::weak_ptr<Area> GetArea(int area_id);
     int GetAreaIdFor(void* address);
     int GetNextAreaIdFor(void* address);
     int NextAreaId(int area_id);

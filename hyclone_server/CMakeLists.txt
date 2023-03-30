@@ -22,6 +22,7 @@ add_executable(hyclone_server
     server_apploadnotification.cpp
     server_dispatch.cpp
     server_filesystem.cpp
+    server_memory.cpp
     server_prefix.cpp
     server_workers.cpp
     shutdown.cpp
@@ -36,5 +37,5 @@ install(TARGETS hyclone_server DESTINATION bin)
 if(HYCLONE_HOST_LINUX)
     install(CODE "
         message(STATUS \"Setting capabilities for hyclone_server\")
-        execute_process(COMMAND sudo setcap cap_sys_ptrace,cap_sys_nice+eip ${CMAKE_INSTALL_PREFIX}/bin/hyclone_server)")
+        execute_process(COMMAND sudo setcap cap_sys_ptrace,cap_sys_nice,cap_sys_admin+eip ${CMAKE_INSTALL_PREFIX}/bin/hyclone_server)")
 endif()

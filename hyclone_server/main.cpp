@@ -5,6 +5,7 @@
 
 #include "server_filesystem.h"
 #include "server_main.h"
+#include "server_memory.h"
 #include "server_prefix.h"
 #include "server_workers.h"
 
@@ -17,6 +18,11 @@ int main(int argc, char** argv)
     if (!server_setup_filesystem())
     {
         std::cerr << "failed to setup hyclone filesystem." << std::endl;
+        return 1;
+    }
+    if (!server_setup_memory())
+    {
+        std::cerr << "failed to setup hyclone memory." << std::endl;
         return 1;
     }
     return server_main(argc, argv);

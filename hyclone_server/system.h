@@ -12,6 +12,7 @@
 #include "id_map.h"
 #include "server_apploadnotification.h"
 
+struct Area;
 class Process;
 class Port;
 class Semaphore;
@@ -31,7 +32,7 @@ private:
     std::unordered_map<std::string, int> _portNames;
     IdMap<std::shared_ptr<Semaphore>, int> _semaphores;
     IdMap<std::shared_ptr<haiku_fs_info>, int> _fsInfos;
-    std::map<int, haiku_area_info> _areas;
+    std::map<int, std::shared_ptr<Area>> _areas;
     std::unordered_map<EntryRef, std::string> _entryRefs;
     std::mutex _lock;
     AppLoadNotificationService _appLoadNotificationService;
@@ -69,10 +70,9 @@ public:
     int NextFSInfoId(int id) const;
     size_t UnregisterFSInfo(int id);
 
-    int RegisterArea(const haiku_area_info& info);
+    std::weak_ptr<Area> RegisterArea(const haiku_area_info& info);
+    std::weak_ptr<Area> GetArea(int id);
     bool IsValidAreaId(int id) const;
-    const haiku_area_info& GetArea(int id) const;
-    haiku_area_info& GetArea(int id);
     size_t UnregisterArea(int id);
 
     int RegisterEntryRef(const EntryRef& ref, const std::string& path);

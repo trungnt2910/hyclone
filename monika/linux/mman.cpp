@@ -194,6 +194,42 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
 
     *address = hintAddr;
 
+    if (protection & B_CLONEABLE_AREA)
+    {
+        char hostPath[PATH_MAX];
+        if (GET_SERVERCALLS()->share_area(area_id, -1, 0, hostPath, sizeof(hostPath)) != B_OK)
+        {
+            return B_OK;
+        }
+
+        int open_flags = 0;
+        if (protection & (B_READ_AREA | B_WRITE_AREA))
+        {
+            open_flags |= O_RDWR;
+        }
+        else if (protection & B_WRITE_AREA)
+        {
+            open_flags |= O_WRONLY;
+        }
+        else
+        {
+            open_flags |= O_RDONLY;
+        }
+
+        int fd = LINUX_SYSCALL3(__NR_open, (long)hostPath, open_flags, 0);
+        if (fd < 0)
+        {
+            return B_OK;
+        }
+
+        if (LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, fd, 0) == -1)
+        {
+            panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
+        }
+
+        LINUX_SYSCALL1(__NR_close, fd);
+    }
+
     return area_id;
 }
 
@@ -594,6 +630,16 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
         mmap_flags |= MAP_STACK | MAP_GROWSDOWN;
         mmap_prot |= PROT_READ | PROT_WRITE | PROT_GROWSDOWN;
     }
+    if (protection & B_CLONEABLE_AREA)
+    {
+        if (mapping == REGION_PRIVATE_MAP)
+        {
+            // This is a weird case. To properly handle this we'll
+            // have to use hooks at fork.
+            return B_BAD_VALUE;
+        }
+        mmap_flags |= MAP_SHARED;
+    }
 
     if (protection & (B_READ_AREA | B_WRITE_AREA))
     {
@@ -741,6 +787,31 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
     }
 
     *address = hintAddr;
+
+    if (protection & B_CLONEABLE_AREA || mapping == REGION_NO_PRIVATE_MAP)
+    {
+        char hostPath[PATH_MAX];
+        if (GET_SERVERCALLS()->share_area(area_id, fd, offset, hostPath, sizeof(hostPath)) != B_OK)
+        {
+            // If we return an error state at this point things will be highly inconsistent.
+            return B_OK;
+        }
+
+        fd = LINUX_SYSCALL3(__NR_open, (long)hostPath, open_flags, 0);
+        if (fd < 0)
+        {
+            return B_OK;
+        }
+
+        if (LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, fd, offset) == -1)
+        {
+            // This is probably not Linux but a poorly implemented emulator.
+            panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
+        }
+
+        LINUX_SYSCALL1(__NR_close, fd);
+    }
+
     return area_id;
 }
 
@@ -760,7 +831,14 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
     {
         return B_OK;
     }
-    else if (newSize < info.size)
+
+    status = GET_SERVERCALLS()->resize_area(area, newSize);
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    if (newSize < info.size)
     {
         if (GET_HOSTCALLS()->is_in_reserved_range(info.address, info.size))
         {
@@ -769,6 +847,7 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
 
             if (status < 0)
             {
+                GET_SERVERCALLS()->resize_area(area, info.size);
                 return LinuxToB(-status);
             }
 
@@ -783,6 +862,7 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
 
             if (status < 0)
             {
+                GET_SERVERCALLS()->resize_area(area, info.size);
                 return LinuxToB(-status);
             }
         }
@@ -801,6 +881,7 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
 
             if (status < 0)
             {
+                GET_SERVERCALLS()->resize_area(area, info.size);
                 return LinuxToB(-status);
             }
         }
@@ -814,12 +895,12 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
                     MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
                 GET_HOSTCALLS()->unmap_reserved_range((uint8_t*)info.address + info.size, newSize - info.size);
             }
+            GET_SERVERCALLS()->resize_area(area, info.size);
             return LinuxToB(-status);
         }
     }
 
-    status = GET_SERVERCALLS()->resize_area(area, newSize);
-    return status;
+    return B_OK;
 }
 
 area_id MONIKA_EXPORT _kern_area_for(void *address)

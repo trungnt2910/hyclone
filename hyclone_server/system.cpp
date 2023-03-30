@@ -2,6 +2,7 @@
 #include <cstring>
 #include <iostream>
 
+#include "area.h"
 #include "entry_ref.h"
 #include "haiku_area.h"
 #include "haiku_errors.h"
@@ -198,7 +199,7 @@ int System::NextFSInfoId(int id) const
     return _fsInfos.NextId(id);
 }
 
-int System::RegisterArea(const haiku_area_info& info)
+std::weak_ptr<Area> System::RegisterArea(const haiku_area_info& info)
 {
     int nextId = _nextAreaId;
     _nextAreaId = (_nextAreaId == INT_MAX) ? 1 : _nextAreaId + 1;
@@ -209,11 +210,10 @@ int System::RegisterArea(const haiku_area_info& info)
         _nextAreaId = (_nextAreaId == INT_MAX) ? 1 : _nextAreaId + 1;
     }
 
-    std::cerr << "Registering area " << nextId << " with size " << info.size << " for pid " << info.team << std::endl;
-
-    _areas[nextId] = info;
-    _areas[nextId].area = nextId;
-    return nextId;
+    auto ptr = std::make_shared<Area>(info);
+    ptr->_info.area = nextId;
+    _areas[nextId] = ptr;
+    return ptr;
 }
 
 bool System::IsValidAreaId(int id) const
@@ -221,15 +221,12 @@ bool System::IsValidAreaId(int id) const
     return _areas.find(id) != _areas.end();
 }
 
-const haiku_area_info& System::GetArea(int id) const
+std::weak_ptr<Area> System::GetArea(int id)
 {
-    return _areas.at(id);
-}
-
-haiku_area_info& System::GetArea(int id)
-{
-    std::cerr << _areas.contains(id) << std::endl;
-    return _areas.at(id);
+    auto it = _areas.find(id);
+    if (it == _areas.end())
+        return std::weak_ptr<Area>();
+    return it->second;
 }
 
 size_t System::UnregisterArea(int id)
