@@ -236,6 +236,213 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
     return area_id;
 }
 
+area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
+    uint32 addressSpec, uint32 protection, area_id sourceArea)
+{
+    struct haiku_area_info sourceInfo;
+    long status = GET_SERVERCALLS()->get_area_info(sourceArea, &sourceInfo);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    if (!(sourceInfo.protection & B_CLONEABLE_AREA))
+    {
+        return B_BAD_VALUE;
+    }
+
+    void* hintAddr = *address;
+    void* baseAddr = hintAddr;
+    int mmap_flags = MAP_PRIVATE;
+    int mmap_prot = 0;
+
+    if (protection & B_READ_AREA)
+        mmap_prot |= PROT_READ;
+    if (protection & B_WRITE_AREA)
+        mmap_prot |= PROT_WRITE;
+    if (protection & B_EXECUTE_AREA)
+        mmap_prot |= PROT_EXEC;
+    if (protection & B_STACK_AREA)
+    {
+        mmap_flags |= MAP_STACK | MAP_GROWSDOWN;
+        mmap_prot |= PROT_READ | PROT_WRITE | PROT_GROWSDOWN;
+    }
+
+    switch (addressSpec)
+    {
+        case B_ANY_ADDRESS:
+        case B_RANDOMIZED_ANY_ADDRESS:
+            hintAddr = NULL;
+        break;
+        case B_EXACT_ADDRESS:
+            // B_EXACT_ADDRESS is NOT MAP_FIXED!
+            // mmap_flags |= MAP_FIXED;
+        break;
+        case B_RANDOMIZED_BASE_ADDRESS:
+        {
+            addr_t randnum;
+            status = LINUX_SYSCALL3(__NR_getrandom, &randnum, sizeof(addr_t), 0);
+            if (status < 0)
+            {
+                return LinuxToB(-status);
+            }
+            randnum %= kMaxRandomize;
+            hintAddr = (void*)((addr_t)hintAddr + randnum);
+        }
+        break;
+        case B_CLONE_ADDRESS:
+            hintAddr = sourceInfo.address;
+        break;
+    }
+    
+    char hostPath[PATH_MAX];
+    status = GET_SERVERCALLS()->get_shared_area_path(sourceArea, hostPath, sizeof(hostPath));
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    int open_flags = 0;
+    if (protection & (B_READ_AREA | B_WRITE_AREA))
+    {
+        open_flags |= O_RDWR;
+    }
+    else if (protection & B_WRITE_AREA)
+    {
+        open_flags |= O_WRONLY;
+    }
+    else
+    {
+        open_flags |= O_RDONLY;
+    }
+    int fd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
+    if (fd < 0)
+    {
+        return LinuxToB(-fd);
+    }
+
+    LINUX_SYSCALL1(__NR_fsync, fd);
+
+    status = LINUX_SYSCALL6(__NR_mmap, hintAddr, sourceInfo.size, mmap_prot, mmap_flags, fd, 0);
+
+    if (status == -1)
+    {
+        LINUX_SYSCALL1(__NR_close, fd);
+        return LinuxToB(-status);
+    }
+
+    switch (addressSpec)
+    {
+        case B_BASE_ADDRESS:
+        case B_RANDOMIZED_BASE_ADDRESS:
+            if (status < (long)baseAddr)
+            {
+                // Success, but not greater than base.
+                LINUX_SYSCALL2(__NR_munmap, status, sourceInfo.size);
+                LINUX_SYSCALL1(__NR_close, fd);
+                return B_NO_MEMORY;
+            }
+        break;
+        case B_EXACT_ADDRESS:
+            if (status != (long)hintAddr)
+            {
+                // Success, but not at the address requested.
+                LINUX_SYSCALL2(__NR_munmap, status, sourceInfo.size);
+                LINUX_SYSCALL1(__NR_close, fd);
+                return B_NO_MEMORY;
+            }
+        case B_CLONE_ADDRESS:
+            if (status != (long)sourceInfo.address)
+            {
+                // Success, but not at the address requested.
+                LINUX_SYSCALL2(__NR_munmap, status, sourceInfo.size);
+                LINUX_SYSCALL1(__NR_close, fd);
+                return B_NO_MEMORY;
+            }
+    }
+
+    hintAddr = (void *)status;
+
+    struct haiku_area_info info;
+
+    strlcpy(info.name, name, sizeof(info.name));
+    info.size = sourceInfo.size;
+    info.lock = sourceInfo.lock;
+    info.protection = protection;
+    info.address = hintAddr;
+    info.ram_size = 0;
+    info.copy_count = 0;
+    info.in_count = 0;
+    info.out_count = 0;
+
+    int area_id = GET_SERVERCALLS()->register_area(&info, REGION_PRIVATE_MAP);
+
+    if (area_id < 0)
+    {
+        LINUX_SYSCALL2(__NR_munmap, hintAddr, info.size);
+        LINUX_SYSCALL1(__NR_close, fd);
+        // This is actually an error code returned by the server.
+        return area_id;
+    }
+
+    if (protection & B_CLONEABLE_AREA)
+    {
+        status = GET_SERVERCALLS()->share_area(area_id, fd, 0, hostPath, sizeof(hostPath));
+
+        if (status != B_OK)
+        {
+            GET_SERVERCALLS()->unregister_area(area_id);
+            LINUX_SYSCALL2(__NR_munmap, hintAddr, info.size);
+            LINUX_SYSCALL1(__NR_close, fd);
+            return status;
+        }
+
+        LINUX_SYSCALL1(__NR_close, fd);
+        fd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
+        if (fd < 0)
+        {
+            GET_SERVERCALLS()->unregister_area(area_id);
+            LINUX_SYSCALL2(__NR_munmap, hintAddr, info.size);
+            return LinuxToB(-fd);            
+        }
+
+        mmap_flags |= MAP_SHARED | MAP_FIXED;
+        mmap_flags &= ~(MAP_ANONYMOUS | MAP_PRIVATE);
+
+        if (LINUX_SYSCALL6(__NR_mmap, hintAddr, info.size, mmap_prot, mmap_flags, fd, 0) == -1)
+        {
+            panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
+        }
+    }
+
+    LINUX_SYSCALL1(__NR_close, fd);
+
+    switch (sourceInfo.lock)
+    {
+        case B_NO_LOCK:
+            break;
+        case B_LAZY_LOCK:
+            status = LINUX_SYSCALL3(__NR_mlock2, hintAddr, sourceInfo.size, MLOCK_ONFAULT);
+            break;
+        case B_FULL_LOCK:
+            status = LINUX_SYSCALL3(__NR_mlock2, hintAddr, sourceInfo.size, 0);
+            break;
+        default:
+            status = -ENOSYS;
+    }
+
+    if (status < 0)
+    {
+        GET_SERVERCALLS()->unregister_area(area_id);
+        LINUX_SYSCALL2(__NR_munmap, hintAddr, info.size);
+        return LinuxToB(-status);
+    }
+
+    *address = hintAddr;
+    return area_id;
+}
+
 int MONIKA_EXPORT _kern_delete_area(int area)
 {
     CHECK_COMMPAGE();

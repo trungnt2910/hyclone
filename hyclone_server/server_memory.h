@@ -74,6 +74,7 @@ public:
     bool OpenSharedFile(int pid, intptr_t userHandle, bool writable, EntryRef& ref);
     bool OpenSharedFile(const std::string& name, bool writable, EntryRef& ref);
     bool AcquireSharedFile(const EntryRef& ref);
+    bool GetSharedFilePath(const EntryRef& ref, std::string& path);
 
     void* AcquireMemory(const EntryRef& ref, size_t size, size_t offset, bool writable);
     void ReleaseMemory(void* address, size_t size);

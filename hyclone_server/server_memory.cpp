@@ -177,6 +177,26 @@ bool MemoryService::AcquireSharedFile(const EntryRef& ref)
     return false;
 }
 
+bool MemoryService::GetSharedFilePath(const EntryRef& ref, std::string& path)
+{
+    if (!_sharedFiles.contains(ref))
+    {
+        return false;
+    }
+
+    auto& file = _sharedFiles[ref];
+    if (file.HasHandle())
+    {
+        return false;
+    }
+    else
+    {
+        path = file.GetName();
+    }
+
+    return true;
+}
+
 void* MemoryService::AcquireMemory(const EntryRef& ref, size_t size, size_t offset, bool writable)
 {
     if (!_sharedFiles.contains(ref))

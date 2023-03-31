@@ -150,6 +150,51 @@ intptr_t server_hserver_call_share_area(hserver_context& context, int area_id, i
     }
 }
 
+intptr_t server_hserver_call_get_shared_area_path(hserver_context& context, int area_id, char* user_path, size_t pathLen)
+{
+    std::shared_ptr<Area> area;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        if (system.IsValidAreaId(area_id))
+        {
+            area = system.GetArea(area_id).lock();
+        }
+    }
+
+    if (!area)
+    {
+        return B_BAD_VALUE;
+    }
+
+    if (!area->IsShared())
+    {
+        return B_BAD_VALUE;
+    }
+
+    auto& memService = System::GetInstance().GetMemoryService();
+    auto lock = memService.Lock();
+
+    std::string path;
+    if (!memService.GetSharedFilePath(area->GetEntryRef(), path))
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
+
+    if (path.size() > pathLen)
+    {
+        return B_NAME_TOO_LONG;
+    }
+
+    if (context.process->WriteMemory(user_path, path.c_str(), path.size()) != path.size())
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id, void* user_area_info)
 {
     std::shared_ptr<Area> area;
