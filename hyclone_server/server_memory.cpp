@@ -1,7 +1,37 @@
+#include <filesystem>
 #include <vector>
 
 #include "server_memory.h"
+#include "server_prefix.h"
+#include "servercalls.h"
 
+static bool IsSubDir(const std::filesystem::path& parent, const std::filesystem::path& child)
+{
+    auto parentIt = parent.begin();
+    auto childIt = child.begin();
+
+    while (parentIt != parent.end() && childIt != child.end() && *parentIt == *childIt)
+    {
+        ++parentIt;
+        ++childIt;
+    }
+
+    return parentIt == parent.end();
+}
+
+bool MemoryService::CreateSharedFile(const std::string& name, size_t size, std::string& hostPath)
+{
+    intptr_t handle = server_open_shared_file(name.c_str(), size, true);
+    if (handle == -1)
+    {
+        return false;
+    }
+
+    server_close_file(handle);
+
+    hostPath = (std::filesystem::path(gHaikuPrefix) / HYCLONE_SHM_NAME / name).string();
+    return true;
+}
 
 bool MemoryService::OpenSharedFile(int pid, intptr_t userHandle, bool writable, EntryRef& ref)
 {
@@ -33,50 +63,16 @@ bool MemoryService::OpenSharedFile(int pid, intptr_t userHandle, bool writable, 
     if (_sharedFiles.contains(ref))
     {
         auto& file = _sharedFiles[ref];
-        ++file.refCount;
+        file.IncrementRefCount();
 
-        if (writable && !file.writable)
+        if (writable && !file.IsWritable())
         {
-            if (!file.hasHandle)
+            if (file.HasHandle())
             {
-                file.hasHandle = true;
-                file.name.~basic_string();
-                file.handle = handle;
+                server_close_file(file.HasHandle());
             }
-            else
-            {
-                server_close_file(file.handle);
-                file.handle = handle;
-            }
-
-            file.writable = true;
-
-            // Unmap all read-only regions in favor of writable ones
-            if (_mappedFiles.contains(ref))
-            {
-                std::vector<size_t> toRemove;
-                auto& map = _mappedFiles[ref];
-
-                for (auto& [offset, pair] : map)
-                {
-                    if (!pair.second)
-                    {
-                        server_unmap_memory(pair.first, server_get_page_size());
-                        pair.first = server_map_memory(handle, offset, server_get_page_size(), true);
-                        pair.second = true;
-
-                        if (pair.first == nullptr)
-                        {
-                            toRemove.push_back(offset);
-                        }
-                    }
-                }
-
-                for (auto offset : toRemove)
-                {
-                    map.erase(offset);
-                }
-            }
+            file.SetHandle(handle);
+            file.SetWritable();
         }
         else
         {
@@ -124,49 +120,17 @@ bool MemoryService::OpenSharedFile(const std::string& name, bool writable, Entry
     if (_sharedFiles.contains(ref))
     {
         auto& file = _sharedFiles[ref];
-        ++file.refCount;
+        file.IncrementRefCount();
 
-        if (writable && !file.writable)
+        if (writable && !file.IsWritable())
         {
-            if (file.hasHandle)
+            if (file.HasHandle())
             {
-                server_close_file(file.handle);
-                file.hasHandle = false;
-                new (&file.name) std::string(name);
-            }
-            else
-            {
-                file.name = name;
+                server_close_file(file.GetHandle());
             }
 
-            file.writable = true;
-
-            // Unmap all read-only regions in favor of writable ones
-            if (_mappedFiles.contains(ref))
-            {
-                std::vector<size_t> toRemove;
-                auto& map = _mappedFiles[ref];
-
-                for (auto& [offset, pair] : map)
-                {
-                    if (!pair.second)
-                    {
-                        server_unmap_memory(pair.first, server_get_page_size());
-                        pair.first = server_map_memory(handle, offset, server_get_page_size(), true);
-                        pair.second = true;
-
-                        if (pair.first == nullptr)
-                        {
-                            toRemove.push_back(offset);
-                        }
-                    }
-                }
-
-                for (auto offset : toRemove)
-                {
-                    map.erase(offset);
-                }
-            }
+            file.SetName(name);
+            file.SetWritable();
         }
 
         return true;
@@ -178,7 +142,17 @@ bool MemoryService::OpenSharedFile(const std::string& name, bool writable, Entry
     }
 }
 
-void* MemoryService::AccessMemory(const EntryRef& ref, size_t offset, bool writable)
+bool MemoryService::AcquireSharedFile(const EntryRef& ref)
+{
+    if (_sharedFiles.contains(ref))
+    {
+        _sharedFiles[ref].IncrementRefCount();
+        return true;
+    }
+    return false;
+}
+
+void* MemoryService::AcquireMemory(const EntryRef& ref, size_t size, size_t offset, bool writable)
 {
     if (!_sharedFiles.contains(ref))
     {
@@ -186,80 +160,31 @@ void* MemoryService::AccessMemory(const EntryRef& ref, size_t offset, bool writa
     }
 
     auto& file = _sharedFiles[ref];
-
-    if (writable && !file.writable)
+    if (writable && !file.IsWritable())
     {
         return NULL;
     }
 
-    intptr_t handle;
-    if (file.hasHandle)
+    if (file.HasHandle())
     {
-        handle = file.handle;
+        return server_map_memory(file.GetHandle(), offset, size, writable);
     }
     else
     {
-        handle = server_open_file(file.name.c_str(), file.writable);
+        intptr_t handle = server_open_file(file.GetName().c_str(), writable);
         if (handle == -1)
         {
             return NULL;
         }
-    }
-
-    size_t roundedOffset = offset & ~(server_get_page_size() - 1);
-
-    if (_mappedFiles.contains(ref))
-    {
-        auto& map = _mappedFiles[ref];
-
-        if (map.contains(roundedOffset))
-        {
-            auto& pair = map[roundedOffset];
-
-            if (writable && !pair.second)
-            {
-                server_unmap_memory(pair.first, server_get_page_size());
-                pair.first = server_map_memory(file.handle, roundedOffset, server_get_page_size(), true);
-                pair.second = true;
-
-                if (pair.first == NULL)
-                {
-                    map.erase(roundedOffset);
-                    if (!file.hasHandle)
-                    {
-                        server_close_file(handle);
-                    }
-                    return NULL;
-                }
-            }
-
-            if (!file.hasHandle)
-            {
-                server_close_file(handle);
-            }
-            return pair.first;
-        }
-    }
-
-    void* ptr = server_map_memory(file.handle, roundedOffset, server_get_page_size(), writable);
-
-    if (!file.hasHandle)
-    {
+        void* address = server_map_memory(handle, offset, size, writable);
         server_close_file(handle);
+        return address;
     }
+}
 
-    if (ptr == NULL)
-    {
-        return NULL;
-    }
-
-    if (!_mappedFiles.contains(ref))
-    {
-        _mappedFiles.emplace(ref, std::unordered_map<size_t, std::pair<void*, bool>>());
-    }
-
-    _mappedFiles[ref].emplace(roundedOffset, std::make_pair(ptr, writable));
-    return ((uint8_t*)ptr) + (offset - roundedOffset);
+void MemoryService::ReleaseMemory(void* address, size_t size)
+{
+    server_unmap_memory(address, size);
 }
 
 void MemoryService::ReleaseSharedFile(const EntryRef& ref)
@@ -267,25 +192,24 @@ void MemoryService::ReleaseSharedFile(const EntryRef& ref)
     if (_sharedFiles.contains(ref))
     {
         auto& file = _sharedFiles[ref];
-        --file.refCount;
+        file.DecrementRefCount();
 
-        if (file.refCount == 0)
+        if (file.GetRefCount() == 0)
         {
-            // Let the desctructor take care of SharedFile
-            // and its paths/handles.
-            _sharedFiles.erase(ref);
-
-            if (_mappedFiles.contains(ref))
+            if (file.HasHandle())
             {
-                auto& map = _mappedFiles[ref];
-
-                for (auto& [offset, pair] : map)
-                {
-                    server_unmap_memory(pair.first, server_get_page_size());
-                }
-
-                _mappedFiles.erase(ref);
+                server_close_file(file.GetHandle());
             }
+            else
+            {
+                auto sharedFilePath = std::filesystem::path(file.GetName());
+                if (IsSubDir(std::filesystem::path(gHaikuPrefix) / HYCLONE_SHM_NAME, sharedFilePath))
+                {
+                    std::filesystem::remove(sharedFilePath);
+                }
+            }
+
+            _sharedFiles.erase(ref);
         }
     }
 }

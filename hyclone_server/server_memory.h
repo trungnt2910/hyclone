@@ -2,9 +2,11 @@
 #define __SERVER_MEMORY_H__
 
 #include <cstddef>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 
 #include "entry_ref.h"
 
@@ -35,79 +37,47 @@ size_t server_get_page_size();
 class MemoryService
 {
 private:
-    struct SharedFile
+    class SharedFile
     {
-        union
-        {
-            std::string name;
-            intptr_t handle = -1;
-        };
-        bool hasHandle = true;
-        bool writable = false;
-        size_t refCount = 0;
-
+    private:
+        std::variant<std::string, intptr_t> _handleOrName = -1;
+        bool _writable = false;
+        size_t _refCount = 1;
+    public:
         SharedFile(const std::string& name, bool writable) :
-            name(name),
-            hasHandle(false),
-            writable(writable),
-            refCount(1)
-        {
-        }
-
+            _handleOrName(name), _writable(writable) { }
         SharedFile(intptr_t handle, bool writable) :
-            handle(handle),
-            hasHandle(true),
-            writable(writable),
-            refCount(1)
-        {
-        }
-
-        SharedFile()
-        {
-        }
-
-        SharedFile(SharedFile&& other)
-        {
-            if (other.hasHandle)
-            {
-                handle = other.handle;
-                hasHandle = true;
-            }
-            else
-            {
-                new (&name) std::string(std::move(other.name));
-                hasHandle = false;
-            }
-            writable = other.writable;
-            refCount = other.refCount;
-        }
-
-        ~SharedFile()
-        {
-            if (hasHandle)
-            {
-                server_close_file(handle);
-            }
-            else
-            {
-                name.~basic_string();
-            }
-        }
+            _handleOrName(handle), _writable(writable) { }
+        SharedFile() = default;
+        bool IsWritable() const { return _writable; }
+        void SetWritable(bool writable = true) { _writable = writable; }
+        bool HasHandle() const { return std::holds_alternative<intptr_t>(_handleOrName); }
+        intptr_t GetHandle() const { return std::get<intptr_t>(_handleOrName); }
+        void SetHandle(intptr_t handle) { _handleOrName = handle; }
+        const std::string& GetName() const { return std::get<std::string>(_handleOrName); }
+        void SetName(const std::string& name) { _handleOrName = name; }
+        size_t GetRefCount() const { return _refCount; }
+        void IncrementRefCount() { ++_refCount; }
+        void DecrementRefCount() { --_refCount; }
     };
 
     std::unordered_map<EntryRef, SharedFile> _sharedFiles;
-    std::unordered_map<EntryRef, std::unordered_map<size_t, std::pair<void*, bool>>> _mappedFiles;
+    std::mutex _lock;
 public:
     MemoryService() = default;
     ~MemoryService() = default;
 
+    bool CreateSharedFile(const std::string& name, size_t size, std::string& hostPath);
     bool OpenSharedFile(int pid, intptr_t userHandle, bool writable, EntryRef& ref);
     bool OpenSharedFile(const std::string& name, bool writable, EntryRef& ref);
+    bool AcquireSharedFile(const EntryRef& ref);
 
-    // Access exactly one page of memory
-    void* AccessMemory(const EntryRef& ref, size_t offset, bool writable);
+    void* AcquireMemory(const EntryRef& ref, size_t size, size_t offset, bool writable);
+    void ReleaseMemory(void* address, size_t size);
 
     void ReleaseSharedFile(const EntryRef& ref);
+
+    std::unique_lock<std::mutex> Lock() { return std::unique_lock(_lock); }
 };
 
 #endif // __SERVER_MEMORY_H__

@@ -11,6 +11,7 @@
 #include "entry_ref.h"
 #include "id_map.h"
 #include "server_apploadnotification.h"
+#include "server_memory.h"
 
 struct Area;
 class Process;
@@ -36,6 +37,7 @@ private:
     std::unordered_map<EntryRef, std::string> _entryRefs;
     std::mutex _lock;
     AppLoadNotificationService _appLoadNotificationService;
+    MemoryService _memoryService;
     System() = default;
     ~System() = default;
 public:
@@ -71,6 +73,7 @@ public:
     size_t UnregisterFSInfo(int id);
 
     std::weak_ptr<Area> RegisterArea(const haiku_area_info& info);
+    std::weak_ptr<Area> RegisterArea(const std::shared_ptr<Area>& ptr);
     std::weak_ptr<Area> GetArea(int id);
     bool IsValidAreaId(int id) const;
     size_t UnregisterArea(int id);
@@ -84,6 +87,9 @@ public:
 
     AppLoadNotificationService& GetAppLoadNotificationService() { return _appLoadNotificationService; }
     const AppLoadNotificationService& GetAppLoadNotificationService() const { return _appLoadNotificationService; }
+
+    MemoryService& GetMemoryService() { return _memoryService; }
+    const MemoryService& GetMemoryService() const { return _memoryService; }
 
     std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(_lock); }
 

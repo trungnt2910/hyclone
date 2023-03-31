@@ -216,6 +216,31 @@ std::weak_ptr<Area> System::RegisterArea(const haiku_area_info& info)
     return ptr;
 }
 
+std::weak_ptr<Area> System::RegisterArea(const std::shared_ptr<Area>& ptr)
+{
+    int nextId = _nextAreaId;
+    _nextAreaId = (_nextAreaId == INT_MAX) ? 1 : _nextAreaId + 1;
+
+    while (_areas.find(nextId) != _areas.end())
+    {
+        nextId = _nextAreaId;
+        _nextAreaId = (_nextAreaId == INT_MAX) ? 1 : _nextAreaId + 1;
+    }
+
+    if (ptr->IsShared())
+    {
+        auto lock = _memoryService.Lock();
+        if (!_memoryService.AcquireSharedFile(ptr->_entryRef))
+        {
+            return std::weak_ptr<Area>();
+        }
+    }
+
+    ptr->_info.area = nextId;
+    _areas[nextId] = ptr;
+    return ptr;
+}
+
 bool System::IsValidAreaId(int id) const
 {
     return _areas.find(id) != _areas.end();
@@ -231,7 +256,16 @@ std::weak_ptr<Area> System::GetArea(int id)
 
 size_t System::UnregisterArea(int id)
 {
-    _areas.erase(id);
+    if (_areas.contains(id))
+    {
+        const auto& area = _areas.at(id);
+        if (area->IsShared())
+        {
+            auto lock = _memoryService.Lock();
+            _memoryService.ReleaseSharedFile(area->_entryRef);
+        }
+        _areas.erase(id);
+    }
     return _areas.size();
 }
 

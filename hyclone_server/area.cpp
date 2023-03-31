@@ -1,6 +1,7 @@
 #include <array>
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <vector>
 #include <utility>
@@ -13,6 +14,35 @@
 #include "server_servercalls.h"
 #include "system.h"
 
+std::vector<std::shared_ptr<Area>> Area::Split(const std::vector<std::pair<uint8_t*, uint8_t*>>& ranges)
+{
+    std::vector<std::shared_ptr<Area>> areas;
+    areas.reserve(ranges.size() - 1);
+
+    uint8_t* originalAddress = (uint8_t*)_info.address;
+    size_t originalOffset = _offset;
+
+    _info.address = ranges[0].first;
+    _info.size = ranges[0].second - ranges[0].first;
+    if (IsShared())
+    {
+        _offset = originalOffset + (ranges[0].first - originalAddress);
+    }
+
+    for (size_t i = 1; i < ranges.size(); i++)
+    {
+        const auto& [start, end] = ranges[i];
+        areas.emplace_back(std::make_shared<Area>(*this));
+        areas.back()->_info.address = start;
+        areas.back()->_info.size = end - start;
+        if (IsShared())
+        {
+            areas.back()->_offset = originalOffset + (start - originalAddress);
+        }
+    }
+
+    return areas;
+}
 
 intptr_t server_hserver_call_register_area(hserver_context& context, void* user_area_info)
 {
@@ -49,7 +79,73 @@ intptr_t server_hserver_call_register_area(hserver_context& context, void* user_
 
 intptr_t server_hserver_call_share_area(hserver_context& context, int area_id, intptr_t handle, size_t offset, char* path, size_t pathLen)
 {
-    return B_BAD_VALUE;
+    std::shared_ptr<Area> area;
+
+    auto& system = System::GetInstance();
+
+    {
+        auto lock = system.Lock();
+        if (system.IsValidAreaId(area_id))
+        {
+            area = system.GetArea(area_id).lock();
+        }
+    }
+
+    if (!area)
+    {
+        return B_BAD_VALUE;
+    }
+
+    if (handle != -1)
+    {
+        auto& memService = system.GetMemoryService();
+        auto lock = memService.Lock();
+
+        EntryRef ref;
+        if (!memService.OpenSharedFile(context.pid, handle, area->IsWritable(), ref))
+        {
+            return B_ENTRY_NOT_FOUND;
+        }
+        area->Share(ref, offset);
+
+        return B_OK;
+    }
+    else
+    {
+        auto& memService = system.GetMemoryService();
+        auto lock = memService.Lock();
+
+        std::string pathStr;
+        if (!memService.CreateSharedFile(std::to_string(area->GetAreaId()), area->GetSize(), pathStr))
+        {
+            return B_NO_MEMORY;
+        }
+
+        if (pathStr.size() > pathLen)
+        {
+            std::filesystem::remove(pathStr);
+            return B_NAME_TOO_LONG;
+        }
+
+        {
+            auto lock = context.process->Lock();
+            if (context.process->WriteMemory(path, pathStr.c_str(), pathStr.size()) != pathStr.size())
+            {
+                std::filesystem::remove(pathStr);
+                return B_BAD_ADDRESS;
+            }
+        }
+
+        EntryRef ref;
+        if (!memService.OpenSharedFile(pathStr, area->IsWritable(), ref))
+        {
+            std::filesystem::remove(pathStr);
+            return B_ENTRY_NOT_FOUND;
+        }
+        area->Share(ref, offset);
+
+        return B_OK;
+    }
 }
 
 intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id, void* user_area_info)
@@ -258,28 +354,23 @@ intptr_t server_hserver_call_set_memory_protection(hserver_context& context, voi
             }
             else
             {
-                area->GetInfo().address = unchangedRanges[0].first;
-                area->GetInfo().size = unchangedRanges[0].second - unchangedRanges[0].first;
+                std::vector<std::pair<uint8_t*, uint8_t*>> newRanges = unchangedRanges;
+                newRanges.insert(newRanges.end(), changedRanges.begin(), changedRanges.end());
+                std::vector<std::shared_ptr<Area>> newAreas = area->Split(newRanges);
 
                 auto& system = System::GetInstance();
                 auto sysLock = system.Lock();
 
                 for (size_t i = 1; i < unchangedRanges.size(); ++i)
                 {
-                    haiku_area_info newArea = area->GetInfo();
-                    newArea.address = unchangedRanges[i].first;
-                    newArea.size = unchangedRanges[i].second - unchangedRanges[i].first;
-                    auto areaPtr = system.RegisterArea(newArea).lock();
+                    auto areaPtr = system.RegisterArea(newAreas[i]).lock();
                     context.process->RegisterArea(areaPtr);
                 }
 
-                for (const auto& [begin, end]: changedRanges)
+                for (size_t i = unchangedRanges.size(); i < newAreas.size(); ++i)
                 {
-                    haiku_area_info newArea = area->GetInfo();
-                    newArea.address = begin;
-                    newArea.size = end - begin;
-                    newArea.protection = protection;
-                    auto areaPtr = system.RegisterArea(newArea).lock();
+                    newAreas[i]->GetInfo().protection = protection;
+                    auto areaPtr = system.RegisterArea(newAreas[i]).lock();
                     context.process->RegisterArea(areaPtr);
                 }
             }
@@ -309,7 +400,7 @@ intptr_t server_hserver_call_set_memory_lock(hserver_context& context, void* add
         {
             auto area = context.process->GetArea(id).lock();
 
-            if ((uint8_t*)area->GetAddress() + area->GetSize() <= (uint8_t*)address 
+            if ((uint8_t*)area->GetAddress() + area->GetSize() <= (uint8_t*)address
                 || (uint8_t*)area->GetAddress() >= (uint8_t*)address + size)
             {
                 continue;
@@ -356,7 +447,7 @@ intptr_t server_hserver_call_unmap_memory(hserver_context& context, void* addres
                 if (addresses[i + 1] <= (uint8_t*)address || addresses[i] >= (uint8_t*)address + size)
                 {
                     // And if the current range is in the existing area...
-                    if (addresses[i] >= (uint8_t*)area->GetAddress() 
+                    if (addresses[i] >= (uint8_t*)area->GetAddress()
                         && addresses[i + 1] <= (uint8_t*)area->GetAddress() + area->GetSize())
                     {
                         survivingRanges.emplace_back(addresses[i], addresses[i + 1]);
@@ -371,26 +462,27 @@ intptr_t server_hserver_call_unmap_memory(hserver_context& context, void* addres
             }
             else
             {
-                area->GetInfo().address = survivingRanges[0].first;
-                area->GetInfo().size = survivingRanges[0].second - survivingRanges[0].first;
+                std::vector<std::shared_ptr<Area>> newAreas = area->Split(survivingRanges);
 
                 auto& system = System::GetInstance();
                 auto sysLock = system.Lock();
 
                 for (size_t i = 1; i < survivingRanges.size(); ++i)
                 {
-                    haiku_area_info newArea = area->GetInfo();
-                    newArea.address = survivingRanges[i].first;
-                    newArea.size = survivingRanges[i].second - survivingRanges[i].first;
-                    auto areaPtr = system.RegisterArea(newArea).lock();
+                    auto areaPtr = system.RegisterArea(newAreas[i]).lock();
                     context.process->RegisterArea(areaPtr);
                 }
             }
         }
 
-        for (auto id : idsToUnregister)
         {
-            context.process->UnregisterArea(id);
+            auto& system = System::GetInstance();
+            auto sysLock = system.Lock();
+            for (auto id : idsToUnregister)
+            {
+                context.process->UnregisterArea(id);
+                system.UnregisterArea(id);
+            }
         }
     }
 
