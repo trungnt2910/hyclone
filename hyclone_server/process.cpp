@@ -174,7 +174,7 @@ void Process::Fork(Process& child)
                 EntryRef ref;
                 if (memService.OpenSharedFile(hostPath, registeredArea->IsWritable(), ref))
                 {
-                    registeredArea->Share(ref, registeredArea->GetOffset());
+                    registeredArea->Share(ref, area->GetOffset());
                 }
             }
         }
