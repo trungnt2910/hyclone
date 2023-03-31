@@ -34,8 +34,8 @@ intptr_t server_open_shared_file(const char* name, size_t size, bool writable)
 {
     auto path = std::filesystem::path(gHaikuPrefix) / HYCLONE_SHM_NAME / name;
     int fd = writable ?
-        open(path.c_str(), O_RDWR | O_CREAT | O_EXCL) :
-        open(path.c_str(), O_RDONLY | O_CREAT | O_EXCL);
+        open(path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0600) :
+        open(path.c_str(), O_RDONLY | O_CREAT | O_EXCL, 0600);
     if (fd < 0)
     {
         return -1;
@@ -43,6 +43,20 @@ intptr_t server_open_shared_file(const char* name, size_t size, bool writable)
     if (writable && ftruncate(fd, size) != 0)
     {
         close(fd);
+        return -1;
+    }
+    return fd;
+}
+
+intptr_t server_clone_shared_file(const char* name, const char* path, bool writable)
+{
+    auto shmpath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SHM_NAME / name;
+    std::filesystem::copy_file(path, shmpath, std::filesystem::copy_options::overwrite_existing);
+    int fd = writable ?
+        open(shmpath.c_str(), O_RDWR) :
+        open(shmpath.c_str(), O_RDONLY);
+    if (fd < 0)
+    {
         return -1;
     }
     return fd;

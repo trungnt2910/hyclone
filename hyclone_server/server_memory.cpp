@@ -33,6 +33,31 @@ bool MemoryService::CreateSharedFile(const std::string& name, size_t size, std::
     return true;
 }
 
+bool MemoryService::CloneSharedFile(const std::string& name, const EntryRef& ref, std::string& hostPath)
+{
+    if (!_sharedFiles.contains(ref))
+    {
+        return false;
+    }
+
+    auto& file = _sharedFiles[ref];
+    if (file.HasHandle())
+    {
+        return false;
+    }
+
+    intptr_t handle = server_clone_shared_file(name.c_str(), file.GetName().c_str(), true);
+    if (handle == -1)
+    {
+        return false;
+    }
+
+    server_close_file(handle);
+
+    hostPath = (std::filesystem::path(gHaikuPrefix) / HYCLONE_SHM_NAME / name).string();
+    return true;
+}
+
 bool MemoryService::OpenSharedFile(int pid, intptr_t userHandle, bool writable, EntryRef& ref)
 {
     intptr_t handle = server_acquire_process_file_handle(pid, userHandle, true);

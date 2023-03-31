@@ -15,6 +15,7 @@ private:
     haiku_area_info _info;
     EntryRef _entryRef;
     size_t _offset = (size_t)-1;
+    uint32_t _mapping = REGION_NO_PRIVATE_MAP;
 public:
     Area(const haiku_area_info& info) : _info(info) {}
     Area(const Area& other) = default;
@@ -28,9 +29,13 @@ public:
     size_t GetSize() const { return _info.size; }
     const EntryRef& GetEntryRef() const { return _entryRef; }
     size_t GetOffset() const { return _offset; }
+    uint32_t GetMapping() const { return _mapping; }
+
+    void SetMapping(uint32_t mapping) { _mapping = mapping; }
 
     bool IsShared() const { return _offset != -1; }
     void Share(const EntryRef& entryRef, size_t offset) { _entryRef = entryRef; _offset = offset; }
+    void Unshare() { _entryRef = EntryRef(); _offset = -1; }
 
     bool IsWritable() const { return _info.protection & B_WRITE_AREA; }
 

@@ -44,7 +44,7 @@ std::vector<std::shared_ptr<Area>> Area::Split(const std::vector<std::pair<uint8
     return areas;
 }
 
-intptr_t server_hserver_call_register_area(hserver_context& context, void* user_area_info)
+intptr_t server_hserver_call_register_area(hserver_context& context, void* user_area_info, unsigned int mapping)
 {
     haiku_area_info area_info;
     if (context.process->ReadMemory(user_area_info, &area_info, sizeof(area_info)) != sizeof(area_info))
@@ -73,6 +73,8 @@ intptr_t server_hserver_call_register_area(hserver_context& context, void* user_
             return B_NO_MEMORY;
         }
     }
+
+    area->SetMapping(mapping);
 
     return area->GetInfo().area;
 }
@@ -174,7 +176,7 @@ intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id
     return B_OK;
 }
 
-intptr_t server_hserver_call_get_next_area_info(hserver_context& context, int target_pid, void* user_cookie, void* user_info)
+intptr_t server_hserver_call_get_next_area_info(hserver_context& context, int target_pid, void* user_cookie, void* user_info, void* user_extended)
 {
     if (target_pid == 0)
     {
@@ -233,6 +235,15 @@ intptr_t server_hserver_call_get_next_area_info(hserver_context& context, int ta
     if (context.process->WriteMemory(user_cookie, &address, sizeof(address)) != sizeof(address))
     {
         return B_BAD_ADDRESS;
+    }
+
+    if (user_extended != NULL)
+    {
+        uint32_t mapping = area->GetMapping();
+        if (context.process->WriteMemory(user_extended, &mapping, sizeof(mapping)) != sizeof(mapping))
+        {
+            return B_BAD_ADDRESS;
+        }
     }
 
     return B_OK;

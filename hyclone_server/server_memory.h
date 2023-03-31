@@ -15,6 +15,8 @@ bool server_setup_memory();
 // Opens a shared file that can be mapped to any process's address space
 // The file should be accessible by monika at gHaikuPrefix / HYCLONE_SHM_NAME / name
 intptr_t server_open_shared_file(const char* name, size_t size, bool writable);
+// Clones the file located at path into a shared file
+intptr_t server_clone_shared_file(const char* name, const char* path, bool writable);
 // Opens an existing file
 intptr_t server_open_file(const char* name, bool writable);
 // Resizes a shared file
@@ -68,6 +70,7 @@ public:
     ~MemoryService() = default;
 
     bool CreateSharedFile(const std::string& name, size_t size, std::string& hostPath);
+    bool CloneSharedFile(const std::string& name, const EntryRef& ref, std::string& hostPath);
     bool OpenSharedFile(int pid, intptr_t userHandle, bool writable, EntryRef& ref);
     bool OpenSharedFile(const std::string& name, bool writable, EntryRef& ref);
     bool AcquireSharedFile(const EntryRef& ref);

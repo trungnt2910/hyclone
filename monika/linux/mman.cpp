@@ -183,7 +183,7 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
     info.in_count = 0;
     info.out_count = 0;
 
-    int area_id = GET_SERVERCALLS()->register_area(&info);
+    int area_id = GET_SERVERCALLS()->register_area(&info, REGION_PRIVATE_MAP);
 
     if (area_id < 0)
     {
@@ -222,7 +222,10 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
             return B_OK;
         }
 
-        if (LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, fd, 0) == -1)
+        mmap_flags |= MAP_SHARED | MAP_FIXED;
+        mmap_flags &= ~(MAP_ANONYMOUS | MAP_PRIVATE);
+
+        if (LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, fd, 0) == -1)
         {
             panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
         }
@@ -778,7 +781,7 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
 
     // TODO: What happens when B_EXACT_ADDRESS is specified and
     // the mapped area collides with an existing one?
-    int area_id = GET_SERVERCALLS()->register_area(&info);
+    int area_id = GET_SERVERCALLS()->register_area(&info, mapping);
 
     if (area_id < 0)
     {
@@ -802,6 +805,9 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
         {
             return B_OK;
         }
+
+        mmap_flags |= MAP_SHARED | MAP_FIXED;
+        mmap_flags &= ~(MAP_ANONYMOUS | MAP_PRIVATE);
 
         if (LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, fd, offset) == -1)
         {
@@ -915,7 +921,7 @@ status_t MONIKA_EXPORT _kern_get_area_info(area_id area, void* info)
 
 status_t MONIKA_EXPORT _kern_get_next_area_info(team_id team, ssize_t *cookie, void* info)
 {
-    return GET_SERVERCALLS()->get_next_area_info(team, cookie, info);
+    return GET_SERVERCALLS()->get_next_area_info(team, cookie, info, NULL);
 }
 
 status_t MONIKA_EXPORT _kern_mlock(const void* address, size_t size)

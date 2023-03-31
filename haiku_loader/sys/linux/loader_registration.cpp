@@ -62,7 +62,7 @@ bool loader_register_builtin_areas(void* commpage, char** args)
     areaInfo.protection = B_READ_AREA | B_WRITE_AREA;
     areaInfo.lock = B_FULL_LOCK;
     strncpy(areaInfo.name, "commpage", sizeof(areaInfo.name));
-    if (loader_hserver_call_register_area(&areaInfo) < 0)
+    if (loader_hserver_call_register_area(&areaInfo, REGION_PRIVATE_MAP) < 0)
         return false;
 
     // Get pthread stack address and size
@@ -75,7 +75,7 @@ bool loader_register_builtin_areas(void* commpage, char** args)
     areaInfo.lock = 0;
     std::string areaName = std::filesystem::path(*args).filename().string() + "_" + std::to_string(getpid()) + "_stack";
     strncpy(areaInfo.name, areaName.c_str(), sizeof(areaInfo.name));
-    if (loader_hserver_call_register_area(&areaInfo) < 0)
+    if (loader_hserver_call_register_area(&areaInfo, REGION_PRIVATE_MAP) < 0)
         return false;
 
     std::ifstream fin("/proc/self/maps");
@@ -130,7 +130,7 @@ bool loader_register_builtin_areas(void* commpage, char** args)
         areaInfo.lock = 0;
         std::string areaName = std::string("runtime_loader_seg") + std::to_string(i) + (isWritable ? "rw" : "ro");
         strncpy(areaInfo.name, areaName.c_str(), sizeof(areaInfo.name));
-        if (loader_hserver_call_register_area(&areaInfo) < 0)
+        if (loader_hserver_call_register_area(&areaInfo, REGION_PRIVATE_MAP) < 0)
             return false;
     }
 

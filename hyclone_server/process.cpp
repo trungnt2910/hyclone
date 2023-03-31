@@ -158,9 +158,26 @@ void Process::Fork(Process& child)
     // so we can safely access the areas.
     for (const auto& [areaId, area] : _areas)
     {
-        auto registeredArea = system.RegisterArea(area->GetInfo()).lock();
+        auto registeredArea = std::make_shared<Area>(*area);
+        registeredArea->Unshare();
         registeredArea->GetInfo().team = child._pid;
-        child._areas[areaId] = registeredArea;
+        registeredArea = system.RegisterArea(registeredArea).lock();
+        child._areas[registeredArea->GetInfo().area] = registeredArea;
+        if (area->IsShared() && area->GetMapping() == REGION_PRIVATE_MAP)
+        {
+            auto& memService = system.GetMemoryService();
+            auto lock = memService.Lock();
+            std::string hostPath;
+            if (memService.CloneSharedFile(std::to_string(registeredArea->GetAreaId()),
+                area->GetEntryRef(), hostPath))
+            {
+                EntryRef ref;
+                if (memService.OpenSharedFile(hostPath, registeredArea->IsWritable(), ref))
+                {
+                    registeredArea->Share(ref, registeredArea->GetOffset());
+                }
+            }
+        }
     }
 
     // No, semaphores don't seem to be inherited.

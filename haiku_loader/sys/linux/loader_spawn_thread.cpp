@@ -207,7 +207,7 @@ void* loader_pthread_entry_trampoline(void* arg)
         std::string area_name = std::string(attributes->name) + "_" + std::to_string(tid) + "_stack";
         strncpy(stack_area_info.name, area_name.c_str(), sizeof(stack_area_info.name));
     }
-    stack_area_info.area = loader_hserver_call_register_area(&stack_area_info);
+    stack_area_info.area = loader_hserver_call_register_area(&stack_area_info, REGION_PRIVATE_MAP);
 
     if (attributes->guard_size > 0)
     {
@@ -219,7 +219,7 @@ void* loader_pthread_entry_trampoline(void* arg)
             std::string area_name = std::string(attributes->name) + "_" + std::to_string(tid) + "_stack_guard";
             strncpy(guard_area_info.name, area_name.c_str(), sizeof(guard_area_info.name));
         }
-        guard_area_info.area = loader_hserver_call_register_area(&guard_area_info);
+        guard_area_info.area = loader_hserver_call_register_area(&guard_area_info, REGION_PRIVATE_MAP);
     }
     else
     {
