@@ -302,6 +302,13 @@ void System::Shutdown()
     {
         server_kill_process(process.first);
     }
+    for (const auto& [id, area] : _areas)
+    {
+        if (area->IsShared())
+        {
+            _memoryService.ReleaseSharedFile(area->_entryRef);
+        }
+    }
     for (const auto& connection : _connections)
     {
         server_close_connection(connection.first);

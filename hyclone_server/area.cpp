@@ -110,6 +110,15 @@ intptr_t server_hserver_call_share_area(hserver_context& context, int area_id, i
         }
         area->Share(ref, offset);
 
+        if (pathLen >= 1)
+        {
+            int num = 0;
+            if (context.process->WriteMemory(path, &num, 1) != 1)
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
+
         return B_OK;
     }
     else

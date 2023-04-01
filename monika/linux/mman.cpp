@@ -1084,21 +1084,30 @@ int ShareArea(void* mappedAddr, size_t size, int area_id,
         return status;
     }
 
-    int newFd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
-    if (newFd < 0)
+    bool ownsFd = false;
+    if (hostPath[0] != '\0')
     {
-        return LinuxToB(-newFd);
+        fd = LINUX_SYSCALL2(__NR_open, hostPath, open_flags);
+        offset = 0;
+        if (fd < 0)
+        {
+            return LinuxToB(-fd);
+        }
+        ownsFd = true;
     }
 
     mmap_flags |= MAP_SHARED | MAP_FIXED;
     mmap_flags &= ~(MAP_ANONYMOUS | MAP_PRIVATE);
 
-    if (LINUX_SYSCALL6(__NR_mmap, mappedAddr, size, mmap_prot, mmap_flags, newFd, 0) == -1)
+    if (LINUX_SYSCALL6(__NR_mmap, mappedAddr, size, mmap_prot, mmap_flags, fd, offset) == -1)
     {
         panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
     }
 
-    LINUX_SYSCALL1(__NR_close, newFd);
+    if (ownsFd)
+    {
+        LINUX_SYSCALL1(__NR_close, fd);
+    }
 
     return B_OK;
 }
