@@ -67,4 +67,10 @@ status_t MONIKA_EXPORT _kern_delete_port(port_id id)
     return GET_SERVERCALLS()->delete_port(id);
 }
 
+status_t MONIKA_EXPORT _kern_register_messaging_service(sem_id lockingSem,
+    sem_id counterSem)
+{
+    return GET_SERVERCALLS()->register_messaging_service(lockingSem, counterSem);
+}
+
 }

@@ -23,6 +23,7 @@ add_executable(hyclone_server
     server_dispatch.cpp
     server_filesystem.cpp
     server_memory.cpp
+    server_messaging.cpp
     server_prefix.cpp
     server_workers.cpp
     shutdown.cpp

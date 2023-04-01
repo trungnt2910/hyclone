@@ -12,6 +12,7 @@
 #include "id_map.h"
 #include "server_apploadnotification.h"
 #include "server_memory.h"
+#include "server_messaging.h"
 
 struct Area;
 class Process;
@@ -38,6 +39,7 @@ private:
     std::mutex _lock;
     AppLoadNotificationService _appLoadNotificationService;
     MemoryService _memoryService;
+    MessagingService _messagingService;
     System() = default;
     ~System() = default;
 public:
@@ -90,6 +92,9 @@ public:
 
     MemoryService& GetMemoryService() { return _memoryService; }
     const MemoryService& GetMemoryService() const { return _memoryService; }
+
+    MessagingService& GetMessagingService() { return _messagingService; }
+    const MessagingService& GetMessagingService() const { return _messagingService; }
 
     std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(_lock); }
 
