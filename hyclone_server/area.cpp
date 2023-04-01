@@ -129,9 +129,13 @@ intptr_t server_hserver_call_share_area(hserver_context& context, int area_id, i
             return B_NAME_TOO_LONG;
         }
 
+        // If the buffer allows, write an additional NULL character to distinguish
+        // the new path from one that might already be there.
+        size_t writeSize = std::min(pathStr.size() + 1, pathLen);
+
         {
             auto lock = context.process->Lock();
-            if (context.process->WriteMemory(path, pathStr.c_str(), pathStr.size()) != pathStr.size())
+            if (context.process->WriteMemory(path, pathStr.c_str(), writeSize) != writeSize)
             {
                 std::filesystem::remove(pathStr);
                 return B_BAD_ADDRESS;

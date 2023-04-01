@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -23,6 +24,15 @@ const addr_t kMaxRandomize = 0x800000ul;
 #endif
 
 static int ProtBToLinux(int protection);
+static int ProcessMmapArgs(void* address, uint32 addressSpec, size_t& size,
+    uint32& lock, uint32 protection, uint32 mapping,
+    int fd, area_id sourceArea,
+    void*& hintAddr, int& mmap_flags, int& mmap_prot, int& open_flags);
+static int ProcessMmapResult(void* mappedAddr, uint32 addressSpec, void* hintAddr, void* baseAddr);
+static int ShareArea(void* mappedAddr, size_t size, int area_id,
+    int fd, off_t offset, char hostPath[PATH_MAX],
+    int mmap_flags, int mmap_prot, int open_flags);
+static int LockArea(void* mappedAddr, size_t size, uint32 lock);
 
 class MmanLock
 {
@@ -45,52 +55,20 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
     uint32_t addressSpec, size_t size,
     uint32_t lock, uint32_t protection)
 {
-    if (lock == B_CONTIGUOUS || lock == B_LOMEM)
-    {
-        return HAIKU_POSIX_ENOSYS;
-    }
-
     long result;
 
-    void* hintAddr = *address;
-    void* baseAddr = hintAddr;
-    int mmap_flags = MAP_PRIVATE | MAP_ANON;
-    int mmap_prot = 0;
+    void* baseAddr = *address;
+    void* hintAddr;
+    int mmap_flags, mmap_prot, open_flags;
 
-    if (protection & B_READ_AREA)
-        mmap_prot |= PROT_READ;
-    if (protection & B_WRITE_AREA)
-        mmap_prot |= PROT_WRITE;
-    if (protection & B_EXECUTE_AREA)
-        mmap_prot |= PROT_EXEC;
-    if (protection & B_STACK_AREA)
-    {
-        mmap_flags |= MAP_STACK | MAP_GROWSDOWN;
-        mmap_prot |= PROT_READ | PROT_WRITE | PROT_GROWSDOWN;
-    }
+    result = ProcessMmapArgs(baseAddr, addressSpec, size,
+        lock, protection, REGION_PRIVATE_MAP,
+        -1, -1,
+        hintAddr, mmap_flags, mmap_prot, open_flags);
 
-    switch (addressSpec)
+    if (result != B_OK)
     {
-        case B_ANY_ADDRESS:
-        case B_RANDOMIZED_ANY_ADDRESS:
-            hintAddr = NULL;
-        break;
-        case B_EXACT_ADDRESS:
-            // B_EXACT_ADDRESS is NOT MAP_FIXED!
-            // mmap_flags |= MAP_FIXED;
-        break;
-        case B_RANDOMIZED_BASE_ADDRESS:
-        {
-            addr_t randnum;
-            result = LINUX_SYSCALL3(__NR_getrandom, &randnum, sizeof(addr_t), 0);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-            randnum %= kMaxRandomize;
-            hintAddr = (void*)((addr_t)hintAddr + randnum);
-        }
-        break;
+        return result;
     }
 
     MmanLock mmanLock;
@@ -99,7 +77,7 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
     {
         if (GET_HOSTCALLS()->reserved_range_longest_mappable_from(hintAddr, size) < size)
         {
-            return HAIKU_POSIX_ENOMEM;
+            return B_NO_MEMORY;
         }
 
         // Safe to call MAP_FIXED in this case.
@@ -122,53 +100,13 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
         }
     }
 
+    void* mappedAddr = (void*)result;
+    result = ProcessMmapResult(mappedAddr, addressSpec, hintAddr, baseAddr);
 
-    switch (addressSpec)
+    if (result != B_OK)
     {
-        case B_BASE_ADDRESS:
-        case B_RANDOMIZED_BASE_ADDRESS:
-            if (result < (long)baseAddr)
-            {
-                // Success, but not greater than base.
-                LINUX_SYSCALL2(__NR_munmap, result, size);
-                return HAIKU_POSIX_ENOMEM;
-            }
-        break;
-        case B_EXACT_ADDRESS:
-            if (result != (long)hintAddr)
-            {
-                // Success, but not at the address requested.
-                LINUX_SYSCALL2(__NR_munmap, result, size);
-                return HAIKU_POSIX_ENOMEM;
-            }
-    }
-
-    hintAddr = (void *)result;
-
-    switch (lock)
-    {
-        case B_NO_LOCK:
-            break;
-        case B_LAZY_LOCK:
-            result = LINUX_SYSCALL3(__NR_mlock2, hintAddr, size, MLOCK_ONFAULT);
-            break;
-        case B_FULL_LOCK:
-            result = LINUX_SYSCALL3(__NR_mlock2, hintAddr, size, 0);
-            break;
-        default:
-            result = -ENOSYS;
-    }
-
-    if (result < 0)
-    {
-        LINUX_SYSCALL2(__NR_munmap, hintAddr, size);
-        return LinuxToB(-result);
-    }
-
-    if (__gCommPageAddress == NULL)
-    {
-        trace("warning: commpage not initialized");
-        return HAIKU_POSIX_ENOSYS;
+        LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
+        return result;
     }
 
     struct haiku_area_info info;
@@ -177,7 +115,7 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
     info.size = size;
     info.lock = lock;
     info.protection = protection;
-    info.address = hintAddr;
+    info.address = mappedAddr;
     info.ram_size = 0;
     info.copy_count = 0;
     info.in_count = 0;
@@ -187,115 +125,58 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
 
     if (area_id < 0)
     {
-        LINUX_SYSCALL2(__NR_munmap, hintAddr, size);
+        LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
         // This is actually an error code returned by the server.
         return area_id;
     }
 
-    *address = hintAddr;
-
     if (protection & B_CLONEABLE_AREA)
     {
         char hostPath[PATH_MAX];
-        if (GET_SERVERCALLS()->share_area(area_id, -1, 0, hostPath, sizeof(hostPath)) != B_OK)
-        {
-            return B_OK;
-        }
+        result = ShareArea(mappedAddr, size, area_id,
+            -1, 0, hostPath,
+            mmap_flags, mmap_prot, open_flags);
 
-        int open_flags = 0;
-        if (protection & (B_READ_AREA | B_WRITE_AREA))
+        if (result != B_OK)
         {
-            open_flags |= O_RDWR;
+            GET_SERVERCALLS()->unregister_area(area_id);
+            LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
+            return result;
         }
-        else if (protection & B_WRITE_AREA)
-        {
-            open_flags |= O_WRONLY;
-        }
-        else
-        {
-            open_flags |= O_RDONLY;
-        }
-
-        int fd = LINUX_SYSCALL3(__NR_open, (long)hostPath, open_flags, 0);
-        if (fd < 0)
-        {
-            return B_OK;
-        }
-
-        mmap_flags |= MAP_SHARED | MAP_FIXED;
-        mmap_flags &= ~(MAP_ANONYMOUS | MAP_PRIVATE);
-
-        if (LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, fd, 0) == -1)
-        {
-            panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
-        }
-
-        LINUX_SYSCALL1(__NR_close, fd);
     }
 
+    result = LockArea(mappedAddr, size, lock);
+
+    if (result != B_OK)
+    {
+        GET_SERVERCALLS()->unregister_area(area_id);
+        LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
+        return result;
+    }
+
+    *address = mappedAddr;
     return area_id;
 }
 
 area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
     uint32 addressSpec, uint32 protection, area_id sourceArea)
 {
-    struct haiku_area_info sourceInfo;
-    long status = GET_SERVERCALLS()->get_area_info(sourceArea, &sourceInfo);
+    void* baseAddr = *address;
+    void* hintAddr;
+    size_t size;
+    uint32 lock;
+    int mmap_flags, mmap_prot, open_flags;
+
+    long status = ProcessMmapArgs(baseAddr, addressSpec, size,
+        lock, protection, REGION_PRIVATE_MAP,
+        -1, sourceArea,
+        hintAddr, mmap_flags, mmap_prot, open_flags);
 
     if (status != B_OK)
     {
         return status;
     }
 
-    if (!(sourceInfo.protection & B_CLONEABLE_AREA))
-    {
-        return B_BAD_VALUE;
-    }
-
-    void* hintAddr = *address;
-    void* baseAddr = hintAddr;
-    int mmap_flags = MAP_PRIVATE;
-    int mmap_prot = 0;
-
-    if (protection & B_READ_AREA)
-        mmap_prot |= PROT_READ;
-    if (protection & B_WRITE_AREA)
-        mmap_prot |= PROT_WRITE;
-    if (protection & B_EXECUTE_AREA)
-        mmap_prot |= PROT_EXEC;
-    if (protection & B_STACK_AREA)
-    {
-        mmap_flags |= MAP_STACK | MAP_GROWSDOWN;
-        mmap_prot |= PROT_READ | PROT_WRITE | PROT_GROWSDOWN;
-    }
-
-    switch (addressSpec)
-    {
-        case B_ANY_ADDRESS:
-        case B_RANDOMIZED_ANY_ADDRESS:
-            hintAddr = NULL;
-        break;
-        case B_EXACT_ADDRESS:
-            // B_EXACT_ADDRESS is NOT MAP_FIXED!
-            // mmap_flags |= MAP_FIXED;
-        break;
-        case B_RANDOMIZED_BASE_ADDRESS:
-        {
-            addr_t randnum;
-            status = LINUX_SYSCALL3(__NR_getrandom, &randnum, sizeof(addr_t), 0);
-            if (status < 0)
-            {
-                return LinuxToB(-status);
-            }
-            randnum %= kMaxRandomize;
-            hintAddr = (void*)((addr_t)hintAddr + randnum);
-        }
-        break;
-        case B_CLONE_ADDRESS:
-            hintAddr = sourceInfo.address;
-        break;
-    }
-    
     char hostPath[PATH_MAX];
     status = GET_SERVERCALLS()->get_shared_area_path(sourceArea, hostPath, sizeof(hostPath));
     if (status != B_OK)
@@ -303,19 +184,6 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
         return status;
     }
 
-    int open_flags = 0;
-    if (protection & (B_READ_AREA | B_WRITE_AREA))
-    {
-        open_flags |= O_RDWR;
-    }
-    else if (protection & B_WRITE_AREA)
-    {
-        open_flags |= O_WRONLY;
-    }
-    else
-    {
-        open_flags |= O_RDONLY;
-    }
     int fd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
     if (fd < 0)
     {
@@ -324,7 +192,33 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
 
     LINUX_SYSCALL1(__NR_fsync, fd);
 
-    status = LINUX_SYSCALL6(__NR_mmap, hintAddr, sourceInfo.size, mmap_prot, mmap_flags, fd, 0);
+    bool isExactAddress = addressSpec == B_EXACT_ADDRESS || addressSpec == B_CLONE_ADDRESS;
+    if (isExactAddress && GET_HOSTCALLS()->is_in_reserved_range(hintAddr, size))
+    {
+        if (GET_HOSTCALLS()->reserved_range_longest_mappable_from(hintAddr, size) < size)
+        {
+            return B_NO_MEMORY;
+        }
+
+        // Safe to call MAP_FIXED in this case.
+        status = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, -1, 0);
+        if (status < 0)
+        {
+            return LinuxToB(-status);
+        }
+
+        status = (long)hintAddr;
+
+        GET_HOSTCALLS()->map_reserved_range(hintAddr, size);
+    }
+    else
+    {
+        status = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, -1, 0);
+        if (status < 0)
+        {
+            return LinuxToB(-status);
+        }
+    }
 
     if (status == -1)
     {
@@ -332,45 +226,23 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
         return LinuxToB(-status);
     }
 
-    switch (addressSpec)
-    {
-        case B_BASE_ADDRESS:
-        case B_RANDOMIZED_BASE_ADDRESS:
-            if (status < (long)baseAddr)
-            {
-                // Success, but not greater than base.
-                LINUX_SYSCALL2(__NR_munmap, status, sourceInfo.size);
-                LINUX_SYSCALL1(__NR_close, fd);
-                return B_NO_MEMORY;
-            }
-        break;
-        case B_EXACT_ADDRESS:
-            if (status != (long)hintAddr)
-            {
-                // Success, but not at the address requested.
-                LINUX_SYSCALL2(__NR_munmap, status, sourceInfo.size);
-                LINUX_SYSCALL1(__NR_close, fd);
-                return B_NO_MEMORY;
-            }
-        case B_CLONE_ADDRESS:
-            if (status != (long)sourceInfo.address)
-            {
-                // Success, but not at the address requested.
-                LINUX_SYSCALL2(__NR_munmap, status, sourceInfo.size);
-                LINUX_SYSCALL1(__NR_close, fd);
-                return B_NO_MEMORY;
-            }
-    }
+    void* mappedAddr = (void*)status;
+    status = ProcessMmapResult(mappedAddr, addressSpec, hintAddr, baseAddr);
 
-    hintAddr = (void *)status;
+    if (status != B_OK)
+    {
+        LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
+        LINUX_SYSCALL1(__NR_close, fd);
+        return status;
+    }
 
     struct haiku_area_info info;
 
     strlcpy(info.name, name, sizeof(info.name));
-    info.size = sourceInfo.size;
-    info.lock = sourceInfo.lock;
+    info.size = size;
+    info.lock = lock;
     info.protection = protection;
-    info.address = hintAddr;
+    info.address = mappedAddr;
     info.ram_size = 0;
     info.copy_count = 0;
     info.in_count = 0;
@@ -380,7 +252,7 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
 
     if (area_id < 0)
     {
-        LINUX_SYSCALL2(__NR_munmap, hintAddr, info.size);
+        LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
         LINUX_SYSCALL1(__NR_close, fd);
         // This is actually an error code returned by the server.
         return area_id;
@@ -388,58 +260,31 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
 
     if (protection & B_CLONEABLE_AREA)
     {
-        status = GET_SERVERCALLS()->share_area(area_id, fd, 0, hostPath, sizeof(hostPath));
+        status = ShareArea(mappedAddr, size, area_id,
+            fd, 0, hostPath,
+            mmap_flags, mmap_prot, open_flags);
 
         if (status != B_OK)
         {
             GET_SERVERCALLS()->unregister_area(area_id);
-            LINUX_SYSCALL2(__NR_munmap, hintAddr, info.size);
+            LINUX_SYSCALL2(__NR_munmap, mappedAddr, info.size);
             LINUX_SYSCALL1(__NR_close, fd);
             return status;
-        }
-
-        LINUX_SYSCALL1(__NR_close, fd);
-        fd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
-        if (fd < 0)
-        {
-            GET_SERVERCALLS()->unregister_area(area_id);
-            LINUX_SYSCALL2(__NR_munmap, hintAddr, info.size);
-            return LinuxToB(-fd);            
-        }
-
-        mmap_flags |= MAP_SHARED | MAP_FIXED;
-        mmap_flags &= ~(MAP_ANONYMOUS | MAP_PRIVATE);
-
-        if (LINUX_SYSCALL6(__NR_mmap, hintAddr, info.size, mmap_prot, mmap_flags, fd, 0) == -1)
-        {
-            panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
         }
     }
 
     LINUX_SYSCALL1(__NR_close, fd);
 
-    switch (sourceInfo.lock)
-    {
-        case B_NO_LOCK:
-            break;
-        case B_LAZY_LOCK:
-            status = LINUX_SYSCALL3(__NR_mlock2, hintAddr, sourceInfo.size, MLOCK_ONFAULT);
-            break;
-        case B_FULL_LOCK:
-            status = LINUX_SYSCALL3(__NR_mlock2, hintAddr, sourceInfo.size, 0);
-            break;
-        default:
-            status = -ENOSYS;
-    }
+    status = LockArea(mappedAddr, size, lock);
 
-    if (status < 0)
+    if (status != B_OK)
     {
         GET_SERVERCALLS()->unregister_area(area_id);
-        LINUX_SYSCALL2(__NR_munmap, hintAddr, info.size);
+        LINUX_SYSCALL2(__NR_munmap, mappedAddr, info.size);
         return LinuxToB(-status);
     }
 
-    *address = hintAddr;
+    *address = mappedAddr;
     return area_id;
 }
 
@@ -823,66 +668,19 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
 	uint32_t mapping, bool unmapAddressRange, int fd,
 	off_t offset)
 {
-    void* hintAddr = *address;
-    int mmap_flags = (fd < 0) ? MAP_ANON : 0;
-    int mmap_prot = 0;
-    int open_flags = 0;
-    long result;
+    void* baseAddr = *address;
+    uint32 lock = 0;
+    void* hintAddr;
+    int mmap_flags, mmap_prot, open_flags;
 
-    if (protection & B_READ_AREA)
-        mmap_prot |= PROT_READ;
-    if (protection & B_WRITE_AREA)
-        mmap_prot |= PROT_WRITE;
-    if (protection & B_EXECUTE_AREA)
-        mmap_prot |= PROT_EXEC;
-    if (protection & B_STACK_AREA)
-    {
-        mmap_flags |= MAP_STACK | MAP_GROWSDOWN;
-        mmap_prot |= PROT_READ | PROT_WRITE | PROT_GROWSDOWN;
-    }
-    if (protection & B_CLONEABLE_AREA)
-    {
-        if (mapping == REGION_PRIVATE_MAP)
-        {
-            // This is a weird case. To properly handle this we'll
-            // have to use hooks at fork.
-            return B_BAD_VALUE;
-        }
-        mmap_flags |= MAP_SHARED;
-    }
+    long result = ProcessMmapArgs(*address, addressSpec, size,
+        lock, protection, mapping,
+        fd, -1,
+        hintAddr, mmap_flags, mmap_prot, open_flags);
 
-    if (protection & (B_READ_AREA | B_WRITE_AREA))
+    if (result != B_OK)
     {
-        open_flags |= O_RDWR;
-    }
-    else if (protection & B_EXECUTE_AREA)
-    {
-        open_flags |= O_RDONLY;
-    }
-    else
-    {
-        open_flags |= O_RDONLY;
-    }
-
-    switch (addressSpec)
-    {
-        case B_ANY_ADDRESS:
-        case B_RANDOMIZED_ANY_ADDRESS:
-            hintAddr = NULL;
-        break;
-        case B_EXACT_ADDRESS:
-            mmap_flags |= MAP_FIXED;
-        break;
-    }
-
-    switch (mapping)
-    {
-        case REGION_NO_PRIVATE_MAP:
-            mmap_flags |= MAP_SHARED;
-        break;
-        case REGION_PRIVATE_MAP:
-            mmap_flags |= MAP_PRIVATE;
-        break;
+        return result;
     }
 
     MmanLock mmanLock;
@@ -952,27 +750,14 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
         }
     }
 
-    switch (addressSpec)
-    {
-        case B_BASE_ADDRESS:
-        case B_RANDOMIZED_BASE_ADDRESS:
-            if (result < (long)hintAddr)
-            {
-                // Success, but not greater than base.
-                LINUX_SYSCALL2(__NR_munmap, result, size);
-                return HAIKU_POSIX_ENOMEM;
-            }
-        break;
-        case B_EXACT_ADDRESS:
-            if (result != (long)hintAddr)
-            {
-                // Success, but not at the address requested.
-                LINUX_SYSCALL2(__NR_munmap, result, size);
-                return HAIKU_POSIX_ENOMEM;
-            }
-    }
+    void* mappedAddr = (void*)result;
+    result = ProcessMmapResult(mappedAddr, addressSpec, hintAddr, baseAddr);
 
-    hintAddr = (void *)result;
+    if (result != B_OK)
+    {
+        LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
+        return result;
+    }
 
     struct haiku_area_info info;
 
@@ -980,7 +765,7 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
     info.size = size;
     info.lock = 0;
     info.protection = protection;
-    info.address = hintAddr;
+    info.address = mappedAddr;
     info.ram_size = 0;
     info.copy_count = 0;
     info.in_count = 0;
@@ -992,39 +777,26 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
 
     if (area_id < 0)
     {
-        LINUX_SYSCALL2(__NR_munmap, hintAddr, size);
+        LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
         return area_id;
     }
-
-    *address = hintAddr;
 
     if (protection & B_CLONEABLE_AREA || mapping == REGION_NO_PRIVATE_MAP)
     {
         char hostPath[PATH_MAX];
-        if (GET_SERVERCALLS()->share_area(area_id, fd, offset, hostPath, sizeof(hostPath)) != B_OK)
+        result = ShareArea(mappedAddr, size, area_id,
+            fd, offset, hostPath,
+            mmap_flags, mmap_prot, open_flags);
+
+        if (result != B_OK)
         {
-            // If we return an error state at this point things will be highly inconsistent.
-            return B_OK;
+            GET_SERVERCALLS()->unregister_area(area_id);
+            LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
+            return result;
         }
-
-        fd = LINUX_SYSCALL3(__NR_open, (long)hostPath, open_flags, 0);
-        if (fd < 0)
-        {
-            return B_OK;
-        }
-
-        mmap_flags |= MAP_SHARED | MAP_FIXED;
-        mmap_flags &= ~(MAP_ANONYMOUS | MAP_PRIVATE);
-
-        if (LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, fd, offset) == -1)
-        {
-            // This is probably not Linux but a poorly implemented emulator.
-            panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
-        }
-
-        LINUX_SYSCALL1(__NR_close, fd);
     }
 
+    *address = mappedAddr;
     return area_id;
 }
 
@@ -1166,4 +938,189 @@ int ProtBToLinux(int protection)
         mmap_prot |= PROT_READ | PROT_WRITE | PROT_GROWSDOWN;
 
     return mmap_prot;
+}
+
+int ProcessMmapArgs(void* address, uint32 addressSpec, size_t& size,
+    uint32& lock, uint32 protection, uint32 mapping,
+    int fd, area_id sourceArea,
+    void*& hintAddr, int& mmap_flags, int& mmap_prot, int& open_flags)
+{
+    if (lock == B_CONTIGUOUS || lock == B_LOMEM)
+    {
+        return HAIKU_POSIX_ENOSYS;
+    }
+
+    struct haiku_area_info sourceInfo;
+
+    if (sourceArea != -1)
+    {
+        long status = GET_SERVERCALLS()->get_area_info(sourceArea, &sourceInfo);
+
+        if (status != B_OK)
+        {
+            return status;
+        }
+
+        if (!(sourceInfo.protection & B_CLONEABLE_AREA))
+        {
+            return B_BAD_VALUE;
+        }
+
+        size = sourceInfo.size;
+        lock = sourceInfo.lock;
+    }
+
+    hintAddr = address;
+    mmap_flags = fd == -1 ? MAP_ANONYMOUS : 0;
+    mmap_prot = 0;
+
+    if (protection & B_READ_AREA)
+        mmap_prot |= PROT_READ;
+    if (protection & B_WRITE_AREA)
+        mmap_prot |= PROT_WRITE;
+    if (protection & B_EXECUTE_AREA)
+        mmap_prot |= PROT_EXEC;
+    if (protection & B_STACK_AREA)
+    {
+        mmap_flags |= MAP_STACK | MAP_GROWSDOWN;
+        mmap_prot |= PROT_READ | PROT_WRITE | PROT_GROWSDOWN;
+    }
+
+    switch (mapping)
+    {
+        case REGION_NO_PRIVATE_MAP:
+            mmap_flags |= MAP_SHARED;
+        break;
+        case REGION_PRIVATE_MAP:
+            mmap_flags |= MAP_PRIVATE;
+        break;
+    }
+
+    switch (addressSpec)
+    {
+        case B_ANY_ADDRESS:
+        case B_RANDOMIZED_ANY_ADDRESS:
+            hintAddr = NULL;
+        break;
+        case B_EXACT_ADDRESS:
+            // B_EXACT_ADDRESS is NOT MAP_FIXED!
+            // mmap_flags |= MAP_FIXED;
+        break;
+        case B_RANDOMIZED_BASE_ADDRESS:
+        {
+            addr_t randnum;
+            long status = LINUX_SYSCALL3(__NR_getrandom, &randnum, sizeof(addr_t), 0);
+            if (status < 0)
+            {
+                return LinuxToB(-status);
+            }
+            randnum %= kMaxRandomize;
+            hintAddr = (void*)((addr_t)hintAddr + randnum);
+        }
+        break;
+        case B_CLONE_ADDRESS:
+        {
+            if (sourceArea == -1)
+            {
+                return B_BAD_VALUE;
+            }
+
+            hintAddr = sourceInfo.address;
+        }
+        break;
+    }
+
+    open_flags = 0;
+    if (protection & (B_READ_AREA | B_WRITE_AREA))
+    {
+        open_flags |= O_RDWR;
+    }
+    else if (protection & B_WRITE_AREA)
+    {
+        open_flags |= O_WRONLY;
+    }
+    else
+    {
+        open_flags |= O_RDONLY;
+    }
+
+    return B_OK;
+}
+
+int ProcessMmapResult(void* result, uint32 addressSpec, void* hintAddr, void* baseAddr)
+{
+    switch (addressSpec)
+    {
+        case B_BASE_ADDRESS:
+        case B_RANDOMIZED_BASE_ADDRESS:
+        {
+            if ((uintptr_t)result < (uintptr_t)baseAddr)
+            {
+                return B_NO_MEMORY;
+            }
+        }
+        break;
+        case B_CLONE_ADDRESS:
+        case B_EXACT_ADDRESS:
+        {
+            if (result != hintAddr)
+            {
+                return B_NO_MEMORY;
+            }
+        }
+    }
+
+    return B_OK;
+}
+
+int ShareArea(void* mappedAddr, size_t size, int area_id,
+    int fd, off_t offset, char hostPath[PATH_MAX],
+    int mmap_flags, int mmap_prot, int open_flags)
+{
+    long status = GET_SERVERCALLS()->share_area(area_id, fd, offset, hostPath, PATH_MAX);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    int newFd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
+    if (newFd < 0)
+    {
+        return LinuxToB(-newFd);
+    }
+
+    mmap_flags |= MAP_SHARED | MAP_FIXED;
+    mmap_flags &= ~(MAP_ANONYMOUS | MAP_PRIVATE);
+
+    if (LINUX_SYSCALL6(__NR_mmap, mappedAddr, size, mmap_prot, mmap_flags, newFd, 0) == -1)
+    {
+        panic("WHY CAN'T I MAP_FIXED ON A FRESHLY MAPPED AREA???");
+    }
+
+    LINUX_SYSCALL1(__NR_close, newFd);
+
+    return B_OK;
+}
+
+int LockArea(void* mappedAddr, size_t size, uint32 lock)
+{
+    long status;
+
+    switch (lock)
+    {
+        case B_NO_LOCK:
+            status = B_OK;
+            break;
+        case B_LAZY_LOCK:
+            status = LINUX_SYSCALL3(__NR_mlock2, mappedAddr, size, MLOCK_ONFAULT);
+            break;
+        case B_FULL_LOCK:
+            status = LINUX_SYSCALL3(__NR_mlock2, mappedAddr, size, 0);
+            break;
+        default:
+            status = -ENOSYS;
+    }
+
+    return LinuxToB(-status);
 }
