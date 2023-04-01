@@ -27,6 +27,7 @@ typedef int32 port_id;
 typedef int32 sem_id;
 typedef int32 team_id;
 typedef int32 thread_id;
+typedef int32 partition_id;
 
 typedef uint32 haiku_mode_t;
 typedef uint32 haiku_gid_t;
