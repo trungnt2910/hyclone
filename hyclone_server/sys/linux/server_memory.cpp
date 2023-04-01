@@ -110,6 +110,10 @@ void* server_map_memory(intptr_t handle, size_t size, size_t offset, bool writab
 {
     int prot = writable ? (PROT_READ | PROT_WRITE) : PROT_READ;
     void* result = mmap((void*)handle, size, prot, MAP_SHARED, (int)handle, offset);
+    if (result == MAP_FAILED)
+    {
+        return NULL;
+    }
     return result;
 }
 

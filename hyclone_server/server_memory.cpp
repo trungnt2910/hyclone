@@ -221,7 +221,7 @@ void* MemoryService::AcquireMemory(const EntryRef& ref, size_t size, size_t offs
         {
             return NULL;
         }
-        void* address = server_map_memory(handle, offset, size, writable);
+        void* address = server_map_memory(handle, size, offset, writable);
         server_close_file(handle);
         return address;
     }
