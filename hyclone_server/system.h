@@ -13,6 +13,7 @@
 #include "server_apploadnotification.h"
 #include "server_memory.h"
 #include "server_messaging.h"
+#include "server_systemnotification.h"
 
 struct Area;
 class Process;
@@ -40,6 +41,7 @@ private:
     AppLoadNotificationService _appLoadNotificationService;
     MemoryService _memoryService;
     MessagingService _messagingService;
+    SystemNotificationService _systemNotificationService;
     System() = default;
     ~System() = default;
 public:
@@ -95,6 +97,9 @@ public:
 
     MessagingService& GetMessagingService() { return _messagingService; }
     const MessagingService& GetMessagingService() const { return _messagingService; }
+
+    SystemNotificationService& GetSystemNotificationService() { return _systemNotificationService; }
+    const SystemNotificationService& GetSystemNotificationService() const { return _systemNotificationService; }
 
     std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }
 

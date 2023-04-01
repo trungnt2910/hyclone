@@ -17,6 +17,7 @@ add_executable(hyclone_server
     entry_ref.cpp
     hsemaphore.cpp
     image.cpp
+    kmessage.cpp
     port.cpp
     process.cpp
     server_apploadnotification.cpp
@@ -25,6 +26,7 @@ add_executable(hyclone_server
     server_memory.cpp
     server_messaging.cpp
     server_prefix.cpp
+    server_systemnotification.cpp
     server_workers.cpp
     shutdown.cpp
     system.cpp
@@ -34,6 +36,7 @@ add_executable(hyclone_server
 
 set_property(TARGET hyclone_server PROPERTY CXX_STANDARD 20)
 target_link_libraries(hyclone_server hpkgvfs)
+target_compile_options(hyclone_server PRIVATE -Wno-multichar)
 install(TARGETS hyclone_server DESTINATION bin)
 if(HYCLONE_HOST_LINUX)
     install(CODE "

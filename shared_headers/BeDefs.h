@@ -3,13 +3,16 @@
 
 #include <cstdint>
 
+typedef char                int8;
 typedef unsigned char       uint8;
+typedef short               int16;
 typedef int                 int32;
 typedef unsigned int        uint32;
 typedef int64_t             int64;
 typedef uint64_t            uint64;
 
 typedef int32 status_t;
+typedef uint32 type_code;
 typedef int32 haiku_pid_t;
 
 typedef int32 haiku_dev_t;

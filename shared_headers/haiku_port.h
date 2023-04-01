@@ -13,4 +13,11 @@ typedef struct haiku_port_info
     int32       total_count; /* total # msgs read so far */
 } haiku_port_info;
 
+typedef struct haiku_port_message_info {
+    size_t      size;
+    haiku_uid_t sender;
+    haiku_gid_t sender_group;
+    team_id     sender_team;
+} haiku_port_message_info;
+
 #endif

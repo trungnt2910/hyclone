@@ -164,4 +164,16 @@ status_t MONIKA_EXPORT _kern_cpu_enabled(uint32 cpu)
     return info.enabled;
 }
 
+status_t MONIKA_EXPORT _kern_start_watching_system(int32 object, uint32 flags,
+    port_id port, int32 token)
+{
+    return GET_SERVERCALLS()->start_watching_system(object, flags, port, token);
+}
+
+status_t MONIKA_EXPORT _kern_stop_watching_system(int32 object, uint32 flags,
+    port_id port, int32 token)
+{
+    return GET_SERVERCALLS()->stop_watching_system(object, flags, port, token);
+}
+
 }
