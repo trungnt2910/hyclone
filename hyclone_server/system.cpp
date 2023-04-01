@@ -368,6 +368,15 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
         {
             system.UnregisterArea(area);
         }
+
+        {
+            auto& msgService = system.GetMessagingService();
+            auto msgLock = msgService.Lock();
+
+            // Will silently fail if the process is not the registered
+            // message server.
+            msgService.UnregisterService(context.process);
+        }
     }
     system.UnregisterThread(context.tid);
     system.UnregisterConnection(context.conn_id);

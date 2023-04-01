@@ -93,6 +93,13 @@ MessagingArea::~MessagingArea()
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
+
+        {
+            auto& memService = system.GetMemoryService();
+            auto memLock = memService.Lock();
+            memService.ReleaseMemory(_header, kMessagingAreaSize);
+        }
+
         system.UnregisterArea(_id);
     }
 }
