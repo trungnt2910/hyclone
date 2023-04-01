@@ -73,4 +73,9 @@ status_t MONIKA_EXPORT _kern_register_messaging_service(sem_id lockingSem,
     return GET_SERVERCALLS()->register_messaging_service(lockingSem, counterSem);
 }
 
+status_t MONIKA_EXPORT _kern_unregister_messaging_service()
+{
+    return GET_SERVERCALLS()->unregister_messaging_service();
+}
+
 }

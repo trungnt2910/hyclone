@@ -170,6 +170,27 @@ status_t MessagingService::RegisterService(const std::shared_ptr<Process>& team,
     return B_OK;
 }
 
+status_t MessagingService::UnregisterService(const std::shared_ptr<Process>& team)
+{
+    if (team != _serverTeam.lock())
+        return B_BAD_VALUE;
+
+    // delete all areas
+    while (_firstArea)
+    {
+        auto area = _firstArea;
+        _firstArea = area->NextArea();
+    }
+    _lastArea = std::shared_ptr<MessagingArea>();
+
+    // unset the other members
+    _lockSem = std::weak_ptr<Semaphore>();
+    _counterSem = std::weak_ptr<Semaphore>();
+    _serverTeam = std::weak_ptr<Process>();
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_register_messaging_service(hserver_context& context, int lockSemId, int counterSemId)
 {
     auto& system = System::GetInstance();
@@ -200,4 +221,14 @@ intptr_t server_hserver_call_register_messaging_service(hserver_context& context
     }
 
     return area;
+}
+
+intptr_t server_hserver_call_unregister_messaging_service(hserver_context& context)
+{
+    auto& system = System::GetInstance();
+    auto& msgService = system.GetMessagingService();
+
+    auto msgLock = msgService.Lock();
+
+    return msgService.UnregisterService(context.process);
 }

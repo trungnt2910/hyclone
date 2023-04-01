@@ -85,8 +85,8 @@ public:
     void* AllocateCommand(uint32 commandWhat, int32 dataSize, bool& wasEmpty);
     void CommitCommand();
 
-    void SetNextArea(MessagingArea* area);
-    MessagingArea* NextArea() const;
+    void SetNextArea(std::shared_ptr<MessagingArea> area) { _nextArea = area; }
+    std::shared_ptr<MessagingArea> NextArea() const { return _nextArea; }
 };
 
 // MessagingService
@@ -112,7 +112,7 @@ public:
         const std::shared_ptr<Semaphore>& lockSem,
         const std::shared_ptr<Semaphore>& counterSem,
         area_id& areaID);
-    status_t UnregisterService();
+    status_t UnregisterService(const std::shared_ptr<Process>& team);
 
     status_t SendMessage(const void* message, int32 messageSize,
                          const messaging_target* targets, int32 targetCount);
