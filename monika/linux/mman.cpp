@@ -1125,7 +1125,7 @@ int LockArea(void* mappedAddr, size_t size, uint32 lock)
             status = LINUX_SYSCALL3(__NR_mlock2, mappedAddr, size, MLOCK_ONFAULT);
             break;
         case B_FULL_LOCK:
-            status = LINUX_SYSCALL3(__NR_mlock2, mappedAddr, size, 0);
+            status = LINUX_SYSCALL2(__NR_mlock, mappedAddr, size);
             break;
         default:
             status = -ENOSYS;
