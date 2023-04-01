@@ -176,4 +176,10 @@ status_t MONIKA_EXPORT _kern_stop_watching_system(int32 object, uint32 flags,
     return GET_SERVERCALLS()->stop_watching_system(object, flags, port, token);
 }
 
+status_t MONIKA_EXPORT _kern_get_safemode_option(const char* parameter,
+    char* buffer, size_t* _bufferSize)
+{
+    return GET_SERVERCALLS()->get_safemode_option(parameter, strlen(parameter), buffer, _bufferSize);
+}
+
 }

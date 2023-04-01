@@ -441,3 +441,48 @@ intptr_t server_hserver_call_wait_for_fork_unlock(hserver_context& context)
     std::cerr << "server_hserver_call_wait_for_fork_unlock: Impossible code path reached." << std::endl;
     return B_BAD_DATA;
 }
+
+intptr_t server_hserver_call_get_safemode_option(hserver_context& context, const char* userParameter, size_t parameterSize,
+    char* userBuffer, size_t* userBufferSize)
+{
+    // TODO: Allow passing safe mode options as HyClone command line arguments.
+    std::string parameter(parameterSize, '\0');
+
+    {
+        auto lock = context.process->Lock();
+        if (context.process->ReadMemory((void*)userParameter, parameter.data(), parameterSize) != parameterSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    const char* env = getenv(parameter.c_str());
+
+    if (!env)
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
+
+    size_t envSize = strlen(env) + 1;
+    size_t bufferSize;
+
+    {
+        auto lock = context.process->Lock();
+        if (context.process->ReadMemory(userBuffer, &bufferSize, sizeof(bufferSize)) != sizeof(bufferSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        size_t writeSize = std::min(bufferSize, envSize);
+        if (context.process->WriteMemory(userBuffer, env, writeSize) != writeSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+        if (context.process->WriteMemory(userBufferSize, &envSize, sizeof(envSize)) != sizeof(envSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return B_OK;
+}
