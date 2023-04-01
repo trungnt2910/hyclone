@@ -36,7 +36,7 @@ private:
     IdMap<std::shared_ptr<haiku_fs_info>, int> _fsInfos;
     std::map<int, std::shared_ptr<Area>> _areas;
     std::unordered_map<EntryRef, std::string> _entryRefs;
-    std::mutex _lock;
+    std::recursive_mutex _lock;
     AppLoadNotificationService _appLoadNotificationService;
     MemoryService _memoryService;
     MessagingService _messagingService;
@@ -96,7 +96,7 @@ public:
     MessagingService& GetMessagingService() { return _messagingService; }
     const MessagingService& GetMessagingService() const { return _messagingService; }
 
-    std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(_lock); }
+    std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }
 
     static System& GetInstance();
 };
