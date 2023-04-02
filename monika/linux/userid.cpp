@@ -19,24 +19,26 @@ extern "C"
 // and manage these IDs in a way similar to what Darling does.
 haiku_gid_t MONIKA_EXPORT _kern_getgid(bool effective)
 {
-    long result = LINUX_SYSCALL0(effective ? __NR_getegid : __NR_getgid);
-    if (result < 0)
-    {
-        return LinuxToB(-result);
-    }
+    return 0;
+    // long result = LINUX_SYSCALL0(effective ? __NR_getegid : __NR_getgid);
+    // if (result < 0)
+    // {
+    //     return LinuxToB(-result);
+    // }
 
-    return result;
+    // return result;
 }
 
 haiku_uid_t MONIKA_EXPORT _kern_getuid(bool effective)
 {
-    long result = LINUX_SYSCALL0(effective ? __NR_geteuid : __NR_getuid);
-    if (result < 0)
-    {
-        return LinuxToB(-result);
-    }
+    return 0;
+    // long result = LINUX_SYSCALL0(effective ? __NR_geteuid : __NR_getuid);
+    // if (result < 0)
+    // {
+    //     return LinuxToB(-result);
+    // }
 
-    return result;
+    // return result;
 }
 
 haiku_ssize_t MONIKA_EXPORT _kern_getgroups(int groupCount, haiku_gid_t* groupList)
