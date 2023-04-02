@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -64,6 +65,37 @@ int server_main(int argc, char **argv)
     }
 
     std::cerr << "HyClone server listening on " << gHaikuPrefix << std::endl;
+
+    // TODO: This approach leaves a small time window during the launch_deamon's initialization
+    // before it could create the launch_daemon port.
+    // Haiku's bash does not really require this feature, but some other apps may be affected.
+    // If we ever require launch_daemon to initialize before everything else, we maybe should
+    // turn to the approach used by DarlingHQ: Use a dedicated "shellspawn" service that is
+    // launched by the launch daemon, and then make it wake up the host's shell.
+    auto haikuLoaderPath = std::filesystem::canonical("/proc/self/exe").parent_path() / "haiku_loader";
+
+    int pipefd[2];
+    if (pipe(pipefd) == -1)
+    {
+        perror("pipe");
+        return 1;
+    }
+
+    int pid = fork();
+    if (pid == 0)
+    {
+        std::cerr << "Starting launch_daemon" << std::endl;
+        const char* argv[] = {haikuLoaderPath.c_str(), "/boot/system/servers/launch_daemon", NULL};
+        close(pipefd[0]);
+        fcntl(pipefd[1], F_SETFD, FD_CLOEXEC);
+        execv(haikuLoaderPath.c_str(), (char* const*)argv);
+        perror("execve");
+        return 1;
+    }
+
+    close(pipefd[1]);
+    // Should be safe as we blocked SIGPIPE.
+    read(pipefd[0], &pid, sizeof(pid));
 
     daemon(0, 0);
     freopen((std::filesystem::path(gHaikuPrefix) / ".hyclone.log").c_str(), "w", stderr);
