@@ -93,6 +93,16 @@ status_t MONIKA_EXPORT _kern_delete_port(port_id id)
     return result;
 }
 
+status_t MONIKA_EXPORT _kern_get_port_message_info_etc(port_id port,
+    haiku_port_message_info* info, size_t infoSize, uint32 flags,
+    bigtime_t timeout)
+{
+    DEBUG("get_port_message_info_etc(%d, %p, %d, %d, %lld)\n", port, info, infoSize, flags, timeout);
+    status_t result = GET_SERVERCALLS()->get_port_message_info_etc(port, info, infoSize, flags, timeout);
+    DEBUG("get_port_message_info_etc(%d, %p, %d, %d, %lld) = %d\n", port, info, infoSize, flags, timeout, result);
+    return result;
+}
+
 status_t MONIKA_EXPORT _kern_register_messaging_service(sem_id lockingSem,
     sem_id counterSem)
 {
