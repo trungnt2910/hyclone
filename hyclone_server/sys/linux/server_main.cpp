@@ -163,7 +163,7 @@ int server_main(int argc, char **argv)
                 {
                     std::cerr << "read failed" << std::endl;
                 }
-                std::cerr << "received servercall: " + std::to_string(buffer[0]) << std::endl;
+                // std::cerr << "received servercall: " + std::to_string(buffer[0]) << std::endl;
 
                 const auto dispatch = [&](int fd, std::unique_ptr<intptr_t[]> buffer)
                 {

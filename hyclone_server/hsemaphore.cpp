@@ -231,11 +231,11 @@ intptr_t server_hserver_call_acquire_sem_etc(hserver_context& context, int id, u
         return B_BAD_VALUE;
     }
 
-    if (flags & B_RELATIVE_TIMEOUT)
+    if (flags & B_RELATIVE_TIMEOUT && timeout != B_INFINITE_TIMEOUT)
     {
         return sem->TryAcquireFor(context.tid, count, timeout);
     }
-    else if (flags & B_ABSOLUTE_TIMEOUT)
+    else if (flags & B_ABSOLUTE_TIMEOUT && timeout != B_INFINITE_TIMEOUT)
     {
         return sem->TryAcquireUntil(context.tid, count, timeout);
     }

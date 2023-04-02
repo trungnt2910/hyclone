@@ -23,7 +23,10 @@ port_id MONIKA_EXPORT _kern_create_port(int32 queue_length, const char *name)
 {
     // No +1, the server will add the null byte when it reads the memory.
     // name can't be null for ports, we won't check anything here.
-    return GET_SERVERCALLS()->create_port(queue_length, name, strlen(name));
+    DEBUG("create_port(%d, %s)\n", queue_length, name);
+    size_t result = GET_SERVERCALLS()->create_port(queue_length, name, strlen(name));
+    DEBUG("create_port(%d, %s) = %d)\n", queue_length, name, result);
+    return result;
 }
 
 size_t MONIKA_EXPORT _kern_read_port_etc(port_id port, int32 *msgCode,
