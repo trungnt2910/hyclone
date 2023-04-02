@@ -18,6 +18,7 @@ set(monika_sources
     stringutils.cpp
 
     debug.cpp
+    disk.cpp
     fcntl.cpp
     image.cpp
     io.cpp

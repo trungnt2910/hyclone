@@ -182,10 +182,4 @@ status_t MONIKA_EXPORT _kern_get_safemode_option(const char* parameter,
     return GET_SERVERCALLS()->get_safemode_option(parameter, strlen(parameter), buffer, _bufferSize);
 }
 
-partition_id MONIKA_EXPORT _kern_get_next_disk_device_id(int32* cookie, size_t* neededSize)
-{
-    // HyClone currently doesn't manage any disk device anyway.
-    return B_BAD_VALUE;
-}
-
 }
