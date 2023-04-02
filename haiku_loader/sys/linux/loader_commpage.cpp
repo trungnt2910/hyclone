@@ -129,7 +129,7 @@ void* loader_allocate_commpage()
     hostcalls_ptr->vchroot_expandlinkat = loader_vchroot_expandlinkat;
 
     hostcalls_ptr->at_exit = NULL;
-    hostcalls_ptr->printf = printf;
+    hostcalls_ptr->printf = loader_dprintf;
 
     servercalls* servercalls_ptr = (servercalls*)((uint8_t*)commpage + EXTENDED_COMMPAGE_SERVERCALLS_OFFSET);
     #define HYCLONE_SERVERCALL0(name) servercalls_ptr->name = loader_hserver_call_##name;

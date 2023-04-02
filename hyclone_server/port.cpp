@@ -1,4 +1,3 @@
-#include <cassert>
 #include <cstddef>
 #include <cstring>
 #include <iostream>
@@ -27,21 +26,153 @@ Port::Port(int pid, int capacity, const char* name)
     _info.port = 0;
 }
 
-void Port::Write(int code, std::vector<char>&& message)
+status_t Port::Write(Message&& message, bigtime_t timeout)
 {
-    _messages.emplace(code, std::move(message));
+    message.info.size == message.data.size();
+
+    std::unique_lock<std::mutex> lock(_messagesLock);
+
+    if (_info.queue_count == _info.capacity)
+    {
+        if (timeout == 0)
+        {
+            return B_WOULD_BLOCK;
+        }
+
+        server_worker_run_wait([&]()
+        {
+            const auto writableOrDead = [&]()
+            {
+                return !_registered || _info.queue_count < _info.capacity;
+            };
+
+            if (timeout != B_INFINITE_TIMEOUT)
+            {
+                _writeCondVar.wait_for(lock, std::chrono::microseconds(timeout), writableOrDead);
+                return;
+            }
+            else
+            {
+                _writeCondVar.wait(lock, writableOrDead);
+            }
+        });
+    }
+
+    if (!_registered)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    if (_info.queue_count == _info.capacity)
+    {
+        return B_TIMED_OUT;
+    }
+
+    _messages.emplace(std::move(message));
     ++_info.queue_count;
+
+    _readCondVar.notify_one();
+
+    return B_OK;
 }
 
-std::pair<int, std::vector<char>> Port::Read()
+status_t Port::Read(Message& message, bigtime_t timeout)
 {
-    assert(_info.queue_count > 0);
+    std::unique_lock<std::mutex> lock(_messagesLock);
+
+    if (_info.queue_count == 0)
+    {
+        if (timeout == 0)
+        {
+            return B_WOULD_BLOCK;
+        }
+
+        server_worker_run_wait([&]()
+        {
+            const auto readableOrDead = [&]()
+            {
+                return !_registered || _info.queue_count > 0;
+            };
+
+            if (timeout != B_INFINITE_TIMEOUT)
+            {
+                _readCondVar.wait_for(lock, std::chrono::microseconds(timeout), readableOrDead);
+                return;
+            }
+            else
+            {
+                _readCondVar.wait(lock, readableOrDead);
+            }
+        });
+    }
+
+    if (!_registered)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    if (_info.queue_count == 0)
+    {
+        return B_TIMED_OUT;
+    }
+
     --_info.queue_count;
     ++_info.total_count;
-    std::vector<char> resultData = std::move(_messages.front().second);
-    int resultCode = _messages.front().first;
+
+    message = std::move(_messages.front());
     _messages.pop();
-    return std::make_pair(resultCode, std::move(resultData));
+
+    _writeCondVar.notify_one();
+
+    return B_OK;
+}
+
+status_t Port::GetMessageInfo(haiku_port_message_info& info, bigtime_t timeout)
+{
+    std::unique_lock<std::mutex> lock(_messagesLock);
+
+    if (_info.queue_count == 0)
+    {
+        if (timeout == 0)
+        {
+            return B_WOULD_BLOCK;
+        }
+
+        server_worker_run_wait([&]()
+        {
+            const auto readableOrDead = [&]()
+            {
+                return !_registered || _info.queue_count > 0;
+            };
+
+            if (timeout != B_INFINITE_TIMEOUT)
+            {
+                _readCondVar.wait_for(lock, std::chrono::microseconds(timeout), readableOrDead);
+                return;
+            }
+            else
+            {
+                _readCondVar.wait(lock, readableOrDead);
+            }
+        });
+    }
+
+    if (!_registered)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    if (_info.queue_count == 0)
+    {
+        return B_TIMED_OUT;
+    }
+
+    info = _messages.front().info;
+
+    // We haven't read anything, let someone else read it.
+    _readCondVar.notify_one();
+
+    return B_OK;
 }
 
 intptr_t server_hserver_call_create_port(hserver_context& context, int32 queue_length, const char *name, size_t portNameLength)
@@ -80,6 +211,7 @@ intptr_t server_hserver_call_delete_port(hserver_context& context, int portId)
     auto& system = System::GetInstance();
 
     std::shared_ptr<Port> port;
+    std::shared_ptr<Process> owner;
 
     {
         auto lock = system.Lock();
@@ -90,11 +222,17 @@ intptr_t server_hserver_call_delete_port(hserver_context& context, int portId)
             return B_BAD_PORT_ID;
         }
 
+        owner = system.GetProcess(port->GetOwner()).lock();
+        if (!owner)
+        {
+            std::cerr << "Port #" << port->GetId() << " (" << port->GetName() << ") owned by dead process " << port->GetInfo().team << std::endl;
+            return B_BAD_PORT_ID;
+        }
     }
 
     {
-        auto lock = context.process->Lock();
-        context.process->RemoveOwningPort(portId);
+        auto lock = owner->Lock();
+        owner->RemoveOwningPort(portId);
     }
 
     {
@@ -170,76 +308,30 @@ intptr_t server_hserver_call_port_count(hserver_context& context, port_id id)
 intptr_t server_hserver_call_port_buffer_size_etc(hserver_context& context, port_id id,
     uint32 flags, unsigned long long timeout)
 {
-    bool useTimeout = (bool)(flags & B_TIMEOUT);
-    intptr_t result;
-
-    std::weak_ptr<Port> weak_port;
+    std::shared_ptr<Port> port;
 
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
-        weak_port = system.GetPort(id).lock();
+        port = system.GetPort(id).lock();
     }
 
+    if (!port)
     {
-        auto port = weak_port.lock();
-
-        if (!port)
-        {
-            return B_BAD_PORT_ID;
-        }
-
-        {
-            auto lock = port->Lock();
-            if (port->GetInfo().queue_count > 0)
-            {
-                result = port->GetBufferSize();
-                goto good;
-            }
-        }
+        return B_BAD_PORT_ID;
     }
 
-    if (useTimeout && (timeout == 0))
+    haiku_port_message_info messageInfo;
+    bool useTimeout = flags & B_TIMEOUT;
+
+    status_t status = port->GetMessageInfo(messageInfo, useTimeout ? timeout : B_INFINITE_TIMEOUT);
+
+    if (status != B_OK)
     {
-        return B_WOULD_BLOCK;
+        return status;
     }
 
-    while (!useTimeout || (timeout > 0))
-    {
-        server_worker_sleep(kSleepTimeMicroseconds);
-        {
-            auto port = weak_port.lock();
-
-            if (!port)
-            {
-                return B_BAD_PORT_ID;
-            }
-
-            {
-                auto lock = port->Lock();
-                if (port->GetInfo().queue_count > 0)
-                {
-                    result = port->GetBufferSize();
-                    goto good;
-                }
-            }
-        }
-        if (timeout > kSleepTimeMicroseconds)
-        {
-            timeout -= kSleepTimeMicroseconds;
-        }
-        else
-        {
-            return B_TIMED_OUT;
-        }
-    }
-
-    // Should not reach here.
-    std::cerr << "server_hserver_call_port_buffer_size_etc: Impossible code path reached." << std::endl;
-    return B_BAD_DATA;
-
-good:
-    return result;
+    return messageInfo.size;
 }
 
 intptr_t server_hserver_call_set_port_owner(hserver_context& context, port_id id, team_id team)
@@ -275,18 +367,13 @@ intptr_t server_hserver_call_set_port_owner(hserver_context& context, port_id id
         }
     }
 
+    if (oldOwner != newOwner)
     {
-        auto lock = oldOwner->Lock();
+        auto oldOwnerLock = oldOwner->Lock();
+        auto newOwnerLock = newOwner->Lock();
+        auto portLock = port->Lock();
         oldOwner->RemoveOwningPort(id);
-    }
-
-    {
-        auto lock = newOwner->Lock();
         newOwner->AddOwningPort(id);
-    }
-
-    {
-        auto lock = port->Lock();
         port->SetOwner(team);
     }
 
@@ -296,163 +383,111 @@ intptr_t server_hserver_call_set_port_owner(hserver_context& context, port_id id
 intptr_t server_hserver_call_write_port_etc(hserver_context& context, port_id id, int32 messageCode, const void *msgBuffer,
     size_t bufferSize, uint32 flags, unsigned long long timeout)
 {
-    std::weak_ptr<Port> weak_port;
+    std::shared_ptr<Port> port;
 
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
-        weak_port = system.GetPort(id);
+        port = system.GetPort(id).lock();
     }
 
-    std::vector<char> message(bufferSize);
-    if (server_read_process_memory(context.pid, (void*)msgBuffer, message.data(), bufferSize)
+    if (!port)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    Port::Message message;
+    message.code = messageCode;
+    message.data.resize(bufferSize);
+    memset(&message.info, 0, sizeof(message.info));
+    message.info.sender_team = context.pid;
+    message.info.size = bufferSize;
+
+    if (server_read_process_memory(context.pid, (void*)msgBuffer, message.data.data(), bufferSize)
         != bufferSize)
     {
         return B_BAD_ADDRESS;
     }
 
-    {
-        auto port = weak_port.lock();
+    bool useTimeout = flags & B_TIMEOUT;
 
-        if (!port)
-        {
-            return B_BAD_PORT_ID;
-        }
-
-        {
-            auto lock = port->Lock();
-            if (port->GetInfo().queue_count < port->GetInfo().capacity)
-            {
-                port->Write(messageCode, std::move(message));
-                return B_OK;
-            }
-        }
-    }
-
-    bool useTimeout = (bool)(flags & B_TIMEOUT);
-
-    if (useTimeout && (timeout == 0))
-    {
-        return B_WOULD_BLOCK;
-    }
-
-    // TODO: Use some kind of condition variable?
-    while (!useTimeout || (timeout > 0))
-    {
-        server_worker_sleep(kSleepTimeMicroseconds);
-        {
-            auto port = weak_port.lock();
-
-            if (!port)
-            {
-                return B_BAD_PORT_ID;
-            }
-
-            {
-                auto lock = port->Lock();
-                if (port->GetInfo().queue_count < port->GetInfo().capacity)
-                {
-                    port->Write(messageCode, std::move(message));
-                    return B_OK;
-                }
-            }
-        }
-        if (timeout > kSleepTimeMicroseconds)
-        {
-            timeout -= kSleepTimeMicroseconds;
-        }
-        else
-        {
-            return B_TIMED_OUT;
-        }
-    }
-
-    // Should not reach here.
-    std::cerr << "server_hserver_call_write_port_etc: Impossible code path reached." << std::endl;
-    return B_BAD_DATA;
+    return port->Write(std::move(message), useTimeout ? timeout : B_INFINITE_TIMEOUT);
 }
 
 intptr_t server_hserver_call_read_port_etc(hserver_context& context,
     port_id id, int32* userMessageCode, void *msgBuffer,
     size_t bufferSize, uint32 flags, unsigned long long timeout)
 {
-    bool useTimeout = (bool)(flags & B_TIMEOUT);
-
-    std::weak_ptr<Port> weak_port;
+    std::shared_ptr<Port> port;
 
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
-        weak_port = system.GetPort(id);
+        port = system.GetPort(id).lock();
     }
 
-    int32 messageCode;
-    std::vector<char> message;
-
+    if (!port)
     {
-        auto port = weak_port.lock();
-
-        if (!port)
-        {
-            return B_BAD_PORT_ID;
-        }
-
-        {
-            auto lock = port->Lock();
-            if (port->GetInfo().queue_count > 0)
-            {
-                std::tie(messageCode, message) = port->Read();
-                goto good;
-            }
-        }
+        return B_BAD_PORT_ID;
     }
 
-    if (useTimeout && (timeout == 0))
+    Port::Message message;
+
+    bool useTimeout = flags & B_TIMEOUT;
+
+    status_t status = port->Read(message, useTimeout ? timeout : B_INFINITE_TIMEOUT);
+
+    if (status != B_OK)
     {
-        return B_WOULD_BLOCK;
+        return status;
     }
 
-    while (!useTimeout || (timeout > 0))
-    {
-        server_worker_sleep(kSleepTimeMicroseconds);
-        {
-            auto port = weak_port.lock();
-
-            if (!port)
-            {
-                return B_BAD_PORT_ID;
-            }
-
-            {
-                auto lock = port->Lock();
-                if (port->GetInfo().queue_count > 0)
-                {
-                    std::tie(messageCode, message) = port->Read();
-                    goto good;
-                }
-            }
-        }
-        if (timeout > kSleepTimeMicroseconds)
-        {
-            timeout -= kSleepTimeMicroseconds;
-        }
-        else
-        {
-            return B_TIMED_OUT;
-        }
-    }
-
-    // Should not reach here.
-    std::cerr << "server_hserver_call_read_port_etc: Impossible code path reached." << std::endl;
-    return B_BAD_DATA;
-
-good:
-    if (context.process->WriteMemory(&userMessageCode, &messageCode, sizeof(messageCode)) != sizeof(int32))
+    if (context.process->WriteMemory(userMessageCode, &message.code, sizeof(message.code)) != sizeof(message.code))
     {
         return B_BAD_ADDRESS;
     }
 
-    if (context.process->WriteMemory(msgBuffer, message.data(), std::min(message.size(), bufferSize)) != message.size())
+    size_t writeSize = std::min(message.data.size(), bufferSize);
+    if (context.process->WriteMemory(msgBuffer, message.data.data(), writeSize) != writeSize)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_get_port_message_info_etc(hserver_context& context, int id,
+    void* userPortMessageInfo, size_t infoSize, unsigned int flags, unsigned long long timeout)
+{
+    if (infoSize != sizeof(haiku_port_message_info))
+    {
+        return B_BAD_VALUE;
+    }
+
+    std::shared_ptr<Port> port;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        port = system.GetPort(id).lock();
+    }
+
+    if (!port)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    haiku_port_message_info messageInfo;
+    bool useTimeout = flags & B_TIMEOUT;
+
+    status_t status = port->GetMessageInfo(messageInfo, useTimeout ? timeout : B_INFINITE_TIMEOUT);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    if (context.process->WriteMemory(userPortMessageInfo, &messageInfo, infoSize) != infoSize)
     {
         return B_BAD_ADDRESS;
     }

@@ -96,6 +96,7 @@ int System::RegisterPort(std::shared_ptr<Port>&& port)
 {
     int id = _ports.Add(port);
     port->_info.port = id;
+    port->_registered = true;
     // Haiku doesn't seem to do anything
     // about ports with duplicate names,
     // so neither should we.
@@ -129,6 +130,9 @@ size_t System::UnregisterPort(int port_id)
     {
         _portNames.erase(port->GetName());
         _ports.Remove(port_id);
+        port->_registered = false;
+        port->_readCondVar.notify_all();
+        port->_writeCondVar.notify_all();
     }
     return _ports.Size();
 }
