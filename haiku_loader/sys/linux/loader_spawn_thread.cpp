@@ -23,12 +23,19 @@ struct loader_trampoline_args
 {
     std::atomic<int>* thread_id;
     thread_creation_attributes* attributes;
-    bool stack_needs_freeing;
+};
+
+struct ThreadInfo
+{
+    pthread_t thread;
+    void* stack_address;
+    size_t stack_size;
+    size_t guard_size;
 };
 
 static void* loader_pthread_entry_trampoline(void* arg);
 
-static std::unordered_map<int, pthread_t> sHostPthreadObjects;
+static std::unordered_map<int, ThreadInfo> sHostPthreadObjects;
 static std::mutex sHostPthreadObjectsLock;
 
 // To-Do: This function assumes that the stack grows down.
@@ -40,7 +47,8 @@ int loader_spawn_thread(void* arg)
     pthread_attr_t linux_thread_attributes;
     pthread_attr_init(&linux_thread_attributes);
 
-    bool stack_needs_freeing = false;
+    ThreadInfo threadInfo;
+    memset(&threadInfo, 0, sizeof(threadInfo));
 
     if (attributes->stack_address == NULL)
     {
@@ -62,7 +70,9 @@ int loader_spawn_thread(void* arg)
         }
 
         attributes->stack_address = (void*)((uintptr_t)stack_end + guard_size);
-        stack_needs_freeing = true;
+        threadInfo.stack_address = stack_end;
+        threadInfo.stack_size = stack_size;
+        threadInfo.guard_size = guard_size;
     }
 
     pthread_attr_setstack(&linux_thread_attributes, attributes->stack_address, attributes->stack_size);
@@ -72,12 +82,11 @@ int loader_spawn_thread(void* arg)
     sched.sched_priority = attributes->priority;
     pthread_attr_setschedparam(&linux_thread_attributes, &sched);
 
-    pthread_t thread;
     std::atomic<int> thread_id = 0;
 
-    loader_trampoline_args args = {&thread_id, attributes, stack_needs_freeing};
+    loader_trampoline_args args = {&thread_id, attributes};
 
-    int result = pthread_create(&thread, &linux_thread_attributes, loader_pthread_entry_trampoline, &args);
+    int result = pthread_create(&threadInfo.thread, &linux_thread_attributes, loader_pthread_entry_trampoline, &args);
 
     if (result != 0)
     {
@@ -90,7 +99,7 @@ int loader_spawn_thread(void* arg)
 
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
-        sHostPthreadObjects[thread_id_nonatomic] = thread;
+        sHostPthreadObjects[thread_id_nonatomic] = threadInfo;
     }
 
     return thread_id_nonatomic;
@@ -106,7 +115,7 @@ void loader_exit_thread(int retVal)
 
 int loader_wait_for_thread(int thread_id, int* retVal)
 {
-    pthread_t thread;
+    ThreadInfo threadInfo;
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
         auto it = sHostPthreadObjects.find(thread_id);
@@ -114,14 +123,14 @@ int loader_wait_for_thread(int thread_id, int* retVal)
         {
             return -ESRCH;
         }
-        thread = it->second;
+        threadInfo = it->second;
     }
     // A temporary pointer.
     // Attempting to cast retVal (a int*) to a void** on 64-bit
     // platforms may corrupt data during assignment.
     void* retPtr;
     // Zero if succeeds, positive error code on error.
-    int error = pthread_join(thread, &retPtr);
+    int error = pthread_join(threadInfo.thread, &retPtr);
     if (error != 0)
     {
         return -error;
@@ -129,9 +138,18 @@ int loader_wait_for_thread(int thread_id, int* retVal)
     *retVal = (int)(intptr_t)retPtr;
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
+        auto& threadInfo = sHostPthreadObjects[thread_id];
         sHostPthreadObjects.erase(thread_id);
     }
-    return 0;
+    if (threadInfo.stack_address != NULL)
+    {
+        munmap(threadInfo.stack_address, threadInfo.stack_size);
+        if (threadInfo.guard_size > 0)
+        {
+            munmap((uint8_t*)threadInfo.stack_address - threadInfo.guard_size, threadInfo.guard_size);
+        }
+    }
+    return 0; 
 }
 
 bool loader_register_thread(int tid, const thread_creation_attributes* attributes, bool suspended)
@@ -199,7 +217,7 @@ void* loader_pthread_entry_trampoline(void* arg)
     loader_register_thread(tid, attributes, true);
 
     haiku_area_info stack_area_info, guard_area_info;
-    stack_area_info.address = (void*)((uintptr_t)attributes->stack_address - attributes->stack_size);
+    stack_area_info.address = attributes->stack_address;
     stack_area_info.size = attributes->stack_size;
     stack_area_info.protection = B_READ_AREA | B_WRITE_AREA | B_STACK_AREA;
     stack_area_info.lock = 0;
@@ -211,7 +229,7 @@ void* loader_pthread_entry_trampoline(void* arg)
 
     if (attributes->guard_size > 0)
     {
-        guard_area_info.address = (void*)((uintptr_t)attributes->stack_address - attributes->stack_size - attributes->guard_size);
+        guard_area_info.address = (void*)((uintptr_t)attributes->stack_address - attributes->guard_size);
         guard_area_info.size = attributes->guard_size;
         guard_area_info.protection = 0;
         guard_area_info.lock = 0;
@@ -229,7 +247,6 @@ void* loader_pthread_entry_trampoline(void* arg)
     decltype(attributes->entry) entry_point = attributes->entry;
     void* args1 = attributes->args1;
     void* args2 = attributes->args2;
-    bool stack_needs_freeing = trampoline_args->stack_needs_freeing;
 
     // From here, trampoline_args may be invalidated.
     trampoline_args->thread_id->store(tid);
@@ -244,15 +261,6 @@ void* loader_pthread_entry_trampoline(void* arg)
     if (attributes->guard_size > 0)
     {
         loader_hserver_call_unregister_area(guard_area_info.area);
-    }
-
-    if (stack_needs_freeing)
-    {
-        munmap(stack_area_info.address, stack_area_info.size);
-        if (guard_area_info.size > 0)
-        {
-            munmap(guard_area_info.address, guard_area_info.size);
-        }
     }
 
     return (void*)(intptr_t)returnValue;
