@@ -17,14 +17,16 @@ bool server_setup_memory()
 {
     auto shmpath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SHM_NAME;
 
+    std::error_code ec;
     umount(shmpath.c_str());
+    std::filesystem::remove_all(shmpath, ec);
 
     std::filesystem::create_directories(shmpath);
 
     if (mount("shm", shmpath.c_str(), "tmpfs", 0, "size=100%") != 0)
     {
         std::cerr << "Failed to mount shmfs: " << strerror(errno) << std::endl;
-        return false;
+        std::cerr << "HyClone should still work but shared memory will be slower." << std::endl;
     }
 
     return true;

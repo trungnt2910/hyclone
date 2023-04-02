@@ -58,10 +58,10 @@ jobs:
         run: |
           export HAIKU_BUILD_ENVIRONMENT_ROOT=$GITHUB_WORKSPACE/haiku-build
           export HPREFIX=$GITHUB_WORKSPACE/hprefix
-          sudo -E ./build_hprefix.sh
-          sudo umount -f $HPREFIX/.hyclone.shm
-          sudo -E rm -rf $HPREFIX/.hyclone.*
-          pushd $HPREFIX; sudo -E tar cvf ../hprefix.tar *; sudo chmod 666 ../hprefix.tar ; popd
+          ./build_hprefix.sh
+          umount -f $HPREFIX/.hyclone.shm || true
+          sudo rm -rf $HPREFIX/.hyclone.*
+          pushd $HPREFIX; tar cvf ../hprefix.tar *; popd
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
