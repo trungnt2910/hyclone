@@ -1,6 +1,7 @@
 #ifndef __SERVER_VFS_H__
 #define __SERVER_VFS_H__
 
+#include <cassert>
 #include <functional>
 #include <filesystem>
 #include <memory>
@@ -53,11 +54,21 @@ struct VfsDir
 class VfsService
 {
 private:
+    struct PathHash
+    {
+        size_t operator()(const std::filesystem::path& path) const
+        {
+            assert(path.is_absolute());
+            assert(path.lexically_normal() == path);
+            return std::filesystem::hash_value(path);
+        }
+    };
+
     std::mutex _lock;
     std::unordered_map<EntryRef, std::string> _entryRefs;
     IdMap<std::shared_ptr<VfsDevice>, haiku_dev_t> _devices;
-    std::unordered_map<std::filesystem::path, std::shared_ptr<VfsDevice>> _deviceMounts;
-    std::unordered_map<std::filesystem::path, std::string> _mountPoints;
+    std::unordered_map<std::filesystem::path, std::shared_ptr<VfsDevice>, PathHash> _deviceMounts;
+    std::unordered_map<std::filesystem::path, std::string, PathHash> _mountPoints;
 
     typedef std::function<status_t(std::filesystem::path&, const std::shared_ptr<VfsDevice>&, bool&)> callback_t;
     status_t _DoWork(std::filesystem::path&, bool traverseLink, const callback_t& work);

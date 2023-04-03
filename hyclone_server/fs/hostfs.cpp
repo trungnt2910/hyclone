@@ -9,6 +9,9 @@ HostfsDevice::HostfsDevice(const std::filesystem::path& root, const std::filesys
 
 status_t HostfsDevice::GetPath(std::filesystem::path& path, bool& isSymlink)
 {
+    assert(path.is_absolute());
+    assert(path.lexically_normal() == path);
+
     auto relativePath = path.lexically_relative(_root);
     if (relativePath.empty())
     {
@@ -40,6 +43,7 @@ status_t HostfsDevice::GetPath(std::filesystem::path& path, bool& isSymlink)
             {
                 path = path.parent_path() / symlinkPath;
             }
+            path = path.lexically_normal();
             return B_OK;
         }
     }
@@ -50,17 +54,26 @@ status_t HostfsDevice::GetPath(std::filesystem::path& path, bool& isSymlink)
 
 status_t HostfsDevice::ReadStat(std::filesystem::path& path, haiku_stat& stat, bool& isSymlink)
 {
+    assert(path.is_absolute());
+    assert(path.lexically_normal() == path);
+
     return HAIKU_POSIX_ENOSYS;
 }
 
 status_t HostfsDevice::WriteStat(std::filesystem::path& path, const haiku_stat& stat,
     int statMask, bool& isSymlink)
 {
+    assert(path.is_absolute());
+    assert(path.lexically_normal() == path);
+
     return HAIKU_POSIX_ENOSYS;
 }
 
 status_t HostfsDevice::OpenDir(std::filesystem::path& path, VfsDir& dir, bool& isSymlink)
 {
+    assert(path.is_absolute());
+    assert(path.lexically_normal() == path);
+
     return HAIKU_POSIX_ENOSYS;
 }
 
