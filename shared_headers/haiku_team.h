@@ -15,8 +15,8 @@ typedef struct
     port_id debugger_nub_port;
     int32 argc;
     char args[64];
-    uid_t uid;
-    gid_t gid;
+    haiku_uid_t uid;
+    haiku_gid_t gid;
 } haiku_team_info;
 
 #define B_CURRENT_TEAM	0

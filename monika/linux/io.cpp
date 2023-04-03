@@ -484,8 +484,8 @@ int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, h
     haikustat.st_ino = linuxstat.st_ino;
     haikustat.st_mode = ModeLinuxToB(linuxstat.st_mode);
     haikustat.st_nlink = linuxstat.st_nlink;
-    haikustat.st_uid = linuxstat.st_uid;
-    haikustat.st_gid = linuxstat.st_gid;
+    haikustat.st_uid = GET_SERVERCALLS()->uid_for(linuxstat.st_uid);
+    haikustat.st_gid = GET_SERVERCALLS()->gid_for(linuxstat.st_gid);
     haikustat.st_size = linuxstat.st_size;
     haikustat.st_rdev = linuxstat.st_rdev;
     haikustat.st_blksize = linuxstat.st_blksize;
@@ -541,7 +541,8 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
         }
         if (statMask & B_STAT_UID)
         {
-            result = LINUX_SYSCALL3(__NR_fchown, fd, stat->st_uid, -1);
+            result = LINUX_SYSCALL3(__NR_fchown, fd,
+                GET_SERVERCALLS()->hostuid_for(stat->st_uid), -1);
             if (result < 0)
             {
                 return LinuxToB(-result);
@@ -549,7 +550,8 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
         }
         if (statMask & B_STAT_GID)
         {
-            result = LINUX_SYSCALL3(__NR_fchown, fd, -1, stat->st_gid);
+            result = LINUX_SYSCALL3(__NR_fchown, fd,
+                -1, GET_SERVERCALLS()->hostgid_for(stat->st_gid));
             if (result < 0)
             {
                 return LinuxToB(-result);
@@ -641,7 +643,8 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
             {
                 return HAIKU_POSIX_ENOSYS;
             }
-            result = LINUX_SYSCALL3(__NR_chown, hostPath, stat->st_uid, -1);
+            result = LINUX_SYSCALL3(__NR_chown, hostPath,
+                GET_SERVERCALLS()->hostuid_for(stat->st_uid), -1);
             if (result < 0)
             {
                 return LinuxToB(-result);
@@ -653,7 +656,8 @@ int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
             {
                 return HAIKU_POSIX_ENOSYS;
             }
-            result = LINUX_SYSCALL3(__NR_chown, hostPath, -1, stat->st_gid);
+            result = LINUX_SYSCALL3(__NR_chown, hostPath,
+                -1, GET_SERVERCALLS()->hostgid_for(stat->st_gid));
             if (result < 0)
             {
                 return LinuxToB(-result);

@@ -14,6 +14,7 @@
 #include "server_memory.h"
 #include "server_messaging.h"
 #include "server_systemnotification.h"
+#include "server_usermap.h"
 
 struct Area;
 class Process;
@@ -42,12 +43,13 @@ private:
     MemoryService _memoryService;
     MessagingService _messagingService;
     SystemNotificationService _systemNotificationService;
+    UserMapService _userMapService;
     System() = default;
     ~System() = default;
 public:
     System(const System&) = delete;
     System(System&&) = delete;
-    std::weak_ptr<Process> RegisterProcess(int pid);
+    std::weak_ptr<Process> RegisterProcess(int pid, int uid, int gid, int euid, int egid);
     std::weak_ptr<Process> GetProcess(int pid);
     int NextProcessId(int pid) const;
     size_t UnregisterProcess(int pid);
@@ -100,6 +102,9 @@ public:
 
     SystemNotificationService& GetSystemNotificationService() { return _systemNotificationService; }
     const SystemNotificationService& GetSystemNotificationService() const { return _systemNotificationService; }
+
+    UserMapService& GetUserMapService() { return _userMapService; }
+    const UserMapService& GetUserMapService() const { return _userMapService; }
 
     std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }
 

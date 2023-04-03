@@ -12,6 +12,7 @@
 #include <unordered_set>
 
 #include "server_native.h"
+#include "system.h"
 
 size_t server_read_process_memory(int pid, void* address, void* buffer, size_t size)
 {
@@ -113,14 +114,15 @@ void server_fill_team_info(haiku_team_info* info)
         memcpy(info->args, args.c_str(), std::min(sizeof(info->args), args.size() + 1));
     }
 
-    // TODO: Init UID to something else, as 0 is a valid UID.
-    if (info->uid == 0)
+    if (info->uid == -1)
     {
         struct stat st;
         if (stat(("/proc/" + std::to_string(info->team)).c_str(), &st) != -1)
         {
-            info->uid = st.st_uid;
-            info->gid = st.st_gid;
+            auto& mapService = System::GetInstance().GetUserMapService();
+            auto lock = mapService.Lock();
+            info->uid = mapService.GetUid(st.st_uid);
+            info->gid = mapService.GetGid(st.st_gid);
         }
     }
 }

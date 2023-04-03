@@ -22,9 +22,9 @@ System& System::GetInstance()
     return instance;
 }
 
-std::weak_ptr<Process> System::RegisterProcess(int pid)
+std::weak_ptr<Process> System::RegisterProcess(int pid, int uid, int gid, int euid, int egid)
 {
-    auto ptr = std::make_shared<Process>(pid);
+    auto ptr = std::make_shared<Process>(pid, uid, gid, euid, egid);
     _processes[pid] = ptr;
     return ptr;
 }
@@ -319,7 +319,8 @@ void System::Shutdown()
     }
 }
 
-intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid)
+intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
+    intptr_t uid, intptr_t gid, intptr_t euid, intptr_t egid)
 {
     auto& system = System::GetInstance();
     auto lock = system.Lock();
@@ -331,7 +332,15 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid)
     auto process = system.GetProcess(pid).lock();
     if (!process)
     {
-        process = system.RegisterProcess(pid).lock();
+        {
+            auto& mapService = system.GetUserMapService();
+            auto mapLock = mapService.Lock();
+            uid = mapService.GetUid(uid);
+            gid = mapService.GetGid(gid);
+            euid = mapService.GetUid(euid);
+            egid = mapService.GetGid(egid);
+        }
+        process = system.RegisterProcess(pid, uid, gid, euid, egid).lock();
         std::cerr << "Registered process: " << context.conn_id << " " << pid << std::endl;
     }
 
@@ -406,7 +415,11 @@ intptr_t server_hserver_call_fork(hserver_context& context, int newPid)
 
         if (!child)
         {
-            system.RegisterProcess(newPid);
+            system.RegisterProcess(newPid,
+                context.process->GetUid(),
+                context.process->GetGid(),
+                context.process->GetEuid(),
+                context.process->GetEgid());
             std::cerr << "Registered process: " << context.conn_id << " " << newPid << " from fork parent " << context.pid << std::endl;
             child = system.GetProcess(newPid).lock();
         }

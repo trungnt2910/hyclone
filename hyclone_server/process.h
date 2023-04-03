@@ -20,6 +20,7 @@ class Process
 private:
     haiku_team_info _info;
     int _pid;
+    int _uid, _gid, _euid, _egid;
     bool _forkUnlocked;
 
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
@@ -29,7 +30,7 @@ private:
     std::unordered_set<int> _owningSemaphores;
     std::unordered_set<int> _owningPorts;
 public:
-    Process(int pid);
+    Process(int pid, int uid, int gid, int euid, int egid);
     ~Process() = default;
 
     std::unique_lock<std::mutex> Lock() { return std::unique_lock(_lock); }
@@ -54,6 +55,10 @@ public:
     size_t UnregisterArea(int area_id);
 
     int GetPid() const { return _pid; }
+    int GetUid() const { return _uid; }
+    int GetGid() const { return _gid; }
+    int GetEuid() const { return _euid; }
+    int GetEgid() const { return _egid; }
     haiku_team_info& GetInfo() { return _info; }
     const haiku_team_info& GetInfo() const { return _info; }
 

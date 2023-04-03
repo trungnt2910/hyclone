@@ -88,7 +88,7 @@ bool ServerConnection::Connect(bool forceReconnect)
     }
 
     intptr_t args[HYCLONE_SERVERCALL_MAX_ARGS + 1] =
-        { SERVERCALL_ID_connect, getpid(), syscall(SYS_gettid), 0, 0, 0, 0 };
+        { SERVERCALL_ID_connect, getpid(), syscall(SYS_gettid), getuid(), getgid(), geteuid(), getegid() };
     intptr_t returnCode = -1;
 
     if (!Send(args, sizeof(args))) goto fail;

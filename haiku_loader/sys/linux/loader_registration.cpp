@@ -46,8 +46,8 @@ bool loader_register_process(int argc, char** args)
             break;
     }
 
-    teamInfo.uid = getuid();
-    teamInfo.gid = getgid();
+    teamInfo.uid = loader_hserver_call_uid_for(getuid());
+    teamInfo.gid = loader_hserver_call_gid_for(getgid());
 
     return loader_hserver_call_register_team_info(&teamInfo) >= 0;
 }

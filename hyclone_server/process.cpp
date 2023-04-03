@@ -8,11 +8,14 @@
 #include "system.h"
 #include "thread.h"
 
-Process::Process(int pid)
-    : _pid(pid), _forkUnlocked(false)
+Process::Process(int pid, int uid, int gid, int euid, int egid)
+    : _pid(pid), _uid(uid), _gid(gid), _euid(euid), _egid(egid),
+    _forkUnlocked(false)
 {
     memset(&_info, 0, sizeof(_info));
     _info.team = pid;
+    _info.uid = uid;
+    _info.gid = gid;
     _info.debugger_nub_thread = -1;
     _info.debugger_nub_port = -1;
 }
@@ -306,4 +309,16 @@ intptr_t server_hserver_call_register_team_info(hserver_context& context, void* 
     }
 
     return B_OK;
+}
+
+intptr_t server_hserver_call_getuid(hserver_context& context, bool effective)
+{
+    auto lock = context.process->Lock();
+    return effective ? context.process->GetEuid() : context.process->GetUid();
+}
+
+intptr_t server_hserver_call_getgid(hserver_context& context, bool effective)
+{
+    auto lock = context.process->Lock();
+    return effective ? context.process->GetEgid() : context.process->GetGid();
 }
