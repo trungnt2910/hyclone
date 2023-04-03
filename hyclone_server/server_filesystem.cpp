@@ -68,6 +68,27 @@ bool server_setup_filesystem()
     return true;
 }
 
+// Alias functions
+bool server_setup_rootfs(haiku_fs_info& info)
+{
+    return server_setup_rootfs(std::filesystem::path(gHaikuPrefix), info);
+}
+
+bool server_setup_devfs(haiku_fs_info& info)
+{
+    return server_setup_devfs(std::filesystem::path(gHaikuPrefix), info);
+}
+
+bool server_setup_packagefs(haiku_fs_info& info)
+{
+    return server_setup_packagefs(std::filesystem::path(gHaikuPrefix), info);
+}
+
+bool server_setup_systemfs(haiku_fs_info& info)
+{
+    return server_setup_systemfs(std::filesystem::path(gHaikuPrefix), info);
+}
+
 intptr_t server_hserver_call_read_fs_info(hserver_context& context, int deviceId, void* info)
 {
     auto& system = System::GetInstance();

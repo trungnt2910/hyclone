@@ -12,13 +12,13 @@
 intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned long long device, unsigned long long inode,
     const char* userPath, size_t userPathLength)
 {
-    auto& system = System::GetInstance();
+    auto& vfsService = System::GetInstance().GetVfsService();
     std::string path;
 
     {
-        auto lock = system.Lock();
+        auto lock = vfsService.Lock();
 
-        if (system.GetEntryRef(EntryRef(device, inode), path) == -1)
+        if (!vfsService.GetEntryRef(EntryRef(device, inode), path))
         {
             return B_ENTRY_NOT_FOUND;
         }
@@ -55,18 +55,15 @@ intptr_t server_hserver_call_register_entry_ref(hserver_context& context, unsign
         }
     }
 
-    auto& system = System::GetInstance();
     path.resize(strlen(path.c_str()));
     while (path.size() > 1 && path.back() == '/')
         path.pop_back();
     path.shrink_to_fit();
 
     {
-        auto lock = system.Lock();
-        if (system.RegisterEntryRef(EntryRef(device, inode), std::move(path)) == -1)
-        {
-            return B_NO_MEMORY;
-        }
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        vfsService.RegisterEntryRef(EntryRef(device, inode), std::move(path));
     }
 
     return B_OK;
@@ -85,14 +82,14 @@ intptr_t server_hserver_call_register_entry_ref_child(hserver_context& context, 
         }
     }
 
-    auto& system = System::GetInstance();
     path.resize(strlen(path.c_str()));
 
     {
-        auto lock = system.Lock();
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
 
         std::string parentPath;
-        if (system.GetEntryRef(EntryRef(pdevice, pinode), parentPath) == -1)
+        if (!vfsService.GetEntryRef(EntryRef(pdevice, pinode), parentPath))
         {
             return B_ENTRY_NOT_FOUND;
         }
@@ -100,10 +97,7 @@ intptr_t server_hserver_call_register_entry_ref_child(hserver_context& context, 
         path = parentPath + "/" + path;
         path.shrink_to_fit();
 
-        if (system.RegisterEntryRef(EntryRef(device, inode), std::move(path)) == -1)
-        {
-            return B_NO_MEMORY;
-        }
+        vfsService.RegisterEntryRef(EntryRef(device, inode), std::move(path));
     }
 
     return B_OK;

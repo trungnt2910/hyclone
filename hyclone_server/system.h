@@ -15,6 +15,7 @@
 #include "server_messaging.h"
 #include "server_systemnotification.h"
 #include "server_usermap.h"
+#include "server_vfs.h"
 
 struct Area;
 class Process;
@@ -44,6 +45,7 @@ private:
     MessagingService _messagingService;
     SystemNotificationService _systemNotificationService;
     UserMapService _userMapService;
+    VfsService _vfsService;
     System() = default;
     ~System() = default;
 public:
@@ -84,10 +86,6 @@ public:
     bool IsValidAreaId(int id) const;
     size_t UnregisterArea(int id);
 
-    int RegisterEntryRef(const EntryRef& ref, const std::string& path);
-    int RegisterEntryRef(const EntryRef& ref, std::string&& path);
-    int GetEntryRef(const EntryRef& ref, std::string& path) const;
-
     void Shutdown();
     bool IsShuttingDown() const { return _isShuttingDown; }
 
@@ -105,6 +103,9 @@ public:
 
     UserMapService& GetUserMapService() { return _userMapService; }
     const UserMapService& GetUserMapService() const { return _userMapService; }
+
+    VfsService& GetVfsService() { return _vfsService; }
+    const VfsService& GetVfsService() const { return _vfsService; }
 
     std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }
 

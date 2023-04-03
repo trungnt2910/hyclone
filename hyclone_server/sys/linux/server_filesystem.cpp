@@ -14,7 +14,7 @@
 #include "server_filesystem.h"
 #include "server_prefix.h"
 
-bool server_setup_rootfs(haiku_fs_info& info)
+bool server_setup_rootfs(const std::filesystem::path& prefix, haiku_fs_info& info)
 {
     // same as in Haiku.
     info.flags = 0;
@@ -29,17 +29,17 @@ bool server_setup_rootfs(haiku_fs_info& info)
     strncpy(info.fsh_name, "rootfs", sizeof(info.fsh_name));
 
     struct stat statbuf;
-    if (stat(gHaikuPrefix.c_str(), &statbuf) != 0)
+    if (stat(prefix.c_str(), &statbuf) != 0)
     {
         return false;
     }
     info.dev = (haiku_dev_t)statbuf.st_dev;
     info.root = (haiku_ino_t)statbuf.st_ino;
 
-    auto binPath = (std::filesystem::path(gHaikuPrefix) / "bin");
-    auto libPath = (std::filesystem::path(gHaikuPrefix) / "lib");
-    auto etcPath = (std::filesystem::path(gHaikuPrefix) / "etc");
-    auto packagesPath = (std::filesystem::path(gHaikuPrefix) / "packages");
+    auto binPath = prefix / "bin";
+    auto libPath = prefix / "lib";
+    auto etcPath = prefix / "etc";
+    auto packagesPath = prefix / "packages";
 
     try
     {
@@ -62,7 +62,7 @@ bool server_setup_rootfs(haiku_fs_info& info)
     return true;
 }
 
-bool server_setup_devfs(haiku_fs_info& info)
+bool server_setup_devfs(const std::filesystem::path& prefix, haiku_fs_info& info)
 {
     // same as in Haiku.
     info.flags = 0;
@@ -77,7 +77,7 @@ bool server_setup_devfs(haiku_fs_info& info)
     strncpy(info.fsh_name, "devfs", sizeof(info.fsh_name));
 
     struct stat statbuf;
-    if (stat ("/dev", &statbuf) != 0)
+    if (stat("/dev", &statbuf) != 0)
     {
         return false;
     }
@@ -87,12 +87,12 @@ bool server_setup_devfs(haiku_fs_info& info)
     return true;
 }
 
-bool server_setup_systemfs(haiku_fs_info& info)
+bool server_setup_systemfs(const std::filesystem::path& prefix, haiku_fs_info& info)
 {
     info.flags = B_FS_IS_PERSISTENT | B_FS_IS_SHARED | B_FS_HAS_ATTR;
 
     struct statfs statfsbuf;
-    if (statfs(gHaikuPrefix.c_str(), &statfsbuf) != 0)
+    if (statfs(prefix.c_str(), &statfsbuf) != 0)
     {
         return false;
     }
@@ -108,7 +108,7 @@ bool server_setup_systemfs(haiku_fs_info& info)
     strncpy(info.fsh_name, "systemfs", sizeof(info.fsh_name));
 
     struct stat statbuf;
-    if (stat(gHaikuPrefix.c_str(), &statbuf) != 0)
+    if (stat(prefix.c_str(), &statbuf) != 0)
     {
         return false;
     }
@@ -118,11 +118,9 @@ bool server_setup_systemfs(haiku_fs_info& info)
     return true;
 }
 
-bool server_setup_packagefs(haiku_fs_info& info)
+bool server_setup_packagefs(const std::filesystem::path& root, haiku_fs_info& info)
 {
     using namespace HpkgVfs;
-
-    auto root = std::filesystem::path(gHaikuPrefix);
 
     std::filesystem::path packagesPath = root / "boot" / "system" / "packages";
     std::filesystem::path installedPackagesPath = root / "boot" / "system" / ".hpkgvfsPackages";
@@ -264,7 +262,7 @@ bool server_setup_packagefs(haiku_fs_info& info)
     strncpy(info.fsh_name, "packagefs", sizeof(info.fsh_name));
 
     struct stat statbuf;
-    if (stat(gHaikuPrefix.c_str(), &statbuf) != 0)
+    if (stat(root.c_str(), &statbuf) != 0)
     {
         return false;
     }

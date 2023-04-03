@@ -273,32 +273,6 @@ size_t System::UnregisterArea(int id)
     return _areas.size();
 }
 
-int System::RegisterEntryRef(const EntryRef& ref, const std::string& path)
-{
-    std::string tmpPath = path;
-    tmpPath.shrink_to_fit();
-    return RegisterEntryRef(ref, std::move(tmpPath));
-}
-
-int System::RegisterEntryRef(const EntryRef& ref, std::string&& path)
-{
-    // TODO: Limit the total number of entryRefs stored.
-    _entryRefs[ref] = path;
-    return 0;
-}
-
-int System::GetEntryRef(const EntryRef& ref, std::string& path) const
-{
-    auto it = _entryRefs.find(ref);
-    if (it != _entryRefs.end())
-    {
-        path.resize(it->second.size());
-        memcpy(path.data(), it->second.c_str(), it->second.size() + 1);
-        return 0;
-    }
-    return -1;
-}
-
 void System::Shutdown()
 {
     _isShuttingDown = true;
