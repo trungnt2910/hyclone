@@ -3,6 +3,11 @@
 
 #include <filesystem>
 
+#include "fs/devfs.h"
+#include "fs/packagefs.h"
+#include "fs/rootfs.h"
+#include "fs/systemfs.h"
+
 bool server_setup_filesystem();
 
 struct haiku_fs_info;
@@ -19,8 +24,6 @@ bool server_setup_systemfs(haiku_fs_info& info);
 bool server_setup_settings();
 
 bool server_setup_rootfs(const std::filesystem::path& prefix, haiku_fs_info& info);
-bool server_setup_devfs(const std::filesystem::path& prefix, haiku_fs_info& info);
 bool server_setup_packagefs(const std::filesystem::path& prefix, haiku_fs_info& info);
-bool server_setup_systemfs(const std::filesystem::path& prefix, haiku_fs_info& info);
 
 #endif // __SERVER_FILESYSTEM_H__

@@ -1,7 +1,6 @@
 project(hyclone_server)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/fs)
 include_directories(${CMAKE_SOURCE_DIR}/shared_headers)
 include_directories(${CMAKE_SOURCE_DIR}/shared_headers/${HYCLONE_ARCH})
 include_directories(${CMAKE_SOURCE_DIR}/hpkgvfs_analyze/include)
@@ -23,6 +22,7 @@ add_executable(hyclone_server
     process.cpp
     server_apploadnotification.cpp
     server_dispatch.cpp
+    server_errno.cpp
     server_filesystem.cpp
     server_memory.cpp
     server_messaging.cpp
@@ -35,7 +35,11 @@ add_executable(hyclone_server
     system.cpp
     thread.cpp
 
+    fs/devfs.cpp
     fs/hostfs.cpp
+    fs/packagefs.cpp
+    fs/rootfs.cpp
+    fs/systemfs.cpp
 
     ${SERVER_SYSTEM_SPECIFIC_SOURCES})
 

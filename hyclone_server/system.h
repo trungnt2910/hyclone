@@ -74,12 +74,6 @@ public:
     size_t GetSemaphoreCount() const { return _semaphores.size(); }
     size_t UnregisterSemaphore(int id);
 
-    int RegisterFSInfo(std::shared_ptr<haiku_fs_info>&& info);
-    std::weak_ptr<haiku_fs_info> GetFSInfo(int id);
-    std::weak_ptr<haiku_fs_info> FindFSInfoByDevId(int devId);
-    int NextFSInfoId(int id) const;
-    size_t UnregisterFSInfo(int id);
-
     std::weak_ptr<Area> RegisterArea(const haiku_area_info& info);
     std::weak_ptr<Area> RegisterArea(const std::shared_ptr<Area>& ptr);
     std::weak_ptr<Area> GetArea(int id);

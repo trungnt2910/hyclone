@@ -1,5 +1,6 @@
 #include "BeDefs.h"
 #include "extended_commpage.h"
+#include "haiku_fcntl.h"
 #include "haiku_loader.h"
 #include "loader_commpage.h"
 #include "loader_exec.h"
@@ -14,6 +15,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -294,6 +296,11 @@ int main(int argc, char** argv, char** envp)
 	loader_register_process(args.arg_count, args.args);
 	loader_register_thread(-1, NULL, false);
 	loader_register_builtin_areas(commpage, args.args);
+
+	std::filesystem::path cwd = std::filesystem::current_path();
+	char emulatedCwd[PATH_MAX];
+	size_t emulatedCwdLength = loader_vchroot_unexpand(cwd.c_str(), emulatedCwd, sizeof(emulatedCwd));
+	loader_hserver_call_setcwd(HAIKU_AT_FDCWD, emulatedCwd, emulatedCwdLength);
 
 	((hostcalls*)(((uint8_t*)commpage) + EXTENDED_COMMPAGE_HOSTCALLS_OFFSET))
 		->at_exit = &loader_at_exit;

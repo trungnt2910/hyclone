@@ -4,6 +4,7 @@
 #include <string>
 
 #include "haiku_errors.h"
+#include "haiku_fcntl.h"
 #include "haiku_fs_info.h"
 #include "process.h"
 #include "server_filesystem.h"
@@ -20,45 +21,15 @@ bool server_setup_filesystem()
     }
 
     auto& system = System::GetInstance();
+    auto& vfsService = system.GetVfsService();
     auto lock = system.Lock();
 
     haiku_fs_info info;
 
-    if (!server_setup_rootfs(info))
-    {
-        std::cerr << "failed to setup hyclone rootfs." << std::endl;
-        return false;
-    }
-
-    // dev = 0
-    system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
-
-    if (!server_setup_devfs(info))
-    {
-        std::cerr << "failed to setup hyclone devfs." << std::endl;
-        return false;
-    }
-
-    // dev = 1
-    system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
-
-    if (!server_setup_packagefs(info))
-    {
-        std::cerr << "failed to setup hyclone packagefs." << std::endl;
-        return false;
-    }
-
-    // dev = 2
-    system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
-
-    if (!server_setup_systemfs(info))
-    {
-        std::cerr << "failed to setup hyclone systemfs." << std::endl;
-        return false;
-    }
-
-    // dev = 3
-    system.RegisterFSInfo(std::make_shared<haiku_fs_info>(info));
+    vfsService.RegisterDevice(std::make_shared<RootfsDevice>(gHaikuPrefix));
+    vfsService.RegisterDevice(std::make_shared<DevfsDevice>());
+    vfsService.RegisterDevice(std::make_shared<PackagefsDevice>("/boot", std::filesystem::path(gHaikuPrefix) / "boot"));
+    vfsService.RegisterDevice(std::make_shared<SystemfsDevice>());
 
     if (!server_setup_settings())
     {
@@ -74,40 +45,161 @@ bool server_setup_rootfs(haiku_fs_info& info)
     return server_setup_rootfs(std::filesystem::path(gHaikuPrefix), info);
 }
 
-bool server_setup_devfs(haiku_fs_info& info)
-{
-    return server_setup_devfs(std::filesystem::path(gHaikuPrefix), info);
-}
-
 bool server_setup_packagefs(haiku_fs_info& info)
 {
     return server_setup_packagefs(std::filesystem::path(gHaikuPrefix), info);
-}
-
-bool server_setup_systemfs(haiku_fs_info& info)
-{
-    return server_setup_systemfs(std::filesystem::path(gHaikuPrefix), info);
 }
 
 intptr_t server_hserver_call_read_fs_info(hserver_context& context, int deviceId, void* info)
 {
     auto& system = System::GetInstance();
 
-    std::shared_ptr<haiku_fs_info> fsInfo;
-
     {
-        auto lock = system.Lock();
+        auto& vfsService = system.GetVfsService();
+        auto lock = vfsService.Lock();
 
-        fsInfo = system.FindFSInfoByDevId(deviceId).lock();
-        if (!fsInfo)
+        auto device = vfsService.GetDevice(deviceId).lock();
+
+        if (!device)
         {
-            return B_DEVICE_NOT_FOUND;
+            return B_BAD_VALUE;
+        }
+
+        auto procLock = context.process->Lock();
+
+        if (context.process->WriteMemory(info, &device->GetInfo(), sizeof(haiku_fs_info)) != sizeof(haiku_fs_info))
+        {
+            return B_BAD_ADDRESS;
         }
     }
 
-    if (context.process->WriteMemory(info, fsInfo.get(), sizeof(haiku_fs_info)) != sizeof(haiku_fs_info))
+    return B_OK;
+}
+
+intptr_t server_hserver_call_read_stat(hserver_context& context, int fd, const char* userPath, size_t userPathSize,
+    bool traverseSymlink, void* userStatBuf, size_t userStatSize)
+{
+    haiku_stat fullStat;
+
+    std::filesystem::path requestPath;
+
+    status_t status;
+
     {
-        return B_BAD_ADDRESS;
+        auto lock = context.process->Lock();
+        status = context.process->ReadDirFd(fd, userPath, userPathSize, traverseSymlink, requestPath);
+        if (status != B_OK)
+        {
+            return status;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        status = vfsService.ReadStat(requestPath, fullStat, traverseSymlink);
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->WriteMemory(userStatBuf, &fullStat, userStatSize) != userStatSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_write_stat(hserver_context& context, int fd, const char* userPath, size_t userPathSize,
+    bool traverseSymlink, const void* userStatBuf, int statMask)
+{
+    haiku_stat fullStat;
+    std::filesystem::path requestPath;
+
+    status_t status;
+
+    {
+        auto lock = context.process->Lock();
+        status = context.process->ReadDirFd(fd, userPath, userPathSize, traverseSymlink, requestPath);
+        if (status != B_OK)
+        {
+            return status;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        status = vfsService.WriteStat(requestPath, fullStat, traverseSymlink);
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->WriteMemory((void*)userStatBuf, &fullStat, sizeof(haiku_stat)) != sizeof(haiku_stat))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_vchroot_expandat(hserver_context& context, int fd, const char* userPath, size_t userPathSize,
+    bool traverseSymlink, char* userBuffer, size_t userBufferSize)
+{
+    std::filesystem::path requestPath;
+
+    status_t status;
+
+    {
+        auto lock = context.process->Lock();
+        status = context.process->ReadDirFd(fd, userPath, userPathSize, traverseSymlink, requestPath);
+        if (status != B_OK)
+        {
+            return status;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        status = vfsService.GetPath(requestPath, traverseSymlink);
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    std::string resultString = requestPath.string();
+
+    if (resultString.size() >= userBufferSize)
+    {
+        return B_NAME_TOO_LONG;
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        size_t writeSize = resultString.size() + 1;
+
+        if (context.process->WriteMemory(userBuffer, resultString.c_str(), writeSize) != writeSize)
+        {
+            return B_BAD_ADDRESS;
+        }
     }
 
     return B_OK;

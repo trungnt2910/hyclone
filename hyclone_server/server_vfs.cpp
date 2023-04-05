@@ -8,6 +8,12 @@ VfsDevice::VfsDevice(const std::filesystem::path& root, const haiku_fs_info& inf
 {
 }
 
+VfsService::VfsService()
+{
+    // Take up the device ID 0.
+    _devices.Add(std::shared_ptr<VfsDevice>());
+}
+
 size_t VfsService::RegisterEntryRef(const EntryRef& ref, const std::string& path)
 {
     std::string tmpPath = path;
@@ -41,11 +47,6 @@ size_t VfsService::RegisterDevice(const std::shared_ptr<VfsDevice>& device)
     device->GetInfo().dev = _devices.Add(device);
     _deviceMounts[path] = device;
 
-    if (path.has_parent_path())
-    {
-        _mountPoints[path.parent_path()] = path.filename().string();
-    }
-
     return _devices.Size();
 }
 
@@ -54,6 +55,19 @@ std::weak_ptr<VfsDevice> VfsService::GetDevice(int id)
     if (_devices.IsValidId(id))
     {
         return _devices.Get(id);
+    }
+    return std::weak_ptr<VfsDevice>();
+}
+
+std::weak_ptr<VfsDevice> VfsService::GetDevice(const std::filesystem::path& path)
+{
+    assert(path.is_absolute());
+    assert(path.lexically_normal() == path);
+
+    auto it = _deviceMounts.find(path);
+    if (it != _deviceMounts.end())
+    {
+        return it->second;
     }
     return std::weak_ptr<VfsDevice>();
 }
@@ -88,11 +102,16 @@ status_t VfsService::WriteStat(const std::filesystem::path& path, const haiku_st
 
 status_t VfsService::OpenDir(const std::filesystem::path& path, VfsDir& dir, bool traverseLink)
 {
-    return _DoWork(path, traverseLink, [&](std::filesystem::path& currentPath,
+    status_t status = _DoWork(path, traverseLink, [&](std::filesystem::path& currentPath,
         const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
     {
         return device->OpenDir(currentPath, dir, isSymlink);
     });
+    if (status == B_OK)
+    {
+        dir.cookie = (size_t)-3;
+    }
+    return status;
 }
 
 status_t VfsService::ReadDir(VfsDir& dir, haiku_dirent& dirent)
@@ -102,7 +121,67 @@ status_t VfsService::ReadDir(VfsDir& dir, haiku_dirent& dirent)
     {
         return B_ENTRY_NOT_FOUND;
     }
-    return device->ReadDir(dir, dirent);
+    if (dir.cookie == (size_t)-3 || dir.cookie == (size_t)-2)
+    {
+        std::filesystem::path path;
+        std::string name;
+        if (dir.cookie == (size_t)-3)
+        {
+            path = dir.path;
+            name = ".";
+        }
+        else
+        {
+            path = dir.path.parent_path();
+            name = "..";
+        }
+
+        auto parentPath = path.parent_path();
+
+        size_t maxFileNameLen = dirent.d_reclen - sizeof(haiku_dirent);
+
+        if (name.size() >= maxFileNameLen)
+        {
+            return B_BUFFER_OVERFLOW;
+        }
+
+        haiku_stat stat;
+        status_t status = ReadStat(path, stat, false);
+        if (status != B_OK)
+        {
+            return status;
+        }
+
+        haiku_stat pstat;
+        status = ReadStat(parentPath, pstat, false);
+        if (status != B_OK)
+        {
+            return status;
+        }
+
+        dirent.d_dev = stat.st_dev;
+        dirent.d_ino = stat.st_ino;
+        dirent.d_pdev = pstat.st_dev;
+        dirent.d_pino = pstat.st_ino;
+        dirent.d_reclen = sizeof(haiku_dirent) + name.size() + 1;
+        name.copy(dirent.d_name, name.size());
+        dirent.d_name[name.size()] = '\0';
+
+        if (dir.cookie == (size_t)-3)
+        {
+            dir.cookie = (size_t)-2;
+        }
+        else
+        {
+            dir.cookie = 0;
+        }
+
+        return B_OK;
+    }
+    else
+    {
+        return device->ReadDir(dir, dirent);
+    }
 }
 
 status_t VfsService::RewindDir(VfsDir& dir)
@@ -112,11 +191,17 @@ status_t VfsService::RewindDir(VfsDir& dir)
     {
         return B_ENTRY_NOT_FOUND;
     }
-    return device->RewindDir(dir);
+    status_t status = device->RewindDir(dir);
+    if (status == B_OK)
+    {
+        dir.cookie = (size_t)-3;
+    }
+    return status;
 }
 
 status_t VfsService::_DoWork(std::filesystem::path& path, bool traverseLink, const callback_t& work)
 {
+    path = path.lexically_normal();
     bool isSymlink = traverseLink;
 
     do

@@ -2,6 +2,7 @@
 
 #include "area.h"
 #include "haiku_errors.h"
+#include "haiku_fcntl.h"
 #include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
@@ -146,6 +147,28 @@ size_t Process::UnregisterArea(int area_id)
     return _areas.size();
 }
 
+size_t Process::RegisterFd(int fd, const std::filesystem::path& path)
+{
+    _fds[fd] = path;
+    return _fds.size();
+}
+
+const std::filesystem::path& Process::GetFd(int fd)
+{
+    return _fds.at(fd);
+}
+
+bool Process::IsValidFd(int fd)
+{
+    return _fds.contains(fd);
+}
+
+size_t Process::UnregisterFd(int fd)
+{
+    _fds.erase(fd);
+    return _fds.size();
+}
+
 void Process::Fork(Process& child)
 {
     auto& system = System::GetInstance();
@@ -183,6 +206,8 @@ void Process::Fork(Process& child)
         }
     }
 
+    child._cwd = _cwd;
+
     // No, semaphores don't seem to be inherited.
     // child._owningSemaphores = _owningSemaphores;
 
@@ -197,6 +222,207 @@ size_t Process::ReadMemory(void* address, void* buffer, size_t size)
 size_t Process::WriteMemory(void* address, const void* buffer, size_t size)
 {
     return server_write_process_memory(_pid, address, buffer, size);
+}
+
+status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSize, bool traverseLink, std::filesystem::path& output)
+{
+    std::string path(userBufferSize, '\0');
+    if (ReadMemory((void*)userBuffer, path.data(), userBufferSize) != userBufferSize)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    if (path[0] != '/')
+    {
+        if (fd != HAIKU_AT_FDCWD)
+        {
+            if (!IsValidFd(fd))
+            {
+                return HAIKU_POSIX_EBADF;
+            }
+            output = GetFd(fd);
+        }
+        else
+        {
+            output = GetCwd();
+        }
+
+        if (!path.empty())
+        {
+            if (!output.has_filename())
+            {
+                output = output.parent_path() / path;
+            }
+            else
+            {
+                output /= path;
+            }
+        }
+    }
+    else
+    {
+        output = path;
+    }
+
+    output = output.lexically_normal();
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_register_fd(hserver_context& context, int fd, int parentFd,
+    const char* userPath, size_t userPathSize, bool traverseSymlink)
+{
+    std::filesystem::path requestPath;
+
+    status_t status = B_OK;
+
+    {
+        auto lock = context.process->Lock();
+        status = context.process->ReadDirFd(parentFd, userPath, userPathSize, traverseSymlink, requestPath);
+    }
+
+    if (status == B_OK)
+    {
+        requestPath = requestPath.lexically_normal();
+        context.process->RegisterFd(fd, requestPath);
+
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+
+        haiku_stat stat;
+        status = vfsService.ReadStat(requestPath, stat);
+
+        if (status == B_OK)
+        {
+            auto entryRef = EntryRef(stat.st_dev, stat.st_ino);
+            vfsService.RegisterEntryRef(entryRef, requestPath);
+        }
+    }
+
+    return status;
+}
+
+intptr_t server_hserver_call_register_fd1(hserver_context& context, int fd,
+    unsigned long long dev, unsigned long long ino, const char* userName, size_t userNameSize)
+{
+    std::filesystem::path requestPath;
+
+    {
+        std::string requestPathString;
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        if (!vfsService.GetEntryRef(EntryRef(dev, ino), requestPathString))
+        {
+            return B_ENTRY_NOT_FOUND;
+        }
+        requestPath = requestPathString;
+    }
+
+    {
+        std::string name(userNameSize, '\0');
+        auto lock = context.process->Lock();
+        if (context.process->ReadMemory((void*)userName, name.data(), userNameSize) != userNameSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+        if (!name.empty() && name != ".")
+        {
+            requestPath /= name;
+        }
+    }
+
+    {
+        auto lock = context.process->Lock();
+        context.process->RegisterFd(fd, requestPath.lexically_normal());
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_register_parent_dir_fd(hserver_context& context, int fd, int parentDirFd)
+{
+    std::filesystem::path requestPath;
+
+    {
+        auto lock = context.process->Lock();
+        if (!context.process->IsValidFd(parentDirFd))
+        {
+            return HAIKU_POSIX_EBADF;
+        }
+        requestPath = context.process->GetFd(parentDirFd).parent_path();
+        context.process->RegisterFd(fd, requestPath);
+    }
+
+    status_t status;
+    haiku_stat stat;
+    auto& vfsService = System::GetInstance().GetVfsService();
+    auto vfsLock = vfsService.Lock();
+
+    status = vfsService.ReadStat(requestPath, stat);
+
+    if (status == B_OK)
+    {
+        auto entryRef = EntryRef(stat.st_dev, stat.st_ino);
+        vfsService.RegisterEntryRef(entryRef, requestPath);
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_register_dup_fd(hserver_context& context, int fd, int oldFd)
+{
+    auto lock = context.process->Lock();
+    if (!context.process->IsValidFd(oldFd))
+    {
+        return HAIKU_POSIX_EBADF;
+    }
+    context.process->RegisterFd(fd, context.process->GetFd(oldFd));
+    return B_OK;
+}
+
+intptr_t server_hserver_call_unregister_fd(hserver_context& context, int fd)
+{
+    auto lock = context.process->Lock();
+    context.process->UnregisterFd(fd);
+    return B_OK;
+}
+
+intptr_t server_hserver_call_setcwd(hserver_context& context, int fd, const char* userPath, size_t userPathSize)
+{
+    std::filesystem::path requestPath;
+
+    status_t status = B_OK;
+
+    {
+        auto lock = context.process->Lock();
+        status = context.process->ReadDirFd(fd, userPath, userPathSize, true, requestPath);
+
+        if (status == B_OK)
+        {
+            // This is a hook called after the real setcwd syscall, so no check needs to be done.
+            context.process->SetCwd(requestPath.lexically_normal());
+        }
+    }
+
+    return status;
+}
+
+intptr_t server_hserver_call_getcwd(hserver_context& context, char* userBuffer, size_t userSize)
+{
+    auto lock = context.process->Lock();
+    auto cwdString = context.process->GetCwd().string();
+    if (cwdString.size() >= userSize)
+    {
+        return B_BUFFER_OVERFLOW;
+    }
+
+    size_t writeBytes = cwdString.size() + 1;
+    if (context.process->WriteMemory(userBuffer, cwdString.c_str(), writeBytes) != writeBytes)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
 }
 
 intptr_t server_hserver_call_get_team_info(hserver_context& context, int team_id, void* userTeamInfo)

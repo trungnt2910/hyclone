@@ -34,6 +34,7 @@ public:
     virtual status_t WriteStat(std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool& isSymlink) = 0;
     virtual status_t OpenDir(std::filesystem::path& path, VfsDir& dir, bool& isSymlink) = 0;
+    // Length of dirent passed in dirent->reclen.
     virtual status_t ReadDir(VfsDir& dir, haiku_dirent& dirent) = 0;
     virtual status_t RewindDir(VfsDir& dir) = 0;
 
@@ -47,8 +48,12 @@ public:
 struct VfsDir
 {
     std::filesystem::directory_iterator dir;
+    std::filesystem::path hostPath;
+    std::filesystem::path path;
     std::weak_ptr<VfsDevice> device;
     size_t cookie;
+    haiku_dev_t dev;
+    haiku_ino_t ino;
 };
 
 class VfsService
@@ -64,17 +69,16 @@ private:
         }
     };
 
-    std::mutex _lock;
+    std::recursive_mutex _lock;
     std::unordered_map<EntryRef, std::string> _entryRefs;
     IdMap<std::shared_ptr<VfsDevice>, haiku_dev_t> _devices;
     std::unordered_map<std::filesystem::path, std::shared_ptr<VfsDevice>, PathHash> _deviceMounts;
-    std::unordered_map<std::filesystem::path, std::string, PathHash> _mountPoints;
 
     typedef std::function<status_t(std::filesystem::path&, const std::shared_ptr<VfsDevice>&, bool&)> callback_t;
     status_t _DoWork(std::filesystem::path&, bool traverseLink, const callback_t& work);
     status_t _DoWork(const std::filesystem::path&, bool traverseLink, const callback_t& work);
 public:
-    VfsService() = default;
+    VfsService();
     ~VfsService() = default;
 
     size_t RegisterEntryRef(const EntryRef& ref, const std::string& path);
@@ -83,6 +87,7 @@ public:
 
     size_t RegisterDevice(const std::shared_ptr<VfsDevice>& device);
     std::weak_ptr<VfsDevice> GetDevice(int id);
+    std::weak_ptr<VfsDevice> GetDevice(const std::filesystem::path& path);
 
     // Gets the host path for the given VFS path.
     // The VFS path MUST be absolute.
@@ -94,7 +99,7 @@ public:
     status_t ReadDir(VfsDir& dir, haiku_dirent& dirent);
     status_t RewindDir(VfsDir& dir);
 
-    std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(_lock); }
+    std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }
 };
 
 #endif // __SERVER_VFS_H__

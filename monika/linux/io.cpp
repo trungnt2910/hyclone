@@ -74,20 +74,6 @@ struct linux_dirent
     */
 };
 
-enum
-{
-    B_STAT_MODE                 = 0x0001,
-    B_STAT_UID                  = 0x0002,
-    B_STAT_GID                  = 0x0004,
-    B_STAT_SIZE                 = 0x0008,
-    B_STAT_ACCESS_TIME          = 0x0010,
-    B_STAT_MODIFICATION_TIME    = 0x0020,
-    B_STAT_CREATION_TIME        = 0x0040,
-    B_STAT_CHANGE_TIME          = 0x0080,
-
-    B_STAT_INTERIM_UPDATE       = 0x1000
-};
-
 /* You can define your own FDSETSIZE if you need more bits - but
  * it should be enough for most uses.
  */
@@ -421,296 +407,37 @@ status_t MONIKA_EXPORT _kern_create_link(int pathFD, const char* path, int toFD,
 
 int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, haiku_stat* st, size_t statSize)
 {
-    struct stat linuxstat;
-    haiku_stat haikustat;
-    long result;
-
     if (statSize > sizeof(haiku_stat))
     {
         return B_BAD_VALUE;
     }
 
-    if (fd == HAIKU_AT_FDCWD)
-    {
-        fd = AT_FDCWD;
-    }
-
-    if (path != NULL)
-    {
-        char hostPath[PATH_MAX];
-
-        if (traverseLink)
-        {
-            long expandStatus = GET_HOSTCALLS()->vchroot_expandlinkat(fd, path, hostPath, sizeof(hostPath));
-
-            if (expandStatus < 0)
-            {
-                return HAIKU_POSIX_ENOENT;
-            }
-            else if (expandStatus > sizeof(hostPath))
-            {
-                return HAIKU_POSIX_ENAMETOOLONG;
-            }
-
-            result = LINUX_SYSCALL2(__NR_stat, hostPath, &linuxstat);
-        }
-        else
-        {
-            long expandStatus = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
-
-            if (expandStatus < 0)
-            {
-                return HAIKU_POSIX_ENOENT;
-            }
-            else if (expandStatus > sizeof(hostPath))
-            {
-                return HAIKU_POSIX_ENAMETOOLONG;
-            }
-
-            result = LINUX_SYSCALL2(__NR_lstat, hostPath, &linuxstat);
-        }
-    }
-    else
-    {
-        result = LINUX_SYSCALL2(__NR_fstat, fd, &linuxstat);
-    }
-
-    if (result < 0)
-    {
-        return LinuxToB(-result);
-    }
-
-    haikustat.st_dev = linuxstat.st_dev;
-    haikustat.st_ino = linuxstat.st_ino;
-    haikustat.st_mode = ModeLinuxToB(linuxstat.st_mode);
-    haikustat.st_nlink = linuxstat.st_nlink;
-    haikustat.st_uid = GET_SERVERCALLS()->uid_for(linuxstat.st_uid);
-    haikustat.st_gid = GET_SERVERCALLS()->gid_for(linuxstat.st_gid);
-    haikustat.st_size = linuxstat.st_size;
-    haikustat.st_rdev = linuxstat.st_rdev;
-    haikustat.st_blksize = linuxstat.st_blksize;
-    haikustat.st_atim.tv_sec = linuxstat.st_atim.tv_sec;
-    haikustat.st_atim.tv_nsec = linuxstat.st_atim.tv_nsec;
-    haikustat.st_mtim.tv_sec = linuxstat.st_mtim.tv_sec;
-    haikustat.st_mtim.tv_nsec = linuxstat.st_mtim.tv_nsec;
-    haikustat.st_ctim.tv_sec = linuxstat.st_ctim.tv_sec;
-    haikustat.st_ctim.tv_nsec = linuxstat.st_ctim.tv_nsec;
-    haikustat.st_blocks = linuxstat.st_blocks;
-    // Unsupported fields.
-    haikustat.st_crtim.tv_sec = 0;
-    haikustat.st_crtim.tv_nsec = 0;
-    haikustat.st_type = 0;
-
-    memcpy(st, &haikustat, statSize);
-
-    return B_OK;
+    return GET_SERVERCALLS()->read_stat(fd, path, path ? strlen(path) : 0, traverseLink, st, statSize);
 }
 
-int MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
+status_t MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
     bool traverseLink, const struct haiku_stat* stat,
     size_t statSize, int statMask)
 {
-    long result;
-    struct haiku_stat completeStat;
+    struct haiku_stat fullStat;
+    if (statSize > sizeof(haiku_stat))
+    {
+        return B_BAD_VALUE;
+    }
 
     if (stat == NULL)
     {
         return B_BAD_ADDRESS;
     }
 
-    if (statSize > sizeof(haiku_stat))
+    status_t result = GET_SERVERCALLS()->write_stat(fd, path, path ? strlen(path) : 0, traverseLink, &fullStat, statMask);
+
+    if (result != B_OK)
     {
-        return B_BAD_VALUE;
+        return result;
     }
 
-    if (statSize < sizeof(haiku_stat))
-    {
-        memcpy(&completeStat, stat, statSize);
-        stat = &completeStat;
-    }
-
-    if (fd != HAIKU_AT_FDCWD)
-    {
-        if (statMask & B_STAT_MODE)
-        {
-            result = LINUX_SYSCALL3(__NR_fchmod, fd, ModeBToLinux(stat->st_mode), 0);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-        if (statMask & B_STAT_UID)
-        {
-            result = LINUX_SYSCALL3(__NR_fchown, fd,
-                GET_SERVERCALLS()->hostuid_for(stat->st_uid), -1);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-        if (statMask & B_STAT_GID)
-        {
-            result = LINUX_SYSCALL3(__NR_fchown, fd,
-                -1, GET_SERVERCALLS()->hostgid_for(stat->st_gid));
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-        if (statMask & B_STAT_SIZE)
-        {
-            result = LINUX_SYSCALL2(__NR_ftruncate, fd, stat->st_size);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-        if (statMask & (B_STAT_ACCESS_TIME | B_STAT_MODIFICATION_TIME))
-        {
-            struct timespec linuxTimespecs[2];
-            linuxTimespecs[0].tv_nsec = UTIME_OMIT;
-            linuxTimespecs[1].tv_nsec = UTIME_OMIT;
-            if (statMask & B_STAT_ACCESS_TIME)
-            {
-                if (stat->st_atim.tv_nsec == HAIKU_UTIME_NOW)
-                {
-                    linuxTimespecs[0].tv_nsec = UTIME_NOW;
-                }
-                else
-                {
-                    linuxTimespecs[0].tv_sec = stat->st_atim.tv_sec;
-                    linuxTimespecs[0].tv_nsec = stat->st_atim.tv_nsec;
-                }
-            }
-            if (statMask & B_STAT_MODIFICATION_TIME)
-            {
-                if (stat->st_mtim.tv_nsec == HAIKU_UTIME_NOW)
-                {
-                    linuxTimespecs[1].tv_nsec = UTIME_NOW;
-                }
-                else
-                {
-                    linuxTimespecs[1].tv_sec = stat->st_mtim.tv_sec;
-                    linuxTimespecs[1].tv_nsec = stat->st_mtim.tv_nsec;
-                }
-            }
-            result = LINUX_SYSCALL4(__NR_utimensat, fd, NULL, &linuxTimespecs, traverseLink ? 0 : AT_SYMLINK_NOFOLLOW);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-    }
-    else
-    {
-        CHECK_FD_AND_PATH(fd, path);
-
-        char hostPath[PATH_MAX];
-        long expandStatus;
-        if (!traverseLink)
-        {
-            expandStatus = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
-        }
-        else
-        {
-            expandStatus = GET_HOSTCALLS()->vchroot_expandlinkat(fd, path, hostPath, sizeof(hostPath));
-        }
-
-        if (expandStatus < 0)
-        {
-            return HAIKU_POSIX_ENOENT;
-        }
-        else if (expandStatus > sizeof(hostPath))
-        {
-            return HAIKU_POSIX_ENAMETOOLONG;
-        }
-
-        if (statMask & B_STAT_MODE)
-        {
-            if (!traverseLink)
-            {
-                return HAIKU_POSIX_ENOSYS;
-            }
-            result = LINUX_SYSCALL3(__NR_chmod, hostPath, ModeBToLinux(stat->st_mode), 0);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-        if (statMask & B_STAT_UID)
-        {
-            if (!traverseLink)
-            {
-                return HAIKU_POSIX_ENOSYS;
-            }
-            result = LINUX_SYSCALL3(__NR_chown, hostPath,
-                GET_SERVERCALLS()->hostuid_for(stat->st_uid), -1);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-        if (statMask & B_STAT_GID)
-        {
-            if (!traverseLink)
-            {
-                return HAIKU_POSIX_ENOSYS;
-            }
-            result = LINUX_SYSCALL3(__NR_chown, hostPath,
-                -1, GET_SERVERCALLS()->hostgid_for(stat->st_gid));
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-        if (statMask & B_STAT_SIZE)
-        {
-            if (!traverseLink)
-            {
-                return HAIKU_POSIX_ENOSYS;
-            }
-            result = LINUX_SYSCALL2(__NR_truncate, hostPath, stat->st_size);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-        if (statMask & (B_STAT_ACCESS_TIME | B_STAT_MODIFICATION_TIME))
-        {
-            struct timespec linuxTimespecs[2];
-            linuxTimespecs[0].tv_nsec = UTIME_OMIT;
-            linuxTimespecs[1].tv_nsec = UTIME_OMIT;
-            if (statMask & B_STAT_ACCESS_TIME)
-            {
-                if (stat->st_atim.tv_nsec == HAIKU_UTIME_NOW)
-                {
-                    linuxTimespecs[0].tv_nsec = UTIME_NOW;
-                }
-                else
-                {
-                    linuxTimespecs[0].tv_sec = stat->st_atim.tv_sec;
-                    linuxTimespecs[0].tv_nsec = stat->st_atim.tv_nsec;
-                }
-            }
-            if (statMask & B_STAT_MODIFICATION_TIME)
-            {
-                if (stat->st_mtim.tv_nsec == HAIKU_UTIME_NOW)
-                {
-                    linuxTimespecs[1].tv_nsec = UTIME_NOW;
-                }
-                else
-                {
-                    linuxTimespecs[1].tv_sec = stat->st_mtim.tv_sec;
-                    linuxTimespecs[1].tv_nsec = stat->st_mtim.tv_nsec;
-                }
-            }
-            result = LINUX_SYSCALL4(__NR_utimensat, AT_FDCWD, hostPath, &linuxTimespecs, traverseLink ? 0 : AT_SYMLINK_NOFOLLOW);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-        }
-    }
+    memcpy(&fullStat, stat, statSize);
 
     return B_OK;
 }
@@ -720,7 +447,6 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
     if (fd == HAIKU_AT_FDCWD)
     {
         CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, HAIKU_POSIX_ENOENT);
-        fd = AT_FDCWD;
     }
     bool noTraverse = (openMode & HAIKU_O_NOTRAVERSE);
 
@@ -730,23 +456,12 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
 
     char hostPath[PATH_MAX];
 
-    long expandStatus;
-    if (noTraverse)
-    {
-        expandStatus = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
-    }
-    else
-    {
-        expandStatus = GET_HOSTCALLS()->vchroot_expandlinkat(fd, path, hostPath, sizeof(hostPath));
-    }
+    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+        !noTraverse, hostPath, sizeof(hostPath));
 
-    if (expandStatus < 0)
+    if (expandStatus != B_OK)
     {
-        return HAIKU_POSIX_ENOENT;
-    }
-    else if (expandStatus > sizeof(hostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
+        return expandStatus;
     }
 
     if (noTraverse)
@@ -761,11 +476,12 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
         return LinuxToB(-result);
     }
 
+    GET_SERVERCALLS()->register_fd(result, fd, path, path ? strlen(path) : 0, !noTraverse);
+
     struct stat linuxStat;
     if (LINUX_SYSCALL2(__NR_fstat, result, &linuxStat) == 0 && S_ISDIR(linuxStat.st_mode))
     {
         GET_HOSTCALLS()->opendir(result);
-        GET_SERVERCALLS()->register_entry_ref(linuxStat.st_dev, linuxStat.st_ino, hostPath, sizeof(hostPath));
     }
 
     return result;
@@ -781,6 +497,7 @@ int MONIKA_EXPORT _kern_close(int fd)
     }
 
     GET_HOSTCALLS()->closedir(fd);
+    GET_SERVERCALLS()->unregister_fd(fd);
 
     return B_OK;
 }
@@ -1028,13 +745,15 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
     if (fd == HAIKU_AT_FDCWD)
     {
         CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, HAIKU_POSIX_ENOENT);
-        fd = AT_FDCWD;
     }
 
     char hostPath[PATH_MAX];
-    if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
+    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+        true, hostPath, sizeof(hostPath));
+
+    if (expandStatus != B_OK)
     {
-        return HAIKU_POSIX_EBADF;
+        return expandStatus;
     }
 
     int result = LINUX_SYSCALL2(__NR_open, hostPath, O_DIRECTORY);
@@ -1044,14 +763,12 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
         return LinuxToB(-result);
     }
 
-    // Registers the file descriptor as a directory.
-    GET_HOSTCALLS()->opendir(result);
+    GET_SERVERCALLS()->register_fd(result, fd, path, path ? strlen(path) : 0, true);
 
-    struct stat linuxStat;
-    if (LINUX_SYSCALL2(__NR_fstat, result, &linuxStat) == 0)
-    {
-        GET_SERVERCALLS()->register_entry_ref(linuxStat.st_dev, linuxStat.st_ino, hostPath, sizeof(hostPath));
-    }
+    // Registers the file descriptor as a directory.
+    // Must be called AFTER register_fd as haiku_loader internally uses a
+    // read_stat server call.
+    GET_HOSTCALLS()->opendir(result);
 
     return result;
 }
@@ -1097,13 +814,8 @@ status_t MONIKA_EXPORT _kern_open_parent_dir(int fd, char* name, size_t nameLeng
         return LinuxToB(-result);
     }
 
+    GET_SERVERCALLS()->register_parent_dir_fd(result, fd);
     GET_HOSTCALLS()->opendir(result);
-
-    struct stat linuxStat;
-    if (LINUX_SYSCALL2(__NR_fstat, result, &linuxStat) == 0)
-    {
-        GET_SERVERCALLS()->register_entry_ref(linuxStat.st_dev, linuxStat.st_ino, hostPath, sizeof(hostPath));
-    }
 
     return result;
 }
@@ -1139,17 +851,7 @@ haiku_off_t MONIKA_EXPORT _kern_seek(int fd, off_t pos, int seekType)
 
 status_t MONIKA_EXPORT _kern_getcwd(char* buffer, size_t size)
 {
-    char hostPath[PATH_MAX];
-    long result = LINUX_SYSCALL2(__NR_getcwd, hostPath, sizeof(hostPath));
-
-    if (result < 0)
-    {
-        return LinuxToB(-result);
-    }
-
-    GET_HOSTCALLS()->vchroot_unexpand(hostPath, buffer, size);
-
-    return B_OK;
+    return GET_SERVERCALLS()->getcwd(buffer, size);
 }
 
 int MONIKA_EXPORT _kern_dup(int fd)
@@ -1160,6 +862,8 @@ int MONIKA_EXPORT _kern_dup(int fd)
     {
         return LinuxToB(-result);
     }
+
+    GET_SERVERCALLS()->register_dup_fd(result, fd);
 
     return result;
 }
@@ -1172,6 +876,8 @@ int MONIKA_EXPORT _kern_dup2(int ofd, int nfd)
     {
         return LinuxToB(-result);
     }
+
+    GET_SERVERCALLS()->register_dup_fd(nfd, ofd);
 
     return result;
 }
@@ -1323,15 +1029,17 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char* path)
     // in the implementation of fchdir.
     if (fd == HAIKU_AT_FDCWD)
     {
-        fd = AT_FDCWD;
         CHECK_NULL_AND_RETURN_BAD_ADDRESS(path);
         CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, B_ENTRY_NOT_FOUND);
     }
 
     char hostPath[PATH_MAX];
-    if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
+    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+        true, hostPath, sizeof(hostPath));
+
+    if (expandStatus != B_OK)
     {
-        return HAIKU_POSIX_ENOENT;
+        return expandStatus;
     }
 
     long result = LINUX_SYSCALL1(__NR_chdir, hostPath);
@@ -1340,6 +1048,8 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char* path)
     {
         return LinuxToB(-result);
     }
+
+    GET_SERVERCALLS()->setcwd(fd, path, path ? strlen(path) : 0);
 
     return B_OK;
 }
@@ -1423,7 +1133,7 @@ status_t MONIKA_EXPORT _kern_flock(int fd, int op)
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_open_dir_entry_ref(dev_t device, ino_t inode, const char* name)
+status_t MONIKA_EXPORT _kern_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char* name)
 {
     char hostPath[PATH_MAX];
     long status = GET_SERVERCALLS()->get_entry_ref(device, inode, hostPath, sizeof(hostPath));
@@ -1469,12 +1179,13 @@ status_t MONIKA_EXPORT _kern_open_dir_entry_ref(dev_t device, ino_t inode, const
         return LinuxToB(-status);
     }
 
+    GET_SERVERCALLS()->register_fd1(status, device, inode, name, name ? strlen(name) : 0);
     GET_HOSTCALLS()->opendir(status);
 
     return status;
 }
 
-status_t MONIKA_EXPORT _kern_open_entry_ref(dev_t device, ino_t inode, const char* name,
+status_t MONIKA_EXPORT _kern_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char* name,
     int openMode, int perms)
 {
     char hostPath[PATH_MAX];
@@ -1529,10 +1240,12 @@ status_t MONIKA_EXPORT _kern_open_entry_ref(dev_t device, ino_t inode, const cha
         return LinuxToB(-status);
     }
 
+    GET_SERVERCALLS()->register_fd1(status, device, inode, name, name ? strlen(name) : 0);
+
     return status;
 }
 
-status_t MONIKA_EXPORT _kern_entry_ref_to_path(dev_t device, ino_t inode,
+status_t MONIKA_EXPORT _kern_entry_ref_to_path(haiku_dev_t device, haiku_ino_t inode,
     const char *leaf, char *userPath, size_t pathLength)
 {
     char hostPath[PATH_MAX];
@@ -1702,13 +1415,13 @@ ssize_t MONIKA_EXPORT _kern_write_attr(int fd, const char* attribute, uint32 typ
 // The functions below are clearly impossible
 // to be cleanly implemented in Hyclone, so
 // ENOSYS is directly returned and no logging is provided.
-status_t MONIKA_EXPORT _kern_read_index_stat(dev_t device, const char* name, struct haiku_stat *stat)
+status_t MONIKA_EXPORT _kern_read_index_stat(haiku_dev_t device, const char* name, struct haiku_stat *stat)
 {
     // No support for indexing.
     return HAIKU_POSIX_ENOSYS;
 }
 
-status_t MONIKA_EXPORT _kern_create_index(dev_t device, const char* name, uint32 type, uint32 flags)
+status_t MONIKA_EXPORT _kern_create_index(haiku_dev_t device, const char* name, uint32 type, uint32 flags)
 {
     // No support for indexing.
     return HAIKU_POSIX_ENOSYS;

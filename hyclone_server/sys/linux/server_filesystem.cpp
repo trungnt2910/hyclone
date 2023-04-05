@@ -40,6 +40,7 @@ bool server_setup_rootfs(const std::filesystem::path& prefix, haiku_fs_info& inf
     auto libPath = prefix / "lib";
     auto etcPath = prefix / "etc";
     auto packagesPath = prefix / "packages";
+    auto systemRootPath = prefix / "SystemRoot";
 
     try
     {
@@ -52,6 +53,8 @@ bool server_setup_rootfs(const std::filesystem::path& prefix, haiku_fs_info& inf
         std::filesystem::create_directory_symlink("boot/system/etc", etcPath);
         std::filesystem::remove(packagesPath);
         std::filesystem::create_directory_symlink("boot/system/package-links", packagesPath);
+        std::filesystem::remove(systemRootPath);
+        std::filesystem::create_directory(systemRootPath);;
     }
     catch (const std::exception& e)
     {
@@ -62,7 +65,7 @@ bool server_setup_rootfs(const std::filesystem::path& prefix, haiku_fs_info& inf
     return true;
 }
 
-bool server_setup_devfs(const std::filesystem::path& prefix, haiku_fs_info& info)
+bool server_setup_devfs(haiku_fs_info& info)
 {
     // same as in Haiku.
     info.flags = 0;
@@ -87,12 +90,12 @@ bool server_setup_devfs(const std::filesystem::path& prefix, haiku_fs_info& info
     return true;
 }
 
-bool server_setup_systemfs(const std::filesystem::path& prefix, haiku_fs_info& info)
+bool server_setup_systemfs(haiku_fs_info& info)
 {
     info.flags = B_FS_IS_PERSISTENT | B_FS_IS_SHARED | B_FS_HAS_ATTR;
 
     struct statfs statfsbuf;
-    if (statfs(prefix.c_str(), &statfsbuf) != 0)
+    if (statfs("/", &statfsbuf) != 0)
     {
         return false;
     }
@@ -108,7 +111,7 @@ bool server_setup_systemfs(const std::filesystem::path& prefix, haiku_fs_info& i
     strncpy(info.fsh_name, "systemfs", sizeof(info.fsh_name));
 
     struct stat statbuf;
-    if (stat(prefix.c_str(), &statbuf) != 0)
+    if (stat("/", &statbuf) != 0)
     {
         return false;
     }

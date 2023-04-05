@@ -8,6 +8,7 @@
 
 #include "haiku_dirent.h"
 #include "haiku_errors.h"
+#include "haiku_stat.h"
 #include "loader_readdir.h"
 #include "loader_servercalls.h"
 #include "loader_vchroot.h"
@@ -15,8 +16,8 @@
 struct LoaderDirectoryInfo
 {
     DIR* handle;
-    dev_t dev;
-    ino_t ino;
+    haiku_dev_t dev;
+    haiku_ino_t ino;
     int extendedEntryIndex;
 };
 
@@ -33,8 +34,8 @@ void loader_opendir(int fd)
     auto ptr = fdopendir(fd);
     if (ptr != nullptr)
     {
-        struct stat st;
-        fstat(fd, &st);
+        haiku_stat st;
+        loader_hserver_call_read_stat(fd, NULL, 0, false, &st, sizeof(st));
         sFdMap[fd] = LoaderDirectoryInfo{ ptr, st.st_dev, st.st_ino, 0 };
     }
 }
@@ -129,21 +130,22 @@ int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
             break;
         }
         struct haiku_dirent* haikuEntry = (struct haiku_dirent*)bufferOffset;
-        haikuEntry->d_ino = entry->d_ino;
         haikuEntry->d_pdev = it->second.dev;
         haikuEntry->d_pino = it->second.ino;
         haikuEntry->d_reclen = haikuEntrySize;
         strcpy(haikuEntry->d_name, entry->d_name);
 
-        struct stat st;
-        if (fstatat(fd, entry->d_name, &st, AT_SYMLINK_NOFOLLOW) == 0)
+        struct haiku_stat st;
+        if (loader_hserver_call_read_stat(fd,
+            entry->d_name, strlen(entry->d_name), false, &st, sizeof(st)) == B_OK)
         {
             haikuEntry->d_dev = st.st_dev;
+            haikuEntry->d_ino = st.st_ino;
         }
         else
         {
-            // Best guess...
-            haikuEntry->d_dev = it->second.dev;
+            // Probably a blacklisted entry.
+            continue;
         }
 
         bufferOffset += haikuEntrySize;

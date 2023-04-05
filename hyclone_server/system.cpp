@@ -167,42 +167,6 @@ size_t System::UnregisterSemaphore(int id)
     return _semaphores.Size();
 }
 
-int System::RegisterFSInfo(std::shared_ptr<haiku_fs_info>&& info)
-{
-    int id = _fsInfos.Add(info);
-    // Don't add the id here.
-    // info->dev = id;
-    return id;
-}
-
-// Finds a fs_info by hyclone internal id.
-std::weak_ptr<haiku_fs_info> System::GetFSInfo(int id)
-{
-    if (_fsInfos.IsValidId(id))
-    {
-        return _fsInfos.Get(id);
-    }
-    return std::weak_ptr<haiku_fs_info>();
-}
-
-// Finds a fs_info by system dev_t id.
-std::weak_ptr<haiku_fs_info> System::FindFSInfoByDevId(int devId)
-{
-    for (auto& info : _fsInfos)
-    {
-        if (info->dev == devId)
-        {
-            return info;
-        }
-    }
-    return std::weak_ptr<haiku_fs_info>();
-}
-
-int System::NextFSInfoId(int id) const
-{
-    return _fsInfos.NextId(id);
-}
-
 std::weak_ptr<Area> System::RegisterArea(const haiku_area_info& info)
 {
     int nextId = _nextAreaId;

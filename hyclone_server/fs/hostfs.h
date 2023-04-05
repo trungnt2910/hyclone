@@ -5,10 +5,14 @@
 
 // Generic base class for filesystems that uses files on the host.
 // rootfs, systemfs, devfs and even the current "packagefs" should subclass this.
-class HostfsDevice : VfsDevice
+class HostfsDevice : public VfsDevice, private std::enable_shared_from_this<HostfsDevice>
 {
+private:
+    static haiku_ino_t _Hash(uint64_t hostDev, uint64_t hostIno);
 protected:
     std::filesystem::path _hostRoot;
+    virtual bool _IsBlacklisted(const std::filesystem::path& path) const { return false; }
+    virtual bool _IsBlacklisted(const std::filesystem::directory_entry& entry) const { return false; }
 public:
     HostfsDevice(const std::filesystem::path& root, const std::filesystem::path& hostRoot);
     virtual ~HostfsDevice() override = default;

@@ -1,6 +1,7 @@
 #ifndef __HYCLONE_PROCESS_H__
 #define __HYCLONE_PROCESS_H__
 
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -22,10 +23,12 @@ private:
     int _pid;
     int _uid, _gid, _euid, _egid;
     bool _forkUnlocked;
+    std::filesystem::path _cwd;
 
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     IdMap<haiku_extended_image_info, int> _images;
     std::map<int, std::shared_ptr<Area>> _areas;
+    std::unordered_map<int, std::filesystem::path> _fds;
     std::mutex _lock;
     std::unordered_set<int> _owningSemaphores;
     std::unordered_set<int> _owningPorts;
@@ -54,13 +57,22 @@ public:
     bool IsValidAreaId(int area_id);
     size_t UnregisterArea(int area_id);
 
+    size_t RegisterFd(int fd, const std::filesystem::path& path);
+    const std::filesystem::path& GetFd(int fd);
+    bool IsValidFd(int fd);
+    size_t UnregisterFd(int fd);
+
     int GetPid() const { return _pid; }
     int GetUid() const { return _uid; }
     int GetGid() const { return _gid; }
     int GetEuid() const { return _euid; }
     int GetEgid() const { return _egid; }
+    const std::filesystem::path& GetCwd() const { return _cwd; }
     haiku_team_info& GetInfo() { return _info; }
     const haiku_team_info& GetInfo() const { return _info; }
+
+    void SetCwd(const std::filesystem::path& cwd) { _cwd = cwd; }
+    void SetCwd(std::filesystem::path&& cwd) { _cwd = std::move(cwd); }
 
     // Copies managed information to child.
     void Fork(Process& child);
@@ -79,6 +91,8 @@ public:
 
     size_t ReadMemory(void* address, void* buffer, size_t size);
     size_t WriteMemory(void* address, const void* buffer, size_t size);
+
+    status_t ReadDirFd(int fd, const void* userBuffer, size_t bufferSize, bool traverseLink, std::filesystem::path& output);
 };
 
 #endif // __HYCLONE_PROCESS_H__

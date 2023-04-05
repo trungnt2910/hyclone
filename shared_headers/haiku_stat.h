@@ -103,4 +103,18 @@ struct haiku_stat
 #define HAIKU_UTIME_NOW 1000000000
 #define HAIKU_UTIME_OMIT 1000000001
 
+enum
+{
+    B_STAT_MODE                 = 0x0001,
+    B_STAT_UID                  = 0x0002,
+    B_STAT_GID                  = 0x0004,
+    B_STAT_SIZE                 = 0x0008,
+    B_STAT_ACCESS_TIME          = 0x0010,
+    B_STAT_MODIFICATION_TIME    = 0x0020,
+    B_STAT_CREATION_TIME        = 0x0040,
+    B_STAT_CHANGE_TIME          = 0x0080,
+
+    B_STAT_INTERIM_UPDATE       = 0x1000
+};
+
 #endif /* __HAIKU_STAT_H__ */

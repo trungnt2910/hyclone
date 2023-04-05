@@ -7,24 +7,33 @@
 #include "server_servercalls.h"
 #include "system.h"
 
-#include <iostream>
-
 intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned long long device, unsigned long long inode,
     const char* userPath, size_t userPathLength)
 {
     auto& vfsService = System::GetInstance().GetVfsService();
-    std::string path;
+    std::string pathStr;
+    std::filesystem::path path;
 
     {
         auto lock = vfsService.Lock();
 
-        if (!vfsService.GetEntryRef(EntryRef(device, inode), path))
+        if (!vfsService.GetEntryRef(EntryRef(device, inode), pathStr))
         {
             return B_ENTRY_NOT_FOUND;
         }
+
+        path = pathStr;
+        status_t status = vfsService.GetPath(path, false);
+
+        if (status != B_OK)
+        {
+            return status;
+        }
+
+        pathStr = path.string();
     }
 
-    size_t copyLen = path.size() + 1;
+    size_t copyLen = pathStr.size() + 1;
 
     if (copyLen > userPathLength)
     {
@@ -32,7 +41,7 @@ intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned lo
     }
 
     auto lock = context.process->Lock();
-    if (context.process->WriteMemory((void*)userPath, path.data(), copyLen) != copyLen)
+    if (context.process->WriteMemory((void*)userPath, pathStr.data(), copyLen) != copyLen)
     {
         return B_BAD_ADDRESS;
     }
@@ -43,27 +52,20 @@ intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned lo
 }
 
 intptr_t server_hserver_call_register_entry_ref(hserver_context& context, unsigned long long device, unsigned long long inode,
-    const char* userPath, size_t userPathLength)
+    int fd)
 {
-    std::string path(userPathLength, '\0');
-
     {
         auto lock = context.process->Lock();
-        if (context.process->ReadMemory((void*)userPath, path.data(), userPathLength) != userPathLength)
+        if (!context.process->IsValidFd(fd))
         {
-            return B_BAD_ADDRESS;
+            return HAIKU_POSIX_EBADF;
         }
-    }
 
-    path.resize(strlen(path.c_str()));
-    while (path.size() > 1 && path.back() == '/')
-        path.pop_back();
-    path.shrink_to_fit();
+        const auto& path = context.process->GetFd(fd);
 
-    {
         auto& vfsService = System::GetInstance().GetVfsService();
-        auto lock = vfsService.Lock();
-        vfsService.RegisterEntryRef(EntryRef(device, inode), std::move(path));
+        auto vfsLock = vfsService.Lock();
+        vfsService.RegisterEntryRef(EntryRef(device, inode), path.string());
     }
 
     return B_OK;
