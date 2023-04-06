@@ -285,7 +285,7 @@ intptr_t server_hserver_call_ioctl(hserver_context& context, int fd, unsigned in
     {
         auto& vfsService = System::GetInstance().GetVfsService();
         auto lock = vfsService.Lock();
-        status = vfsService.Ioctl(requestPath, op, buffer.data(), userBufferSize);
+        status = vfsService.Ioctl(requestPath, op, userBuffer, buffer.data(), userBufferSize);
     }
 
     if (status != B_OK)

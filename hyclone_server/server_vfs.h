@@ -39,7 +39,7 @@ public:
     virtual status_t ReadDir(VfsDir& dir, haiku_dirent& dirent) = 0;
     virtual status_t RewindDir(VfsDir& dir) = 0;
     virtual status_t Ioctl(const std::filesystem::path& path, unsigned int cmd,
-        void* buffer, size_t size) { return B_BAD_VALUE; }
+        void* addr, void* buffer, size_t size) { return B_BAD_VALUE; }
 
     const haiku_fs_info& GetInfo() const { return _info; }
     haiku_fs_info& GetInfo() { return _info; }
@@ -102,7 +102,7 @@ public:
     status_t OpenDir(const std::filesystem::path& path, VfsDir& dir, bool traverseLink = true);
     status_t ReadDir(VfsDir& dir, haiku_dirent& dirent);
     status_t RewindDir(VfsDir& dir);
-    status_t Ioctl(const std::filesystem::path& path, unsigned int cmd, void* buffer, size_t size);
+    status_t Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size);
 
     std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }
 };

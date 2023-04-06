@@ -206,7 +206,7 @@ status_t VfsService::RewindDir(VfsDir& dir)
     return status;
 }
 
-status_t VfsService::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* buffer, size_t size)
+status_t VfsService::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size)
 {
     auto currentPath = path.lexically_normal();
 
@@ -216,7 +216,7 @@ status_t VfsService::Ioctl(const std::filesystem::path& path, unsigned int cmd, 
 
         if (device)
         {
-            return device->Ioctl(path, cmd, buffer, size);
+            return device->Ioctl(path, cmd, addr, buffer, size);
         }
 
         if (!currentPath.has_parent_path())

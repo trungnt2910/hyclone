@@ -1,6 +1,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 #include <hpkgvfs/Entry.h>
 #include <hpkgvfs/Package.h>
@@ -159,7 +160,7 @@ bool PackagefsDevice::_IsBlacklisted(const std::filesystem::directory_entry& ent
     return _IsBlacklisted(entry.path());
 }
 
-status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* buffer, size_t size)
+status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size)
 {
     switch (cmd)
     {
@@ -192,9 +193,77 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
 
             return B_OK;
         }
+        case PACKAGE_FS_OPERATION_GET_PACKAGE_INFOS:
+        {
+            if (size < sizeof(PackageFSGetPackageInfosRequest))
+            {
+                return B_BAD_VALUE;
+            }
+
+            auto request = (PackageFSGetPackageInfosRequest*)buffer;
+
+            std::vector<std::filesystem::directory_entry> packages(
+                std::filesystem::directory_iterator(_hostRoot / _relativeInstalledPackagesPath),
+                std::filesystem::directory_iterator());
+
+            addr_t bufferEnd = (addr_t)buffer + size;
+            uint32 packageCount = packages.size();
+            char* nameBuffer = (char*)(request->infos + packageCount);
+
+            auto& vfsService = System::GetInstance().GetVfsService();
+
+            haiku_stat dirst;
+            status_t status = vfsService.ReadStat(_root / "system" / "packages", dirst, false);
+            if (status != B_OK)
+            {
+                return status;
+            }
+
+            uint32 packageIndex = 0;
+            for (; packageIndex < packageCount; ++packageIndex)
+            {
+                auto& package = packages[packageIndex];
+                PackageFSPackageInfo* info = request->infos + packageIndex;
+
+                if ((addr_t)(info + 1) <= bufferEnd)
+                {
+                    info->directoryDeviceID = dirst.st_dev;
+                    info->directoryNodeID = dirst.st_ino;
+
+                    haiku_stat st;
+                    status = server_read_stat(package.path(), st);
+
+                    if (status != B_OK)
+                    {
+                        return status;
+                    }
+
+                    info->packageDeviceID = st.st_dev;
+                    info->packageNodeID = st.st_ino;
+
+                    vfsService.RegisterEntryRef(EntryRef(st.st_dev, st.st_ino), _root / "system" / "packages" / package.path().filename());
+                }
+
+                auto name = package.path().filename().string();
+                size_t nameSize = name.length() + 1;
+                char* nameEnd = nameBuffer + nameSize;
+
+                if ((addr_t)nameEnd <= bufferEnd)
+                {
+                    memcpy(nameBuffer, name.c_str(), nameSize);
+                    info->name = (char *)((addr_t)addr + ((addr_t)nameBuffer - (addr_t)buffer));
+                }
+
+                nameBuffer = nameEnd;
+            }
+
+            request->bufferSize = (addr_t)nameBuffer - (addr_t)request;
+            request->packageCount = packageCount;
+            return B_OK;
+        }
         default:
         {
-            return HostfsDevice::Ioctl(path, cmd, buffer, size);
+            return HostfsDevice::Ioctl(path, cmd, addr, buffer, size);
         }
     }
 }

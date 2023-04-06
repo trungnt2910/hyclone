@@ -112,7 +112,7 @@ public:
     PackagefsDevice(const std::filesystem::path& root,
         const std::filesystem::path& hostRoot);
     virtual status_t Ioctl(const std::filesystem::path& path, unsigned int cmd,
-        void* buffer, size_t size) override;
+        void* addr, void* buffer, size_t size) override;
 };
 
 #endif // __HYCLONE_ROOTFS_H__
