@@ -16,7 +16,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     using namespace HpkgVfs;
 
     std::filesystem::path packagesPath = hostRoot / "system" / "packages";
-    std::filesystem::path installedPackagesPath = hostRoot / "system" / ".hpkgvfsPackages";
+    std::filesystem::path installedPackagesPath = hostRoot / _relativeInstalledPackagesPath;
 
     std::shared_ptr<Entry> system;
     std::shared_ptr<Entry> boot = Entry::CreateHaikuBootEntry(&system);
@@ -142,4 +142,18 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     strncpy(_info.fsh_name, "packagefs", sizeof(_info.fsh_name));
 
     server_fill_fs_info(root, &_info);
+}
+
+bool PackagefsDevice::_IsBlacklisted(const std::filesystem::path& hostPath) const
+{
+    if (hostPath.lexically_relative(_hostRoot) == _relativeInstalledPackagesPath)
+    {
+        return true;
+    }
+    return false;
+}
+
+bool PackagefsDevice::_IsBlacklisted(const std::filesystem::directory_entry& entry) const
+{
+    return _IsBlacklisted(entry.path());
 }
