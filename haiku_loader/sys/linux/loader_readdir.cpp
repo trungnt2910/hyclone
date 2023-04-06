@@ -47,52 +47,6 @@ void loader_closedir(int fd)
     sFdMap.erase(fd);
 }
 
-static struct dirent* loader_readdir_extended(int fd, LoaderDirectoryInfo& info)
-{
-    char rootPath[4];
-    // Not root.
-    if (loader_vchroot_unexpandat(fd, NULL, rootPath, sizeof(rootPath)) != 1 || rootPath[0] != '/')
-    {
-        return NULL;
-    }
-
-    struct stat st;
-    struct dirent* dirent = (struct dirent*)sDirentBuf;
-
-    switch (info.extendedEntryIndex)
-    {
-        // SystemRoot
-        case 0:
-        {
-            if (stat("/", &st))
-            {
-                return NULL;
-            }
-
-            dirent->d_ino = st.st_ino;
-            strcpy(dirent->d_name, "SystemRoot");
-        }
-        break;
-        // dev
-        case 1:
-        {
-            if (stat("/dev", &st))
-            {
-                return NULL;
-            }
-
-            dirent->d_ino = st.st_ino;
-            strcpy(dirent->d_name, "dev");
-        }
-        break;
-        default:
-            return NULL;
-    }
-
-    ++info.extendedEntryIndex;
-    return dirent;
-}
-
 int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
 {
     std::unique_lock<std::mutex> lock(sFdMapMutex);
@@ -116,11 +70,7 @@ int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
         struct dirent *entry = readdir(dir);
         if (entry == NULL)
         {
-            entry = loader_readdir_extended(fd, it->second);
-            if (entry == NULL)
-            {
-                break;
-            }
+            break;
         }
         size_t nameLen = strlen(entry->d_name);
         size_t haikuEntrySize = sizeof(haiku_dirent) + nameLen + 1;
