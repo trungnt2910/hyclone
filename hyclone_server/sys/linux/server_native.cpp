@@ -221,7 +221,7 @@ void server_fill_thread_info(haiku_thread_info* info)
 status_t server_read_stat(const std::filesystem::path& path, haiku_stat& st)
 {
     struct stat linux_st;
-    if (stat(path.c_str(), &linux_st) == -1)
+    if (lstat(path.c_str(), &linux_st) == -1)
     {
         return LinuxToB(errno);
     }
