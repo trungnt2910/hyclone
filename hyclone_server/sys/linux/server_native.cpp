@@ -7,12 +7,14 @@
 #include <iostream>
 #include <string>
 #include <sys/stat.h>
+#include <sys/statfs.h>
 #include <sys/uio.h>
 #include <signal.h>
 #include <unistd.h>
 #include <unordered_set>
 
 #include "haiku_errors.h"
+#include "haiku_fs_info.h"
 #include "server_errno.h"
 #include "server_native.h"
 #include "system.h"
@@ -216,6 +218,22 @@ void server_fill_thread_info(haiku_thread_info* info)
     fin >> rt_priority;
 
     info->priority = rt_priority;
+}
+
+void server_fill_fs_info(const std::filesystem::path& path, haiku_fs_info* info)
+{
+    struct statfs linux_st;
+    if (statfs(path.c_str(), &linux_st) == -1)
+    {
+        return;
+    }
+
+    info->block_size = linux_st.f_bsize;
+    info->io_size = linux_st.f_bsize;
+    info->total_blocks = linux_st.f_blocks;
+    info->free_blocks = linux_st.f_bfree;
+    info->total_nodes = linux_st.f_files;
+    info->free_nodes = linux_st.f_ffree;
 }
 
 status_t server_read_stat(const std::filesystem::path& path, haiku_stat& st)

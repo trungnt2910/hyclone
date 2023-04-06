@@ -26,6 +26,11 @@ bool server_setup_filesystem()
 
     haiku_fs_info info;
 
+    // Create mount points
+    std::filesystem::create_directories(gHaikuPrefix);
+    std::filesystem::create_directories(std::filesystem::path(gHaikuPrefix) / "dev");
+    std::filesystem::create_directories(std::filesystem::path(gHaikuPrefix) / "boot" / "system");
+
     vfsService.RegisterDevice(std::make_shared<RootfsDevice>(gHaikuPrefix));
     vfsService.RegisterDevice(std::make_shared<DevfsDevice>());
     vfsService.RegisterDevice(std::make_shared<PackagefsDevice>("/boot", std::filesystem::path(gHaikuPrefix) / "boot"));
@@ -37,17 +42,6 @@ bool server_setup_filesystem()
     }
 
     return true;
-}
-
-// Alias functions
-bool server_setup_rootfs(haiku_fs_info& info)
-{
-    return server_setup_rootfs(std::filesystem::path(gHaikuPrefix), info);
-}
-
-bool server_setup_packagefs(haiku_fs_info& info)
-{
-    return server_setup_packagefs(std::filesystem::path(gHaikuPrefix), info);
 }
 
 intptr_t server_hserver_call_read_fs_info(hserver_context& context, int deviceId, void* info)

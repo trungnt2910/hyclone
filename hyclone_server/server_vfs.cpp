@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "haiku_errors.h"
+#include "server_native.h"
 #include "server_vfs.h"
 
 VfsDevice::VfsDevice(const std::filesystem::path& root, const haiku_fs_info& info)
@@ -46,6 +47,10 @@ size_t VfsService::RegisterDevice(const std::shared_ptr<VfsDevice>& device)
 
     device->GetInfo().dev = _devices.Add(device);
     _deviceMounts[path] = device;
+
+    haiku_stat stat;
+    ReadStat(device->GetRoot(), stat, false);
+    device->GetInfo().root = stat.st_ino;
 
     return _devices.Size();
 }
