@@ -96,7 +96,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         {
             std::cerr << "Uninstalling package: " << kvp.first << std::endl;
             boot->RemovePackage(kvp.first);
-            boot->WriteToDisk(root.parent_path());
+            boot->WriteToDisk(hostRoot.parent_path());
         }
         else if (it->second > kvp.second)
         {
@@ -105,7 +105,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
             Package package((packagesPath / (it->first + ".hpkg")).string());
             std::shared_ptr<Entry> entry = package.GetRootEntry();
             system->Merge(entry);
-            boot->WriteToDisk(root.parent_path());
+            boot->WriteToDisk(hostRoot.parent_path());
             boot->Drop();
         }
         else
@@ -125,7 +125,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         Package package((packagesPath / (pkg.first + ".hpkg")).string());
         std::shared_ptr<Entry> entry = package.GetRootEntry();
         system->Merge(entry);
-        boot->WriteToDisk(root.parent_path());
+        boot->WriteToDisk(hostRoot.parent_path());
         boot->Drop();
     }
 
@@ -141,7 +141,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     strncpy(_info.volume_name, "system", sizeof(_info.volume_name));
     strncpy(_info.fsh_name, "packagefs", sizeof(_info.fsh_name));
 
-    server_fill_fs_info(root, &_info);
+    server_fill_fs_info(hostRoot, &_info);
 }
 
 bool PackagefsDevice::_IsBlacklisted(const std::filesystem::path& hostPath) const
