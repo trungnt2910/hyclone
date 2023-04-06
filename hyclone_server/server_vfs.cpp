@@ -52,6 +52,8 @@ size_t VfsService::RegisterDevice(const std::shared_ptr<VfsDevice>& device)
     ReadStat(device->GetRoot(), stat, false);
     device->GetInfo().root = stat.st_ino;
 
+    RegisterEntryRef(EntryRef(device->GetInfo().dev, device->GetInfo().root), path.string());
+
     return _devices.Size();
 }
 
@@ -204,7 +206,7 @@ status_t VfsService::RewindDir(VfsDir& dir)
     return status;
 }
 
-status_t VfsService::Ioctl(const std::filesystem::path& path, int cmd, void* buffer, size_t length)
+status_t VfsService::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* buffer, size_t size)
 {
     auto currentPath = path.lexically_normal();
 
@@ -214,7 +216,7 @@ status_t VfsService::Ioctl(const std::filesystem::path& path, int cmd, void* buf
 
         if (device)
         {
-            return device->Ioctl(path, cmd, buffer, length);
+            return device->Ioctl(path, cmd, buffer, size);
         }
 
         if (!currentPath.has_parent_path())

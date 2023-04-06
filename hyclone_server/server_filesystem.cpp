@@ -301,6 +301,8 @@ intptr_t server_hserver_call_ioctl(hserver_context& context, int fd, unsigned in
             return B_BAD_ADDRESS;
         }
     }
+
+    return B_OK;
 }
 
 // Sample filesystem info of a Haiku machine.

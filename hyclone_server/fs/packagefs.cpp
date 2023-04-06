@@ -8,6 +8,7 @@
 #include "fs/packagefs.h"
 #include "server_filesystem.h"
 #include "server_native.h"
+#include "system.h"
 
 PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     const std::filesystem::path& hostRoot)
@@ -156,4 +157,44 @@ bool PackagefsDevice::_IsBlacklisted(const std::filesystem::path& hostPath) cons
 bool PackagefsDevice::_IsBlacklisted(const std::filesystem::directory_entry& entry) const
 {
     return _IsBlacklisted(entry.path());
+}
+
+status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* buffer, size_t size)
+{
+    switch (cmd)
+    {
+        case PACKAGE_FS_OPERATION_GET_VOLUME_INFO:
+        {
+            if (size < sizeof(PackageFSVolumeInfo))
+            {
+                return B_BAD_VALUE;
+            }
+
+            auto volumeInfo = (PackageFSVolumeInfo*)buffer;
+            volumeInfo->mountType = _mountType;
+            volumeInfo->rootDeviceID = _info.dev;
+            volumeInfo->rootDirectoryID = _info.root;
+            volumeInfo->packagesDirectoryCount = 1;
+
+            auto& vfsService = System::GetInstance().GetVfsService();
+
+            haiku_stat st;
+            status_t status = vfsService.ReadStat(_root / "system" / "packages", st, false);
+            if (status != B_OK)
+            {
+                return status;
+            }
+
+            volumeInfo->packagesDirectoryInfos[0].deviceID = st.st_dev;
+            volumeInfo->packagesDirectoryInfos[0].nodeID = st.st_ino;
+
+            vfsService.RegisterEntryRef(EntryRef(st.st_dev, st.st_ino), _root / "system" / "packages");
+
+            return B_OK;
+        }
+        default:
+        {
+            return HostfsDevice::Ioctl(path, cmd, buffer, size);
+        }
+    }
 }
