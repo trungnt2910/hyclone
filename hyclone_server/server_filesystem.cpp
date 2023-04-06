@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "haiku_errors.h"
 #include "haiku_fcntl.h"
@@ -256,6 +257,50 @@ intptr_t server_hserver_call_vchroot_expandat(hserver_context& context, int fd, 
     }
 
     return B_OK;
+}
+
+intptr_t server_hserver_call_ioctl(hserver_context& context, int fd, unsigned int op, void* userBuffer, size_t userBufferSize)
+{
+    std::filesystem::path requestPath;
+    std::vector<char> buffer(userBufferSize);
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->ReadMemory(userBuffer, buffer.data(), userBufferSize) != userBufferSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (!context.process->IsValidFd(fd))
+        {
+            return HAIKU_POSIX_EBADF;
+        }
+
+        requestPath = context.process->GetFd(fd);
+    }
+
+    status_t status;
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        status = vfsService.Ioctl(requestPath, op, buffer.data(), userBufferSize);
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->WriteMemory(userBuffer, buffer.data(), userBufferSize) != userBufferSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
 }
 
 // Sample filesystem info of a Haiku machine.

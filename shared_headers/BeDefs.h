@@ -11,6 +11,8 @@ typedef unsigned int        uint32;
 typedef int64_t             int64;
 typedef uint64_t            uint64;
 
+typedef unsigned char       uchar;
+
 typedef int32 status_t;
 typedef uint32 type_code;
 typedef int32 haiku_pid_t;

@@ -12,6 +12,7 @@
 #include "BeDefs.h"
 #include "entry_ref.h"
 #include "haiku_dirent.h"
+#include "haiku_errors.h"
 #include "haiku_fs_info.h"
 #include "haiku_stat.h"
 #include "id_map.h"
@@ -37,6 +38,8 @@ public:
     // Length of dirent passed in dirent->reclen.
     virtual status_t ReadDir(VfsDir& dir, haiku_dirent& dirent) = 0;
     virtual status_t RewindDir(VfsDir& dir) = 0;
+    virtual status_t Ioctl(const std::filesystem::path& path, int cmd,
+        void* buffer, size_t length) { return B_BAD_VALUE; }
 
     const haiku_fs_info& GetInfo() const { return _info; }
     haiku_fs_info& GetInfo() { return _info; }
@@ -99,6 +102,7 @@ public:
     status_t OpenDir(const std::filesystem::path& path, VfsDir& dir, bool traverseLink = true);
     status_t ReadDir(VfsDir& dir, haiku_dirent& dirent);
     status_t RewindDir(VfsDir& dir);
+    status_t Ioctl(const std::filesystem::path& path, int cmd, void* buffer, size_t length);
 
     std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }
 };

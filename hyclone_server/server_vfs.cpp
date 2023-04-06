@@ -204,6 +204,28 @@ status_t VfsService::RewindDir(VfsDir& dir)
     return status;
 }
 
+status_t VfsService::Ioctl(const std::filesystem::path& path, int cmd, void* buffer, size_t length)
+{
+    auto currentPath = path.lexically_normal();
+
+    while (true)
+    {
+        auto device = GetDevice(currentPath).lock();
+
+        if (device)
+        {
+            return device->Ioctl(path, cmd, buffer, length);
+        }
+
+        if (!currentPath.has_parent_path())
+        {
+            return B_ENTRY_NOT_FOUND;
+        }
+
+        currentPath = currentPath.parent_path();
+    }
+}
+
 status_t VfsService::_DoWork(std::filesystem::path& path, bool traverseLink, const callback_t& work)
 {
     path = path.lexically_normal();
