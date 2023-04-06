@@ -2,6 +2,7 @@
 
 #include "BeDefs.h"
 #include "export.h"
+#include "extended_commpage.h"
 #include "haiku_errors.h"
 
 extern "C"
@@ -31,8 +32,7 @@ status_t MONIKA_EXPORT _kern_stop_watching(haiku_dev_t device, haiku_ino_t node,
 
 haiku_dev_t MONIKA_EXPORT _kern_next_device(int32 *_cookie)
 {
-    _kern_debug_output("stub: _kern_next_device");
-    return B_BAD_VALUE;
+    return GET_SERVERCALLS()->next_device(_cookie);
 }
 
 }

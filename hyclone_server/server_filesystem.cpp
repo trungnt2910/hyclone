@@ -70,6 +70,65 @@ intptr_t server_hserver_call_read_fs_info(hserver_context& context, int deviceId
     return B_OK;
 }
 
+intptr_t server_hserver_call_next_device(hserver_context& context, int* userCookie)
+{
+    int cookie;
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->ReadMemory(userCookie, &cookie, sizeof(int)) != sizeof(int))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    if (cookie == -1)
+    {
+        return B_BAD_VALUE;
+    }
+
+    int id = -1;
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+
+        auto device = vfsService.GetDevice(cookie).lock();
+
+        while (!device)
+        {
+            cookie = vfsService.NextDeviceId(cookie);
+
+            if (cookie == -1)
+            {
+                break;
+            }
+
+            device = vfsService.GetDevice(cookie).lock();
+        }
+
+        if (!device)
+        {
+            return B_BAD_VALUE;
+        }
+
+        id = device->GetId();
+        cookie = vfsService.NextDeviceId(cookie);
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->WriteMemory(userCookie, &cookie, sizeof(int)) != sizeof(int))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return id;
+}
+
 intptr_t server_hserver_call_read_stat(hserver_context& context, int fd, const char* userPath, size_t userPathSize,
     bool traverseSymlink, void* userStatBuf, size_t userStatSize)
 {

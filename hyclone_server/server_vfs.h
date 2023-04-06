@@ -88,6 +88,7 @@ public:
     size_t RegisterDevice(const std::shared_ptr<VfsDevice>& device);
     std::weak_ptr<VfsDevice> GetDevice(int id);
     std::weak_ptr<VfsDevice> GetDevice(const std::filesystem::path& path);
+    haiku_dev_t NextDeviceId(haiku_dev_t id) const { return _devices.NextId(id); }
 
     // Gets the host path for the given VFS path.
     // The VFS path MUST be absolute.
