@@ -8,13 +8,24 @@
 #include <vector>
 
 #include "haiku_image.h"
-#include "loader_loadruntime.h"
+#include "loader_runtime.h"
 #include "loader_servercalls.h"
 #include "loader_vchroot.h"
 
+runtime_loader_info gRuntimeLoaderInfo;
+
+static bool sRuntimeLoaderLoaded = false;
+
 // On ELF-bases Sys-V systems, a simple dlopen is enough.
-bool loader_load_runtime(runtime_loader_info* info)
+bool loader_load_runtime()
 {
+    if (sRuntimeLoaderLoaded)
+    {
+        return true;
+    }
+
+    auto info = &gRuntimeLoaderInfo;
+
     auto path = std::filesystem::canonical("/proc/self/exe");
     path = path.parent_path() / "runtime_loader";
 
@@ -137,7 +148,13 @@ bool loader_load_runtime(runtime_loader_info* info)
     return true;
 }
 
-void loader_unload_runtime(runtime_loader_info* info)
+void loader_unload_runtime()
 {
-    dlclose(info->handle);
+    dlclose(gRuntimeLoaderInfo.handle);
+    sRuntimeLoaderLoaded = false;
+}
+
+void* loader_runtime_symbol(const char* name)
+{
+    return dlsym(gRuntimeLoaderInfo.handle, name);
 }

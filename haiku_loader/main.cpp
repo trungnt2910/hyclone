@@ -4,7 +4,7 @@
 #include "haiku_loader.h"
 #include "loader_commpage.h"
 #include "loader_exec.h"
-#include "loader_loadruntime.h"
+#include "loader_runtime.h"
 #include "loader_registration.h"
 #include "loader_servercalls.h"
 #include "loader_spawn_thread.h"
@@ -21,7 +21,6 @@
 #include <string>
 
 rld_export **__gRuntimeLoaderPtr;
-runtime_loader_info gRuntimeLoaderInfo;
 const char* hPrefix;
 
 size_t loader_build_path(char* buffer, size_t bufferSize)
@@ -215,7 +214,7 @@ int main(int argc, char** argv, char** envp)
 	}
 
     // std::cout << "Loading runtime_loader" << std::endl;
-	if (!loader_load_runtime(&gRuntimeLoaderInfo))
+	if (!loader_load_runtime())
 	{
 		std::cout << "Failed to load Haiku runtime_loader" << std::endl;
 		loader_free_commpage(commpage);
@@ -309,7 +308,7 @@ int main(int argc, char** argv, char** envp)
 
     std::cout << "Runtime loader returned: " << retVal << std::endl;
 
-	loader_unload_runtime(&gRuntimeLoaderInfo);
+	loader_unload_runtime();
 	loader_free_commpage(commpage);
 
 	delete[] user_args_memory;

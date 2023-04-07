@@ -12,7 +12,10 @@ struct runtime_loader_info
     rld_export**                gRuntimeLoaderPtr;
 };
 
-bool loader_load_runtime(runtime_loader_info* info);
-void loader_unload_runtime(runtime_loader_info* info);
+extern runtime_loader_info gRuntimeLoaderInfo;
+
+bool loader_load_runtime();
+void loader_unload_runtime();
+void* loader_runtime_symbol(const char* name);
 
 #endif // __LOADER_LOADRUNTIME_H__
