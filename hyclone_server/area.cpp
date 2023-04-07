@@ -11,8 +11,11 @@
 #include "haiku_errors.h"
 #include "process.h"
 #include "server_memory.h"
+#include "server_requests.h"
 #include "server_servercalls.h"
+#include "server_workers.h"
 #include "system.h"
+#include "thread.h"
 
 std::vector<std::shared_ptr<Area>> Area::Split(const std::vector<std::pair<uint8_t*, uint8_t*>>& ranges)
 {
@@ -206,6 +209,114 @@ intptr_t server_hserver_call_get_shared_area_path(hserver_context& context, int 
     }
 
     return B_OK;
+}
+
+intptr_t server_hserver_call_transfer_area(hserver_context& context, int area_id, void** userAddress,
+    unsigned int addressSpec, int base_area_id, int target)
+{
+    std::shared_ptr<Area> area;
+    std::shared_ptr<Area> baseArea;
+
+    {
+        auto lock = context.process->Lock();
+        area = context.process->GetArea(area_id).lock();
+        baseArea = context.process->GetArea(base_area_id).lock();
+    }
+
+    if (!area)
+    {
+        return B_BAD_VALUE;
+    }
+
+    if (!baseArea)
+    {
+        return B_BAD_VALUE;
+    }
+
+    if (!area->IsShared())
+    {
+        return B_BAD_VALUE;
+    }
+
+    void* address;
+
+    {
+        auto lock = context.process->Lock();
+        if (!context.process->ReadMemory(userAddress, &address, sizeof(address)))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    std::shared_ptr<Thread> targetThread;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        targetThread = system.GetThread(target).lock();
+    }
+
+    if (!targetThread)
+    {
+        return B_BAD_VALUE;
+    }
+
+    status_t status;
+
+    {
+        auto requestLock = server_worker_run_wait([&]()
+        {
+            return targetThread->RequestLock();
+        });
+
+        std::shared_future<intptr_t> result;
+
+        {
+            auto lock = targetThread->Lock();
+
+            result = targetThread->SendRequest(
+                std::make_shared<TransferAreaRequest>(
+                    TransferAreaRequestArgs({
+                        REQUEST_ID_transfer_area,
+                        area_id, base_area_id,
+                        addressSpec, address })));
+        }
+
+        status = server_worker_run_wait([&]()
+        {
+            return result.get();
+        });
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    std::shared_ptr<Area> newArea;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        newArea = system.GetArea(status).lock();
+    }
+
+    if (!newArea)
+    {
+        return B_BAD_VALUE;
+    }
+
+    address = newArea->GetAddress();
+
+    {
+        auto lock = context.process->Lock();
+        if (!context.process->WriteMemory(userAddress, &address, sizeof(address)))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return newArea->GetAreaId();
 }
 
 intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id, void* user_area_info)

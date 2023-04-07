@@ -7,6 +7,7 @@
 
 #include "BeDefs.h"
 #include "haiku_errors.h"
+#include "requests.h"
 
 class Request
 {
@@ -24,6 +25,15 @@ public:
     std::shared_future<intptr_t> Result();
 
     void* Data() { return _data; }
+};
+
+class TransferAreaRequest : public Request
+{
+    TransferAreaRequestArgs _args;
+public:
+    TransferAreaRequest(const TransferAreaRequestArgs& args) 
+        : _args(args) { _data = &_args; }
+    virtual size_t Size() override { return sizeof(TransferAreaRequestArgs); }
 };
 
 #endif // __SERVER_REQUESTS_H__

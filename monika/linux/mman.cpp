@@ -167,18 +167,8 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
     uint32 lock;
     int mmap_flags, mmap_prot, open_flags;
 
-    long status = ProcessMmapArgs(baseAddr, addressSpec, size,
-        lock, protection, REGION_PRIVATE_MAP,
-        -1, sourceArea,
-        hintAddr, mmap_flags, mmap_prot, open_flags);
-
-    if (status != B_OK)
-    {
-        return status;
-    }
-
     char hostPath[PATH_MAX];
-    status = GET_SERVERCALLS()->get_shared_area_path(sourceArea, hostPath, sizeof(hostPath));
+    long status = GET_SERVERCALLS()->get_shared_area_path(sourceArea, hostPath, sizeof(hostPath));
     if (status != B_OK)
     {
         return status;
@@ -192,6 +182,17 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
 
     LINUX_SYSCALL1(__NR_fsync, fd);
 
+    status = ProcessMmapArgs(baseAddr, addressSpec, size,
+        lock, protection, REGION_PRIVATE_MAP,
+        fd, sourceArea,
+        hintAddr, mmap_flags, mmap_prot, open_flags);
+
+    if (status != B_OK)
+    {
+        LINUX_SYSCALL1(__NR_close, fd);
+        return status;
+    }
+
     bool isExactAddress = addressSpec == B_EXACT_ADDRESS || addressSpec == B_CLONE_ADDRESS;
     if (isExactAddress && GET_HOSTCALLS()->is_in_reserved_range(hintAddr, size))
     {
@@ -204,6 +205,7 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
         status = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, -1, 0);
         if (status < 0)
         {
+            LINUX_SYSCALL1(__NR_close, fd);
             return LinuxToB(-status);
         }
 
@@ -213,14 +215,10 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
     }
     else
     {
-        status = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, -1, 0);
-        if (status < 0)
-        {
-            return LinuxToB(-status);
-        }
+        status = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, fd, 0);
     }
 
-    if (status == -1)
+    if (status < 0)
     {
         LINUX_SYSCALL1(__NR_close, fd);
         return LinuxToB(-status);
@@ -322,6 +320,56 @@ int MONIKA_EXPORT _kern_delete_area(int area)
     {
         GET_SERVERCALLS()->unregister_area(area);
     }
+
+    return status;
+}
+
+area_id MONIKA_EXPORT _kern_transfer_area(area_id area, void **_address,
+    uint32 addressSpec, team_id target)
+{
+    struct haiku_area_info info;
+    long status = GET_SERVERCALLS()->get_area_info(area, &info);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    area_id transferredArea = area;
+
+    if (!(info.protection & B_CLONEABLE_AREA))
+    {
+        void* address = NULL;
+        status = _kern_create_area(info.name, &address,
+            B_ANY_ADDRESS, info.size, B_NO_LOCK,
+            info.protection | B_CLONEABLE_AREA | B_WRITE_AREA);
+
+        if (status < 0)
+        {
+            return status;
+        }
+
+        memcpy(address, info.address, info.size);
+        transferredArea = status;
+    }
+    else
+    {
+        LINUX_SYSCALL2(__NR_msync, info.address, info.size);
+    }
+
+    status = GET_SERVERCALLS()->transfer_area(transferredArea, _address, addressSpec, area, target);
+
+    if (transferredArea != area)
+    {
+        _kern_delete_area(transferredArea);
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    _kern_delete_area(area);
 
     return status;
 }

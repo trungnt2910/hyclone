@@ -6,12 +6,16 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "BeDefs.h"
+#include "haiku_area.h"
 #include "loader_requests.h"
+#include "loader_runtime.h"
 #include "loader_vchroot.h"
 #include "requests.h"
 #include "servercalls.h"
 
 static void loader_handle_request(int sig, siginfo_t* info, void* context);
+static intptr_t loader_handle_request(const TransferAreaRequestArgs& request);
 
 bool loader_init_requests()
 {
@@ -40,12 +44,13 @@ public:
     ~RequestContext();
 
     template <typename T>
-    T* Arguments() { return (T*)_args; }
+    T& Arguments() { return *(T*)_args; }
 
     template <typename T>
-    const T* Arguments() const { return (const T*)_args; }
+    const T& Arguments() const { return *(const T*)_args; }
 
-    request_id RequestId() const { return (request_id)Arguments<RequestArgs>()->id; }
+    request_id RequestId() const { return (request_id)Arguments<RequestArgs>().id; }
+    int Socket() const { return _socket; }
 
     bool Reply(intptr_t result);
 };
@@ -144,6 +149,11 @@ bool RequestContext::Reply(intptr_t result)
         return false;
     }
 
+    if (!_Receive(&returnCode, sizeof(returnCode)))
+    {
+        return false;
+    }
+
     serverArgs[0] = SERVERCALL_ID_disconnect;
     _Send(serverArgs, sizeof(serverArgs));
 
@@ -183,7 +193,44 @@ bool RequestContext::_Receive(void* data, size_t size)
     return true;
 }
 
+struct ServerConnection
+{
+    int _socket;
+};
+extern thread_local ServerConnection gServerConnection;
+
 static void loader_handle_request(int sig, siginfo_t* info, void* context)
 {
     RequestContext requestContext;
+
+    int oldSocket = gServerConnection._socket;
+    gServerConnection._socket = requestContext.Socket();
+
+    switch (requestContext.RequestId())
+    {
+        case REQUEST_ID_transfer_area:
+            requestContext.Reply(loader_handle_request(requestContext.Arguments<TransferAreaRequestArgs>()));
+        break;
+    }
+
+    gServerConnection._socket = oldSocket;
+}
+
+extern intptr_t loader_hserver_call_get_area_info(int id, void* info);
+
+static intptr_t loader_handle_request(const TransferAreaRequestArgs& request)
+{
+    using kern_clone_area_t = area_id (*)(const char *, void **, uint32, uint32, area_id);
+    static kern_clone_area_t kern_clone_area = (kern_clone_area_t)loader_runtime_symbol("_kern_clone_area");
+
+    haiku_area_info info;
+    status_t status = loader_hserver_call_get_area_info(request.baseArea, &info);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    void* address = request.address;
+    return kern_clone_area(info.name, &address, request.addressSpec, info.protection, request.transferredArea);
 }
