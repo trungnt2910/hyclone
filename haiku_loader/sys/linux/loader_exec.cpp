@@ -77,7 +77,7 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
     if (isHaikuExecutable)
     {
         const char** argv = new const char*[argc + 4];
-        const std::string loaderPath = std::filesystem::canonical("/proc/self/exe").string();
+        const std::string loaderPath = "/proc/self/exe";
         const std::string umaskValue = std::to_string(umask);
 
         argv[0] = loaderPath.c_str();
