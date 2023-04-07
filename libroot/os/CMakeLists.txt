@@ -5,12 +5,15 @@ include_directories(${CMAKE_SOURCE_DIR}/shared_headers/${HYCLONE_ARCH})
 
 add_library(root_os_system_time OBJECT system_time.cpp)
 target_compile_options(root_os_system_time PRIVATE -fPIC)
+target_compile_definitions(root_os_system_time PRIVATE -DHYCLONE_LIBROOT)
 
 add_library(root_os_time OBJECT time.cpp)
 target_compile_options(root_os_time PRIVATE -fPIC)
+target_compile_definitions(root_os_time PRIVATE -DHYCLONE_LIBROOT)
 
 add_library(root_os_tls OBJECT tls.cpp)
 target_compile_options(root_os_tls PRIVATE -fPIC)
+target_compile_definitions(root_os_tls PRIVATE -DHYCLONE_LIBROOT)
 
 add_library(root_os_objects OBJECT IMPORTED)
 
@@ -75,6 +78,7 @@ set_property(TARGET root_os_objects PROPERTY
         )
 
 add_library(root_os STATIC blank.c)
+add_dependencies(root_os CopyHaikuObjects)
 target_link_libraries(root_os PRIVATE root_os_objects)
 target_link_libraries(root_os PRIVATE root_os_system_time)
 target_link_libraries(root_os PRIVATE root_os_time)

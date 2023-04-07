@@ -5,6 +5,7 @@ include_directories(${CMAKE_SOURCE_DIR}/shared_headers/${HYCLONE_ARCH})
 
 add_library(root_posix_signal_signal_limits OBJECT signal_limits.cpp)
 target_compile_options(root_posix_signal_signal_limits PRIVATE -fPIC)
+target_compile_definitions(root_posix_signal_signal_limits PRIVATE -DHYCLONE_LIBROOT)
 
 set(root_posix_signal_objects
         ${CMAKE_CURRENT_SOURCE_DIR}/kill.o

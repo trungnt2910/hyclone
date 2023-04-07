@@ -34,3 +34,4 @@ set(root_posix_objects
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_malloc.o)
 
 add_library(root_posix STATIC ${root_posix_objects})
+add_dependencies(root_posix CopyHaikuObjects)

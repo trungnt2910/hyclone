@@ -18,61 +18,47 @@
 
 int SignalBToLinux(int signal)
 {
-    enum
+    if (signal == 0)
     {
-#define UNSUPPORTED_SIGNAL(signal)                           \
-        HYCLONE_UNSUPPORTED_SIGNAL_##signal,
-
-#include "signal_values.h"
-
-#undef UNSUPPORTED_SIGNAL
-    };
-    switch (signal)
-    {
-    case 0:
         // Null signal, return the same.
         return 0;
-#define SUPPORTED_SIGNAL(signal)                             \
-    case HAIKU_##signal:                                     \
-        return signal;
-#define UNSUPPORTED_SIGNAL(signal)                           \
-    case HAIKU_##signal:                                     \
-        return GET_HOSTCALLS()->get_sigrtmin() + HYCLONE_UNSUPPORTED_SIGNAL_##signal;
+    }
+
+#define SUPPORTED_SIGNAL(code)  \
+    if (signal == HAIKU_##code) \
+        return code;
 
 #include "signal_values.h"
 
 #undef SUPPORTED_SIGNAL
-#undef UNSUPPORTED_SIGNAL
-    default:
-        if (signal >= SIGNAL_REALTIME_MIN)
-        {
-            return HYCLONE_MIN_AVAILABLE_REALTIME_SIGNAL + signal - SIGNAL_REALTIME_MIN;
-        }
-        trace("SignalBToLinux: unsupported signal");
-        return SIGUSR1;
+
+    if (signal >= SIGNAL_REALTIME_MIN)
+    {
+        return HYCLONE_MIN_AVAILABLE_REALTIME_SIGNAL + signal - SIGNAL_REALTIME_MIN;
     }
+
+    trace("SignalBToLinux: unsupported signal");
+    return SIGUSR1;
 }
 
 int SignalLinuxToB(int signal)
 {
-    switch (signal)
+    if (signal == 0)
     {
-    case 0:
         // Null signal, return the same.
         return 0;
-#define UNSUPPORTED_SIGNAL(signal)
-#define SUPPORTED_SIGNAL(signal)                             \
-    case signal:                                             \
-        return HAIKU_##signal;
+    }
+
+#define SUPPORTED_SIGNAL(code) \
+    if (signal == code)        \
+        return HAIKU_##code;
 
 #include "signal_values.h"
 
-#undef UNSUPPORTED_SIGNAL
 #undef SUPPORTED_SIGNAL
-    default:
-        trace("SignalLinuxToB: unsupported signal");
-        return HAIKU_SIGUSR1;
-    }
+
+    trace("SignalLinuxToB: unsupported signal");
+    return HAIKU_SIGUSR1;
 }
 
 void *SigHandlerBToLinux(void *handler)

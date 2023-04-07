@@ -45,6 +45,9 @@ target_compile_options(monika PRIVATE
     -fvisibility=hidden
     -fPIC)
 
+target_compile_definitions(monika PRIVATE
+    -DHYCLONE_MONIKA)
+
 target_link_options(monika PRIVATE
     -nodefaultlibs
     -nostartfiles)
