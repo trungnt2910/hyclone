@@ -1,10 +1,12 @@
 #include "export.h"
+#include "extended_commpage.h"
 #include "linux_debug.h"
 
-#define SYSCALL_STUB(name)      \
-    MONIKA_EXPORT void name()   \
-    {                           \
-        panic("stub: " #name);  \
+#define SYSCALL_STUB(name)                                                       \
+    MONIKA_EXPORT void name()                                                    \
+    {                                                                            \
+        GET_SERVERCALLS()->debug_output("stub: " #name, sizeof("stub: " #name)); \
+        panic("stub: " #name);                                                   \
     }
 
 extern "C"
