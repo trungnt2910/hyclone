@@ -25,6 +25,16 @@ class Thread;
 struct haiku_area_info;
 struct haiku_fs_info;
 
+struct Connection
+{
+    int pid;
+    int tid;
+    bool isPrimary;
+
+    Connection(int pid, int tid, bool isPrimary = true)
+        : pid(pid), tid(tid), isPrimary(isPrimary) { }
+};
+
 class System
 {
 private:
@@ -32,7 +42,7 @@ private:
     int _nextAreaId = 1;
     std::map<int, std::shared_ptr<Process>> _processes;
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
-    std::unordered_map<intptr_t, std::pair<int, int>> _connections;
+    std::unordered_map<intptr_t, Connection> _connections;
     IdMap<std::shared_ptr<Port>, int> _ports;
     std::unordered_map<std::string, int> _portNames;
     IdMap<std::shared_ptr<Semaphore>, int> _semaphores;
@@ -60,8 +70,8 @@ public:
     std::weak_ptr<Thread> GetThread(int tid);
     size_t UnregisterThread(int tid);
 
-    std::pair<int, int> RegisterConnection(intptr_t conn_id, int pid, int tid);
-    std::pair<int, int> GetThreadFromConnection(intptr_t conn_id);
+    const Connection& RegisterConnection(intptr_t conn_id, const Connection& conn);
+    Connection GetThreadFromConnection(intptr_t conn_id);
     size_t UnregisterConnection(intptr_t conn_id);
 
     int RegisterPort(std::shared_ptr<Port>&& port);

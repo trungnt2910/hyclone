@@ -27,6 +27,7 @@ add_executable(hyclone_server
     server_memory.cpp
     server_messaging.cpp
     server_prefix.cpp
+    server_requests.cpp
     server_systemnotification.cpp
     server_usermap.cpp
     server_vfs.cpp

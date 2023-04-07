@@ -4,6 +4,7 @@
 #include "haiku_loader.h"
 #include "loader_commpage.h"
 #include "loader_exec.h"
+#include "loader_requests.h"
 #include "loader_runtime.h"
 #include "loader_registration.h"
 #include "loader_servercalls.h"
@@ -217,6 +218,13 @@ int main(int argc, char** argv, char** envp)
 	if (!loader_load_runtime())
 	{
 		std::cout << "Failed to load Haiku runtime_loader" << std::endl;
+		loader_free_commpage(commpage);
+		return 1;
+	}
+
+	if (!loader_init_requests())
+	{
+		std::cout << "Failed to initialize requests" << std::endl;
 		loader_free_commpage(commpage);
 		return 1;
 	}

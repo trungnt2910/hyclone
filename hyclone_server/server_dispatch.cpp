@@ -6,7 +6,7 @@
 #include "system.h"
 #include "thread.h"
 
-intptr_t server_dispatch(intptr_t conn_id, intptr_t call_id, 
+intptr_t server_dispatch(intptr_t conn_id, intptr_t call_id,
     intptr_t a1, intptr_t a2, intptr_t a3, intptr_t a4, intptr_t a5, intptr_t a6)
 {
     hserver_context context;
@@ -14,7 +14,18 @@ intptr_t server_dispatch(intptr_t conn_id, intptr_t call_id,
 
     auto& system = System::GetInstance();
     auto lock = system.Lock();
-    std::tie(context.pid, context.tid) = system.GetThreadFromConnection(conn_id);
+
+    switch (call_id)
+    {
+        case SERVERCALL_ID_connect:
+        case SERVERCALL_ID_request_ack:
+            std::tie(context.pid, context.tid) = std::tie(a1, a2);
+        break;
+        default:
+            const auto [pid, tid, isPrimary] = system.GetThreadFromConnection(conn_id);
+            std::tie(context.pid, context.tid) = std::tie(pid, tid);
+        break;
+    }
 
     // For SERVERCALL_ID_connect, the process and thread hasn't been registered
     // in HyClone server yet.

@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -5,7 +6,9 @@
 
 #include "haiku_errors.h"
 #include "haiku_thread.h"
+#include "process.h"
 #include "server_native.h"
+#include "server_requests.h"
 #include "server_servercalls.h"
 #include "system.h"
 #include "thread.h"
@@ -47,6 +50,49 @@ void Thread::Resume()
 void Thread::WaitForResume()
 {
     _suspended.wait(true);
+}
+
+std::shared_future<intptr_t> Thread::SendRequest(std::shared_ptr<Request> request)
+{
+    assert(!IsRequesting());
+    _request = request;
+    server_send_request(_info.team, _info.thread);
+
+    return request->Result();
+}
+
+size_t Thread::RequestAck()
+{
+    return _request->Size();
+}
+
+status_t Thread::RequestRead(void* address)
+{
+    status_t status = _request->Relocate(address);
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    if (server_write_process_memory(_info.team, address, _request->Data(), _request->Size()) != _request->Size())
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
+}
+
+status_t Thread::RequestReply(intptr_t result)
+{
+    status_t status = _request->Reply(result);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    _request = std::shared_ptr<Request>();
+    return B_OK;
 }
 
 intptr_t server_hserver_call_get_thread_info(hserver_context& context, int thread_id, void* userThreadInfo)
@@ -262,4 +308,54 @@ intptr_t server_hserver_call_wait_for_resume(hserver_context& context)
     context.thread->WaitForResume();
 
     return B_OK;
+}
+
+intptr_t server_hserver_call_request_ack(hserver_context& context, int pid, int tid)
+{
+    auto lock = context.thread->Lock();
+
+    if (!context.thread->IsRequesting())
+    {
+        return B_BAD_VALUE;
+    }
+
+    ssize_t status = context.thread->RequestAck();
+
+    if (status < 0)
+    {
+        return status;
+    }
+
+    {
+        auto& system = System::GetInstance();
+        auto systemLock = system.Lock();
+
+        system.RegisterConnection(context.conn_id, Connection(pid, tid, false));
+    }
+
+    return status;
+}
+
+intptr_t server_hserver_call_request_read(hserver_context& context, void* userData)
+{
+    auto lock = context.thread->Lock();
+
+    if (!context.thread->IsRequesting())
+    {
+        return B_BAD_VALUE;
+    }
+
+    return context.thread->RequestRead(userData);
+}
+
+intptr_t server_hserver_call_request_reply(hserver_context& context, intptr_t reply)
+{
+    auto lock = context.thread->Lock();
+
+    if (!context.thread->IsRequesting())
+    {
+        return B_BAD_VALUE;
+    }
+
+    return context.thread->RequestReply(reply);
 }

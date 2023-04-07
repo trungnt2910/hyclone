@@ -13,6 +13,8 @@ struct haiku_fs_info;
 size_t server_read_process_memory(int pid, void* address, void* buffer, size_t size);
 size_t server_write_process_memory(int pid, void* address, const void* buffer, size_t size);
 
+void server_send_request(int pid, int tid);
+
 void server_kill_process(int pid);
 void server_close_connection(intptr_t conn_id);
 

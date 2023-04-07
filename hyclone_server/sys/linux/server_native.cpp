@@ -1,3 +1,6 @@
+#include "extended_signal.h"
+#include <signal.h>
+
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
@@ -9,7 +12,6 @@
 #include <sys/stat.h>
 #include <sys/statfs.h>
 #include <sys/uio.h>
-#include <signal.h>
 #include <unistd.h>
 #include <unordered_set>
 
@@ -42,6 +44,11 @@ size_t server_write_process_memory(int pid, void* address, const void* buffer, s
     struct iovec remote_iov = { address, size };
 
     return (size_t)process_vm_writev((pid_t)pid, &local_iov, 1, &remote_iov, 1, 0);
+}
+
+void server_send_request(int pid, int tid)
+{
+    tgkill(pid, tid, SIGREQUEST);
 }
 
 void server_kill_process(int pid)

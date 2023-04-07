@@ -107,7 +107,7 @@ int server_main(int argc, char **argv)
     {
         auto lock = system.Lock();
         // Register the master socket.
-        system.RegisterConnection(listen_socket, 0, 0);
+        system.RegisterConnection(listen_socket, Connection(0, 0));
     }
 
     while (!system.IsShuttingDown())

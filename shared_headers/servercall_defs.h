@@ -1,5 +1,8 @@
 HYCLONE_SERVERCALL6(connect, int, int, intptr_t, intptr_t, intptr_t, intptr_t)
 HYCLONE_SERVERCALL0(disconnect)
+HYCLONE_SERVERCALL2(request_ack, int, int)
+HYCLONE_SERVERCALL1(request_read, void*)
+HYCLONE_SERVERCALL1(request_reply, intptr_t)
 HYCLONE_SERVERCALL2(debug_output, const char*, size_t)
 HYCLONE_SERVERCALL2(register_image, void*, size_t)
 HYCLONE_SERVERCALL3(get_image_info, int, void*, size_t)

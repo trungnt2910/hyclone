@@ -72,17 +72,17 @@ size_t System::UnregisterThread(int tid)
     return _threads.size();
 }
 
-std::pair<int, int> System::RegisterConnection(intptr_t conn_id, int pid, int tid)
+const Connection& System::RegisterConnection(intptr_t conn_id, const Connection& conn)
 {
-    _connections[conn_id] = std::make_pair(pid, tid);
-    return _connections[conn_id];
+    auto result = _connections.emplace(conn_id, conn);
+    return result.first->second;
 }
 
-std::pair<int, int> System::GetThreadFromConnection(intptr_t conn_id)
+Connection System::GetThreadFromConnection(intptr_t conn_id)
 {
     auto it = _connections.find(conn_id);
     if (it == _connections.end())
-        return std::make_pair(-1, -1);
+        return Connection(-1, -1);
     return it->second;
 }
 
@@ -262,7 +262,7 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
 {
     auto& system = System::GetInstance();
     auto lock = system.Lock();
-    system.RegisterConnection(context.conn_id, pid, tid);
+    system.RegisterConnection(context.conn_id, Connection(pid, tid));
 
     std::cerr << "Connection started: " << context.conn_id << " " << pid << " " << tid << std::endl;
 
@@ -299,37 +299,44 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
 {
     auto& system = System::GetInstance();
     auto lock = system.Lock();
-    auto procLock = context.process->Lock();
-    // No more threads => Process dead.
-    if (!context.process->UnregisterThread(context.tid))
+
+    const auto& connection = system.GetThreadFromConnection(context.conn_id);
+
+    if (connection.isPrimary)
     {
-        system.UnregisterProcess(context.pid);
-        for (const auto& s: context.process->GetOwningSemaphores())
+        auto procLock = context.process->Lock();
+        // No more threads => Process dead.
+        if (!context.process->UnregisterThread(context.tid))
         {
-            system.UnregisterSemaphore(s);
-        }
+            system.UnregisterProcess(context.pid);
+            for (const auto& s: context.process->GetOwningSemaphores())
+            {
+                system.UnregisterSemaphore(s);
+            }
 
-        for (const auto& s: context.process->GetOwningPorts())
-        {
-            system.UnregisterPort(s);
-        }
+            for (const auto& s: context.process->GetOwningPorts())
+            {
+                system.UnregisterPort(s);
+            }
 
-        area_id area = -1;
-        while ((area = context.process->NextAreaId(area)) != -1)
-        {
-            system.UnregisterArea(area);
-        }
+            area_id area = -1;
+            while ((area = context.process->NextAreaId(area)) != -1)
+            {
+                system.UnregisterArea(area);
+            }
 
-        {
-            auto& msgService = system.GetMessagingService();
-            auto msgLock = msgService.Lock();
+            {
+                auto& msgService = system.GetMessagingService();
+                auto msgLock = msgService.Lock();
 
-            // Will silently fail if the process is not the registered
-            // message server.
-            msgService.UnregisterService(context.process);
+                // Will silently fail if the process is not the registered
+                // message server.
+                msgService.UnregisterService(context.process);
+            }
         }
+        system.UnregisterThread(context.tid);
     }
-    system.UnregisterThread(context.tid);
+
     system.UnregisterConnection(context.conn_id);
 
     std::cerr << "Unregistered: " << context.conn_id << " " << context.pid << " " << context.tid << std::endl;
