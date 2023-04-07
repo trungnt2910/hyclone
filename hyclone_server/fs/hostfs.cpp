@@ -62,6 +62,7 @@ status_t HostfsDevice::GetPath(std::filesystem::path& path, bool& isSymlink)
     {
         std::vector<std::filesystem::path> parts(relativePath.begin(), relativePath.end());
 
+        auto originalHostPath = std::move(hostPath);
         hostPath = _hostRoot;
         path = _root;
 
@@ -73,7 +74,13 @@ status_t HostfsDevice::GetPath(std::filesystem::path& path, bool& isSymlink)
             status = std::filesystem::symlink_status(hostPath, ec);
             if (ec)
             {
-                return CppToB(ec);
+                if (ec.value() != (int)std::errc::no_such_file_or_directory)
+                {
+                    return CppToB(ec);
+                }
+                isSymlink = false;
+                path = originalHostPath;
+                return B_ENTRY_NOT_FOUND;
             }
             if (std::filesystem::is_symlink(status))
             {
@@ -101,6 +108,8 @@ status_t HostfsDevice::GetPath(std::filesystem::path& path, bool& isSymlink)
                 return B_OK;
             }
         }
+        isSymlink = false;
+        path = originalHostPath;
         return B_ENTRY_NOT_FOUND;
     }
     else

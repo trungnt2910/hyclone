@@ -186,6 +186,11 @@ intptr_t server_hserver_call_write_stat(hserver_context& context, int fd, const 
         {
             return status;
         }
+
+        if (context.process->ReadMemory((void*)userStatBuf, &fullStat, sizeof(haiku_stat)) != sizeof(haiku_stat))
+        {
+            return B_BAD_ADDRESS;
+        }
     }
 
     {
@@ -197,15 +202,6 @@ intptr_t server_hserver_call_write_stat(hserver_context& context, int fd, const 
     if (status != B_OK)
     {
         return status;
-    }
-
-    {
-        auto lock = context.process->Lock();
-
-        if (context.process->WriteMemory((void*)userStatBuf, &fullStat, sizeof(haiku_stat)) != sizeof(haiku_stat))
-        {
-            return B_BAD_ADDRESS;
-        }
     }
 
     return B_OK;
@@ -233,7 +229,7 @@ intptr_t server_hserver_call_vchroot_expandat(hserver_context& context, int fd, 
         status = vfsService.GetPath(requestPath, traverseSymlink);
     }
 
-    if (status != B_OK)
+    if (status != B_OK && status != B_ENTRY_NOT_FOUND)
     {
         return status;
     }
@@ -256,7 +252,7 @@ intptr_t server_hserver_call_vchroot_expandat(hserver_context& context, int fd, 
         }
     }
 
-    return B_OK;
+    return status;
 }
 
 intptr_t server_hserver_call_ioctl(hserver_context& context, int fd, unsigned int op, void* userBuffer, size_t userBufferSize)

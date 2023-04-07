@@ -206,6 +206,7 @@ void Process::Fork(Process& child)
         }
     }
 
+    child._fds = _fds;
     child._cwd = _cwd;
 
     // No, semaphores don't seem to be inherited.
@@ -262,6 +263,13 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
     else
     {
         output = path;
+    }
+
+    if (traverseLink)
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        vfsService.RealPath(output);
     }
 
     output = output.lexically_normal();

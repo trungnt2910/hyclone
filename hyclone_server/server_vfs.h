@@ -96,6 +96,7 @@ public:
     // Gets the host path for the given VFS path.
     // The VFS path MUST be absolute.
     status_t GetPath(std::filesystem::path& path, bool traverseLink = true);
+    status_t RealPath(std::filesystem::path& path);
     status_t ReadStat(const std::filesystem::path& path, haiku_stat& stat, bool traverseLink = true);
     status_t WriteStat(const std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool traverseLink = true);

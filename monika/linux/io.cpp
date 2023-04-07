@@ -430,6 +430,8 @@ status_t MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
         return B_BAD_ADDRESS;
     }
 
+    memcpy(&fullStat, stat, statSize);
+
     status_t result = GET_SERVERCALLS()->write_stat(fd, path, path ? strlen(path) : 0, traverseLink, &fullStat, statMask);
 
     if (result != B_OK)
@@ -459,9 +461,14 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
     status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
         !noTraverse, hostPath, sizeof(hostPath));
 
-    if (expandStatus != B_OK)
+    if (expandStatus != B_OK && expandStatus != B_ENTRY_NOT_FOUND)
     {
         return expandStatus;
+    }
+
+    if (!(openMode & HAIKU_O_CREAT) && expandStatus == B_ENTRY_NOT_FOUND)
+    {
+        return B_ENTRY_NOT_FOUND;
     }
 
     if (noTraverse)

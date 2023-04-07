@@ -88,6 +88,21 @@ status_t VfsService::GetPath(std::filesystem::path& path, bool traverseLink)
     });
 }
 
+status_t VfsService::RealPath(std::filesystem::path& path)
+{
+    auto tempPath = path;
+    return _DoWork(tempPath, true, [&](std::filesystem::path& currentPath,
+        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+    {
+        status_t status = device->GetPath(currentPath, isSymlink);
+        if (isSymlink)
+        {
+            path = currentPath;
+        }
+        return status;
+    });
+}
+
 status_t VfsService::ReadStat(const std::filesystem::path& path, haiku_stat& stat, bool traverseLink)
 {
     return _DoWork(path, traverseLink, [&](std::filesystem::path& currentPath,
