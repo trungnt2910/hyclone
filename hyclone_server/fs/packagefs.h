@@ -103,6 +103,7 @@ struct PackageFSActivationChangeRequest
 class PackagefsDevice : public HostfsDevice
 {
 private:
+    std::mutex _updateMutex;
     std::filesystem::path _relativeInstalledPackagesPath = std::filesystem::path("system/.hpkgvfsPackages");
     PackageFSMountType _mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM;
 protected:

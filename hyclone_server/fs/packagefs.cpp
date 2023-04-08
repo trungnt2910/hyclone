@@ -266,6 +266,121 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
             request->packageCount = packageCount;
             return B_OK;
         }
+        case PACKAGE_FS_OPERATION_CHANGE_ACTIVATION:
+        {
+            PackageFSActivationChangeRequest* request = (PackageFSActivationChangeRequest*)buffer;
+            uint32 itemCount = request->itemCount;
+            addr_t requestEnd = (addr_t)buffer + size;
+
+            if (&request->items[itemCount] > (PackageFSActivationChangeItem*)requestEnd)
+            {
+                return B_BAD_VALUE;
+            }
+
+            addr_t nameDelta = (addr_t)request - (addr_t)addr;
+
+            for (uint32 i = 0; i < itemCount; ++i)
+            {
+                PackageFSActivationChangeItem& item = request->items[i];
+                item.name = (char*)((addr_t)item.name + nameDelta);
+
+                if (item.name < (char*)buffer || item.name >= (char*)requestEnd)
+                {
+                    return B_BAD_VALUE;
+                }
+
+                size_t maxNameSize = requestEnd - (addr_t)item.name;
+                if (strnlen(item.name, maxNameSize) >= maxNameSize)
+                {
+                    return B_BAD_VALUE;
+                }
+            }
+
+            std::unique_lock lock(_updateMutex);
+
+            using namespace HpkgVfs;
+
+            std::filesystem::path packagesPath = _hostRoot / "system" / "packages";
+            std::filesystem::path installedPackagesPath = _hostRoot / _relativeInstalledPackagesPath;
+
+            std::shared_ptr<Entry> system;
+            std::shared_ptr<Entry> boot = Entry::CreateHaikuBootEntry(&system);
+
+            std::unordered_set<std::string> installedPackages;
+
+            for (const auto& file : std::filesystem::directory_iterator(installedPackagesPath))
+            {
+                if (file.path().extension() != ".hpkg")
+                {
+                    continue;
+                }
+
+                std::ifstream fin(file.path());
+                if (!fin.is_open())
+                {
+                    continue;
+                }
+
+                Package package(file.path().string());
+                installedPackages.emplace(file.path().stem());
+                std::cerr << "Preinstalled package: " << file.path().stem() << std::endl;
+                std::shared_ptr<Entry> entry = package.GetRootEntry(/*dropData*/ true);
+                system->Merge(entry);
+            }
+
+            for (uint32 i = 0; i < itemCount; ++i)
+            {
+                PackageFSActivationChangeItem& item = request->items[i];
+                auto name = std::filesystem::path(item.name).stem();
+
+                auto it = installedPackages.find(name);
+
+                if (it == installedPackages.end())
+                {
+                    if (item.type != PACKAGE_FS_ACTIVATE_PACKAGE)
+                    {
+                        std::cerr << "Package not found: " << name << std::endl;
+                        continue;
+                    }
+                    std::cerr << "Installing package: " << name << std::endl;
+                    Package package((packagesPath / (name.string() + ".hpkg")).string());
+                    std::shared_ptr<Entry> entry = package.GetRootEntry();
+                    system->Merge(entry);
+                    boot->WriteToDisk(_hostRoot.parent_path());
+                    boot->Drop();
+                }
+                else
+                {
+                    if (item.type == PACKAGE_FS_DEACTIVATE_PACKAGE)
+                    {
+                        std::cerr << "Uninstalling package: " << *it << std::endl;
+                        boot->RemovePackage(*it);
+                        boot->WriteToDisk(_hostRoot.parent_path());
+                    }
+                    else if (item.type == PACKAGE_FS_REACTIVATE_PACKAGE)
+                    {
+                        std::cerr << "Reinstalling package: " << *it << std::endl;
+                        boot->RemovePackage(*it);
+                        Package package((packagesPath / (*it + ".hpkg")).string());
+                        std::shared_ptr<Entry> entry = package.GetRootEntry();
+                        system->Merge(entry);
+                        boot->WriteToDisk(_hostRoot.parent_path());
+                        boot->Drop();
+                    }
+                    else if (item.type == PACKAGE_FS_ACTIVATE_PACKAGE)
+                    {
+                        std::cerr << "Package already installed: " << *it << std::endl;
+                    }
+                    else
+                    {
+                        std::cerr << "Unknown activation change type: " << item.type << std::endl;
+                    }
+                }
+            }
+
+            std::cerr << "Done updating packagefs." << std::endl;
+            return B_OK;
+        }
         default:
         {
             return HostfsDevice::Ioctl(path, cmd, addr, buffer, size);
