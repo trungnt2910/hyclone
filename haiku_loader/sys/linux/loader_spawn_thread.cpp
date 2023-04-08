@@ -135,7 +135,10 @@ int loader_wait_for_thread(int thread_id, int* retVal)
     {
         return -error;
     }
-    *retVal = (int)(intptr_t)retPtr;
+    if (retVal != NULL)
+    {
+        *retVal = (int)(intptr_t)retPtr;
+    }
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
         auto& threadInfo = sHostPthreadObjects[thread_id];
@@ -149,7 +152,7 @@ int loader_wait_for_thread(int thread_id, int* retVal)
             munmap((uint8_t*)threadInfo.stack_address - threadInfo.guard_size, threadInfo.guard_size);
         }
     }
-    return 0; 
+    return 0;
 }
 
 bool loader_register_thread(int tid, const thread_creation_attributes* attributes, bool suspended)
