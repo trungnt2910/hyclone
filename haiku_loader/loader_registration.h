@@ -3,5 +3,6 @@
 
 bool loader_register_process(int argc, char** args);
 bool loader_register_builtin_areas(void* commpage, char** args);
+bool loader_register_existing_fds();
 
 #endif // __LOADER_REGISTRATION_H__

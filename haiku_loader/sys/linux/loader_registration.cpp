@@ -1,21 +1,25 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <dirent.h>
+#include <fcntl.h>
 #include <filesystem>
 #include <fstream>
 #include <pthread.h>
 #include <string>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <utility>
 #include <vector>
 
 #include "commpage_defs.h"
 #include "haiku_area.h"
+#include "haiku_fcntl.h"
 #include "haiku_team.h"
 #include "loader_registration.h"
 #include "loader_servercalls.h"
-
-#include <iostream>
+#include "loader_vchroot.h"
+#include "servercalls.h"
 
 bool loader_register_process(int argc, char** args)
 {
@@ -137,6 +141,60 @@ bool loader_register_builtin_areas(void* commpage, char** args)
     // Still missing a certain "user area" area of size 16384.
     // Haiku uses it to store internal kernel stuff.
     // We might be able to use such an area for our "extended commpage".
+
+    return true;
+}
+
+bool loader_register_existing_fds()
+{
+    int dirfd = open("/proc/self/fd", O_RDONLY | O_DIRECTORY);
+
+    if (dirfd < 0)
+        return false;
+
+    DIR* dir = fdopendir(dirfd);
+    if (dir == NULL)
+        return false;
+
+    std::string hycloneSockPath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SOCKET_NAME;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if (entry->d_type != DT_LNK)
+            continue;
+
+        int fd = atoi(entry->d_name);
+        if (fd < 0)
+            continue;
+
+        if (fd == dirfd)
+            continue;
+
+        char path[PATH_MAX];
+
+        path[0] = '\0';
+
+        if (readlinkat(dirfd, entry->d_name, path, sizeof(path)) == -1)
+            continue;
+
+        // Some special file that we mostly won't care about in our path-based
+        // VFS implementation.
+        if (path[0] == '\0')
+            continue;
+
+        // Don't want Haiku code to mess up our server sockets...
+        if (path == hycloneSockPath)
+            continue;
+
+        char resolvedPath[PATH_MAX];
+        loader_vchroot_unexpand(path, resolvedPath, sizeof(resolvedPath));
+
+        if (loader_hserver_call_register_fd(fd, HAIKU_AT_FDCWD, resolvedPath, sizeof(resolvedPath), false) < 0)
+            return false;
+    }
+
+    closedir(dir);
 
     return true;
 }

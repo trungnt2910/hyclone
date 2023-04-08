@@ -303,6 +303,7 @@ int main(int argc, char** argv, char** envp)
 	loader_register_process(args.arg_count, args.args);
 	loader_register_thread(-1, NULL, false);
 	loader_register_builtin_areas(commpage, args.args);
+	loader_register_existing_fds();
 
 	std::filesystem::path cwd = std::filesystem::current_path();
 	char emulatedCwd[PATH_MAX];
