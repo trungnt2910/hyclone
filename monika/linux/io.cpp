@@ -782,49 +782,26 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
 
 status_t MONIKA_EXPORT _kern_open_parent_dir(int fd, char* name, size_t nameLength)
 {
-    char hostPath[PATH_MAX];
-    long status = GET_HOSTCALLS()->vchroot_expandat(fd, "..", hostPath, sizeof(hostPath));
-
-    if (status < 0)
-    {
-        return HAIKU_POSIX_EBADF;
-    }
-    else if (status >= sizeof(hostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
-    }
-
-    while (status > 0 && hostPath[status] == '/')
-    {
-        hostPath[status] = '\0';
-        --status;
-    }
-
-    char* lastSlash = hostPath + status;
-    while (lastSlash >= hostPath && *lastSlash != '/')
-    {
-        --lastSlash;
-    }
-
-    size_t parentNameLength = (hostPath + status) - (lastSlash + 1) + 1;
-    if (parentNameLength > nameLength)
-    {
-        return B_BUFFER_OVERFLOW;
-    }
-
-    memcpy(name, lastSlash + 1, parentNameLength);
-
-    int result = LINUX_SYSCALL2(__NR_open, hostPath, O_DIRECTORY);
+    long result = LINUX_SYSCALL3(__NR_openat, fd, "..", O_DIRECTORY);
 
     if (result < 0)
     {
         return LinuxToB(-result);
     }
 
-    GET_SERVERCALLS()->register_parent_dir_fd(result, fd);
-    GET_HOSTCALLS()->opendir(result);
+    int newFd = result;
 
-    return result;
+    result = GET_SERVERCALLS()->register_parent_dir_fd(newFd, fd, name, nameLength);
+
+    if (result < 0)
+    {
+        LINUX_SYSCALL1(__NR_close, newFd);
+        return result;
+    }
+
+    GET_HOSTCALLS()->opendir(newFd);
+
+    return newFd;
 }
 
 ssize_t MONIKA_EXPORT _kern_read_dir(int fd, struct haiku_dirent* buffer, size_t bufferSize, uint32 maxCount)

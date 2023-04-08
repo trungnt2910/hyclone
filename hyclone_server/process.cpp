@@ -347,17 +347,31 @@ intptr_t server_hserver_call_register_fd1(hserver_context& context, int fd,
     return B_OK;
 }
 
-intptr_t server_hserver_call_register_parent_dir_fd(hserver_context& context, int fd, int parentDirFd)
+intptr_t server_hserver_call_register_parent_dir_fd(hserver_context& context, int fd, int originalFd, char* userName, size_t userNameSize)
 {
     std::filesystem::path requestPath;
 
     {
         auto lock = context.process->Lock();
-        if (!context.process->IsValidFd(parentDirFd))
+        if (!context.process->IsValidFd(originalFd))
         {
             return HAIKU_POSIX_EBADF;
         }
-        requestPath = context.process->GetFd(parentDirFd).parent_path();
+
+        const auto& originalPath = context.process->GetFd(originalFd);
+        requestPath = originalPath.parent_path();
+        std::string name = originalPath.filename().string();
+
+        if (name.size() >= userNameSize)
+        {
+            return B_BUFFER_OVERFLOW;
+        }
+
+        if (context.process->WriteMemory(userName, name.c_str(), name.size() + 1) != name.size() + 1)
+        {
+            return B_BAD_ADDRESS;
+        }
+
         context.process->RegisterFd(fd, requestPath);
     }
 
