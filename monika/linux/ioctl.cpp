@@ -193,40 +193,7 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
             return B_OK;
         }
         case HAIKU_SIOCGIFDSTADDR:
-        {
-            if (buffer == NULL)
-            {
-                return B_BAD_ADDRESS;
-            }
-            struct haiku_ifreq* haiku_ifreq = (struct haiku_ifreq*)buffer;
-            struct ifreq linux_ifreq;
-            strncpy(linux_ifreq.ifr_ifrn.ifrn_name, haiku_ifreq->ifr_name, std::min(IFNAMSIZ, HAIKU_IFNAMSIZ));
-            int result = LINUX_SYSCALL3(__NR_ioctl, fd, SIOCGIFDSTADDR, &linux_ifreq);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-            SocketAddressLinuxToB((sockaddr*)&linux_ifreq.ifr_ifru.ifru_dstaddr,
-                (haiku_sockaddr_storage*)&haiku_ifreq->ifr_dstaddr);
-            return B_OK;
-        }
         case HAIKU_SIOCGIFFLAGS:
-        {
-            if (buffer == NULL)
-            {
-                return B_BAD_ADDRESS;
-            }
-            struct haiku_ifreq* haiku_ifreq = (struct haiku_ifreq*)buffer;
-            struct ifreq linux_ifreq;
-            strncpy(linux_ifreq.ifr_ifrn.ifrn_name, haiku_ifreq->ifr_name, std::min(IFNAMSIZ, HAIKU_IFNAMSIZ));
-            int result = LINUX_SYSCALL3(__NR_ioctl, fd, SIOCGIFFLAGS, &linux_ifreq);
-            if (result < 0)
-            {
-                return LinuxToB(-result);
-            }
-            haiku_ifreq->ifr_flags = InterfaceFlagsLinuxToB(linux_ifreq.ifr_ifru.ifru_flags);
-            return B_OK;
-        }
         case HAIKU_SIOCGIFNETMASK:
         {
             if (buffer == NULL)
@@ -236,13 +203,42 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
             struct haiku_ifreq* haiku_ifreq = (struct haiku_ifreq*)buffer;
             struct ifreq linux_ifreq;
             strncpy(linux_ifreq.ifr_ifrn.ifrn_name, haiku_ifreq->ifr_name, std::min(IFNAMSIZ, HAIKU_IFNAMSIZ));
-            int result = LINUX_SYSCALL3(__NR_ioctl, fd, SIOCGIFNETMASK, &linux_ifreq);
+
+            int linuxOp;
+            switch (op)
+            {
+                case HAIKU_SIOCGIFDSTADDR:
+                    linuxOp = SIOCGIFDSTADDR;
+                    break;
+                case HAIKU_SIOCGIFFLAGS:
+                    linuxOp = SIOCGIFFLAGS;
+                    break;
+                case HAIKU_SIOCGIFNETMASK:
+                    linuxOp = SIOCGIFNETMASK;
+                    break;
+            }
+
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, linuxOp, &linux_ifreq);
             if (result < 0)
             {
                 return LinuxToB(-result);
             }
-            SocketAddressLinuxToB((sockaddr*)&linux_ifreq.ifr_ifru.ifru_netmask,
-                (haiku_sockaddr_storage*)&haiku_ifreq->ifr_mask);
+
+            switch (op)
+            {
+                case HAIKU_SIOCGIFDSTADDR:
+                    SocketAddressLinuxToB((sockaddr*)&linux_ifreq.ifr_ifru.ifru_dstaddr,
+                        (haiku_sockaddr_storage*)&haiku_ifreq->ifr_dstaddr);
+                break;
+                case HAIKU_SIOCGIFFLAGS:
+                    haiku_ifreq->ifr_flags = InterfaceFlagsLinuxToB(linux_ifreq.ifr_ifru.ifru_flags);
+                break;
+                case HAIKU_SIOCGIFNETMASK:
+                    SocketAddressLinuxToB((sockaddr*)&linux_ifreq.ifr_ifru.ifru_netmask,
+                        (haiku_sockaddr_storage*)&haiku_ifreq->ifr_mask);
+                break;
+            }
+
             return B_OK;
         }
         case HAIKU_SIOCGIFCOUNT:
