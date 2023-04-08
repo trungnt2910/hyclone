@@ -448,9 +448,21 @@ status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
                         return B_BAD_VALUE;
                     }
 
+                    struct haiku_timeval* haikuTime = (struct haiku_timeval*)value;
                     struct timeval linuxTime;
-                    linuxTime.tv_sec = ((struct haiku_timeval *)value)->tv_sec;
-                    linuxTime.tv_usec = ((struct haiku_timeval *)value)->tv_usec;
+
+                    // B_INFINITE_TIMEOUT would overflow and become a very small value
+                    // on Linux.
+                    if (haikuTime->tv_sec * 1000000 + haikuTime->tv_usec == B_INFINITE_TIMEOUT)
+                    {
+                        linuxTime.tv_sec = 0;
+                        linuxTime.tv_usec = 0;
+                    }
+                    else
+                    {
+                        linuxTime.tv_sec = haikuTime->tv_sec;
+                        linuxTime.tv_usec = haikuTime->tv_usec;
+                    }
 
                     long status = LINUX_SYSCALL5(__NR_setsockopt, socket, linuxLevel, linuxOption, &linuxTime, length);
 
