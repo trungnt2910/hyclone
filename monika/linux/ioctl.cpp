@@ -3,6 +3,25 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <net/if.h>
+#include <sys/mman.h>
+
+// Internal header, but we have to use it to prevent clashing with
+// names from <asm/termios.h>
+#define _SYS_IOCTL_H
+#include <bits/ioctls.h>
+
+// Annoying macros that breaks Haiku headers
+#undef ifr_name
+#undef ifr_addr
+#undef ifr_dstaddr
+#undef ifr_broadaddr
+#undef ifr_flags
+#undef ifr_metric
+#undef ifr_mtu
+#undef ifr_data
+#undef ifc_buf
+#undef ifc_req
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
@@ -11,13 +30,17 @@
 #include "haiku_drivers.h"
 #include "haiku_errors.h"
 #include "haiku_ioctl.h"
+#include "haiku_net_if.h"
+#include "haiku_sockio.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
+#include "socket_conversion.h"
 
 typedef struct ktermios linux_termios;
 
 static void TermiosLinuxToB(const linux_termios& linuxTermios, haiku_termios& haikuTermios);
 static void TermiosBToLinux(const haiku_termios& haikuTermios, linux_termios& linuxTermios);
+static int InterfaceFlagsLinuxToB(int flags);
 
 extern "C"
 {
@@ -169,6 +192,123 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
             }
             return B_OK;
         }
+        case HAIKU_SIOCGIFDSTADDR:
+        {
+            if (buffer == NULL)
+            {
+                return B_BAD_ADDRESS;
+            }
+            struct haiku_ifreq* haiku_ifreq = (struct haiku_ifreq*)buffer;
+            struct ifreq linux_ifreq;
+            strncpy(linux_ifreq.ifr_ifrn.ifrn_name, haiku_ifreq->ifr_name, std::min(IFNAMSIZ, HAIKU_IFNAMSIZ));
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, SIOCGIFDSTADDR, &linux_ifreq);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            SocketAddressLinuxToB((sockaddr*)&linux_ifreq.ifr_ifru.ifru_dstaddr,
+                (haiku_sockaddr_storage*)&haiku_ifreq->ifr_dstaddr);
+            return B_OK;
+        }
+        case HAIKU_SIOCGIFFLAGS:
+        {
+            if (buffer == NULL)
+            {
+                return B_BAD_ADDRESS;
+            }
+            struct haiku_ifreq* haiku_ifreq = (struct haiku_ifreq*)buffer;
+            struct ifreq linux_ifreq;
+            strncpy(linux_ifreq.ifr_ifrn.ifrn_name, haiku_ifreq->ifr_name, std::min(IFNAMSIZ, HAIKU_IFNAMSIZ));
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, SIOCGIFFLAGS, &linux_ifreq);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            haiku_ifreq->ifr_flags = InterfaceFlagsLinuxToB(linux_ifreq.ifr_ifru.ifru_flags);
+            return B_OK;
+        }
+        case HAIKU_SIOCGIFNETMASK:
+        {
+            if (buffer == NULL)
+            {
+                return B_BAD_ADDRESS;
+            }
+            struct haiku_ifreq* haiku_ifreq = (struct haiku_ifreq*)buffer;
+            struct ifreq linux_ifreq;
+            strncpy(linux_ifreq.ifr_ifrn.ifrn_name, haiku_ifreq->ifr_name, std::min(IFNAMSIZ, HAIKU_IFNAMSIZ));
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, SIOCGIFNETMASK, &linux_ifreq);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            SocketAddressLinuxToB((sockaddr*)&linux_ifreq.ifr_ifru.ifru_netmask,
+                (haiku_sockaddr_storage*)&haiku_ifreq->ifr_mask);
+            return B_OK;
+        }
+        case HAIKU_SIOCGIFCOUNT:
+        {
+            if (buffer == NULL)
+            {
+                return B_BAD_ADDRESS;
+            }
+            struct haiku_ifconf* haiku_ifconf = (struct haiku_ifconf*)buffer;
+            if (haiku_ifconf->ifc_len < sizeof(int))
+            {
+                return B_BAD_VALUE;
+            }
+            struct ifconf linux_ifconf;
+            linux_ifconf.ifc_ifcu.ifcu_buf = NULL;
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, SIOCGIFCONF, &linux_ifconf);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            haiku_ifconf->ifc_value = linux_ifconf.ifc_len / sizeof(struct ifreq);
+            return B_OK;
+        }
+        case HAIKU_SIOCGIFCONF:
+        {
+            if (buffer == NULL)
+            {
+                return B_BAD_ADDRESS;
+            }
+            struct haiku_ifconf* haiku_ifconf = (struct haiku_ifconf*)buffer;
+            struct ifconf linux_ifconf;
+
+            size_t count = haiku_ifconf->ifc_len / sizeof(struct haiku_ifreq);
+            size_t bufferSize = (count * sizeof(struct ifreq) + B_PAGE_SIZE - 1) & ~(B_PAGE_SIZE - 1);
+            long result = LINUX_SYSCALL6(__NR_mmap, NULL, bufferSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+
+            linux_ifconf.ifc_len = count * sizeof(struct ifreq);
+            linux_ifconf.ifc_ifcu.ifcu_buf = (char*)result;
+
+            result = LINUX_SYSCALL3(__NR_ioctl, fd, SIOCGIFCONF, &linux_ifconf);
+            if (result < 0)
+            {
+                LINUX_SYSCALL2(__NR_munmap, (void*)linux_ifconf.ifc_ifcu.ifcu_buf, bufferSize);
+                return LinuxToB(-result);
+            }
+
+            for (size_t i = 0; i < count; ++i)
+            {
+                struct haiku_ifreq& haiku_ifreq = haiku_ifconf->ifc_req[i];
+                struct ifreq& linux_ifreq = linux_ifconf.ifc_ifcu.ifcu_req[i];
+
+                strncpy(haiku_ifreq.ifr_name, linux_ifreq.ifr_ifrn.ifrn_name, std::min(IFNAMSIZ, HAIKU_IFNAMSIZ));
+
+                struct sockaddr_in* haiku_addr = (struct sockaddr_in*)&haiku_ifreq.ifr_addr;
+                struct sockaddr_in* linux_addr = (struct sockaddr_in*)&linux_ifreq.ifr_ifru.ifru_addr;
+
+                SocketAddressLinuxToB((sockaddr*)linux_addr, (haiku_sockaddr_storage*)haiku_addr);
+            }
+
+            LINUX_SYSCALL2(__NR_munmap, (void*)linux_ifconf.ifc_ifcu.ifcu_buf, bufferSize);
+            return B_OK;
+        }
         case B_GET_PATH_FOR_DEVICE:
         {
             char* path = (char*)buffer;
@@ -231,6 +371,7 @@ status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t lengt
             }
             // Trace this, until we have better tools
             // such as strace on Hyclone.
+            GET_HOSTCALLS()->printf("Unknown ioctl: %d\n", op);
             trace("Unknown ioctl.");
             return B_BAD_VALUE;
         }
@@ -370,4 +511,28 @@ static void TermiosBToLinux(const haiku_termios& haikuTermios, linux_termios& li
     {
         trace("Unsupported c_cflag: CTSFLOW without RTSFLOW");
     }
+}
+
+static int InterfaceFlagsLinuxToB(int linuxFlags)
+{
+    int haikuFlags = 0;
+
+    if (linuxFlags & IFF_UP)
+        haikuFlags |= HAIKU_IFF_UP;
+    if (linuxFlags & IFF_BROADCAST)
+        haikuFlags |= HAIKU_IFF_BROADCAST;
+    if (linuxFlags & IFF_LOOPBACK)
+        haikuFlags |= HAIKU_IFF_LOOPBACK;
+    if (linuxFlags & IFF_POINTOPOINT)
+        haikuFlags |= HAIKU_IFF_POINTOPOINT;
+    if (linuxFlags & IFF_NOARP)
+        haikuFlags |= HAIKU_IFF_NOARP;
+    if (linuxFlags & IFF_PROMISC)
+        haikuFlags |= HAIKU_IFF_PROMISC;
+    if (linuxFlags & IFF_ALLMULTI)
+        haikuFlags |= HAIKU_IFF_ALLMULTI;
+    if (linuxFlags & IFF_MULTICAST)
+        haikuFlags |= HAIKU_IFF_MULTICAST;
+
+    return haikuFlags;
 }

@@ -15,6 +15,7 @@ set(monika_sources
     realpath.cpp
     signal_conversion.cpp
     signal_restore.S
+    socket_conversion.cpp
     stringutils.cpp
 
     debug.cpp
