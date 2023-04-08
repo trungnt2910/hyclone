@@ -145,9 +145,12 @@ bool loader_register_builtin_areas(void* commpage, char** args)
     return true;
 }
 
+#include <iostream>
+
 bool loader_register_existing_fds()
 {
     int dirfd = open("/proc/self/fd", O_RDONLY | O_DIRECTORY);
+    int pid = getpid();
 
     if (dirfd < 0)
         return false;
@@ -157,6 +160,18 @@ bool loader_register_existing_fds()
         return false;
 
     std::string hycloneSockPath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SOCKET_NAME;
+
+    char path[PATH_MAX];
+    char resolvedPath[PATH_MAX];
+
+    for (int fd = 0; fd <= STDERR_FILENO; ++fd)
+    {
+        snprintf(path, sizeof(path), "/proc/%d/fd/%d", pid, fd);
+        loader_vchroot_unexpand(path, resolvedPath, sizeof(resolvedPath));
+
+        if (loader_hserver_call_register_fd(fd, HAIKU_AT_FDCWD, resolvedPath, sizeof(resolvedPath), false) < 0)
+            return false;
+    }
 
     struct dirent* entry;
     while ((entry = readdir(dir)) != NULL)
@@ -171,23 +186,18 @@ bool loader_register_existing_fds()
         if (fd == dirfd)
             continue;
 
-        char path[PATH_MAX];
+        if (fd <= STDERR_FILENO)
+            continue;
 
         path[0] = '\0';
 
-        if (readlinkat(dirfd, entry->d_name, path, sizeof(path)) == -1)
-            continue;
+        struct stat st;
+        if (readlinkat(dirfd, entry->d_name, path, sizeof(path)) == -1 || stat(path, &st) == -1)
+        {
+            // Probably path is something weird such as a pipe.
+            snprintf(path, sizeof(path), "/proc/%d/fd/%s", pid, entry->d_name);
+        }
 
-        // Some special file that we mostly won't care about in our path-based
-        // VFS implementation.
-        if (path[0] == '\0')
-            continue;
-
-        // Don't want Haiku code to mess up our server sockets...
-        if (path == hycloneSockPath)
-            continue;
-
-        char resolvedPath[PATH_MAX];
         loader_vchroot_unexpand(path, resolvedPath, sizeof(resolvedPath));
 
         if (loader_hserver_call_register_fd(fd, HAIKU_AT_FDCWD, resolvedPath, sizeof(resolvedPath), false) < 0)

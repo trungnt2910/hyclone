@@ -14,6 +14,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <unordered_set>
+#include <vector>
 
 #include "haiku_errors.h"
 #include "haiku_fs_info.h"
@@ -245,10 +246,24 @@ void server_fill_fs_info(const std::filesystem::path& path, haiku_fs_info* info)
 
 status_t server_read_stat(const std::filesystem::path& path, haiku_stat& st)
 {
+    std::vector<std::filesystem::path> pathComponents(path.begin(), path.end());
+
     struct stat linux_st;
-    if (lstat(path.c_str(), &linux_st) == -1)
+
+    if (pathComponents.size() > 4 && pathComponents[0] == "/" && pathComponents[1] == "proc" && pathComponents[3] == "fd")
     {
-        return LinuxToB(errno);
+        // This is a magic symlink of /proc/[pid]/fd.
+        if (stat(path.c_str(), &linux_st) == -1)
+        {
+            return LinuxToB(errno);
+        }
+    }
+    else
+    {
+        if (lstat(path.c_str(), &linux_st) == -1)
+        {
+            return LinuxToB(errno);
+        }
     }
 
     st.st_dev = linux_st.st_dev;
