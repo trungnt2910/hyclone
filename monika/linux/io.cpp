@@ -456,9 +456,11 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
     int linuxFlags = OFlagsBToLinux(openMode);
     int linuxMode = ModeBToLinux(perms);
 
+    size_t pathLength = path ? strlen(path) : 0;
+
     char hostPath[PATH_MAX];
 
-    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, pathLength,
         !noTraverse, hostPath, sizeof(hostPath));
 
     if (expandStatus != B_OK && expandStatus != B_ENTRY_NOT_FOUND)
@@ -483,7 +485,7 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
         return LinuxToB(-result);
     }
 
-    GET_SERVERCALLS()->register_fd(result, fd, path, path ? strlen(path) : 0, !noTraverse);
+    GET_SERVERCALLS()->register_fd(result, fd, path, pathLength, !noTraverse);
 
     struct stat linuxStat;
     if (LINUX_SYSCALL2(__NR_fstat, result, &linuxStat) == 0 && S_ISDIR(linuxStat.st_mode))
@@ -754,8 +756,10 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
         CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, HAIKU_POSIX_ENOENT);
     }
 
+    size_t pathLength = path ? strlen(path) : 0;
+
     char hostPath[PATH_MAX];
-    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, pathLength,
         true, hostPath, sizeof(hostPath));
 
     if (expandStatus != B_OK)
@@ -770,7 +774,7 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
         return LinuxToB(-result);
     }
 
-    GET_SERVERCALLS()->register_fd(result, fd, path, path ? strlen(path) : 0, true);
+    GET_SERVERCALLS()->register_fd(result, fd, path, pathLength, true);
 
     // Registers the file descriptor as a directory.
     // Must be called AFTER register_fd as haiku_loader internally uses a
@@ -1017,8 +1021,10 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char* path)
         CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, B_ENTRY_NOT_FOUND);
     }
 
+    size_t pathLength = path ? strlen(path) : 0;
+
     char hostPath[PATH_MAX];
-    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(fd, path, pathLength,
         true, hostPath, sizeof(hostPath));
 
     if (expandStatus != B_OK)
@@ -1033,7 +1039,7 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char* path)
         return LinuxToB(-result);
     }
 
-    GET_SERVERCALLS()->setcwd(fd, path, path ? strlen(path) : 0);
+    GET_SERVERCALLS()->setcwd(fd, path, pathLength);
 
     return B_OK;
 }
