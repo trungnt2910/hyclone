@@ -36,6 +36,11 @@ int MONIKA_EXPORT _kern_socket(int family, int type, int protocol)
     int linuxType = SocketTypeBToLinux(type);
     int linuxProtocol = SocketProtocolBToLinux(protocol);
 
+    if (linuxFamily < 0 || linuxType < 0 || linuxProtocol < 0)
+    {
+        return B_UNSUPPORTED;
+    }
+
     long status = LINUX_SYSCALL3(__NR_socket, linuxFamily, linuxType, linuxProtocol);
 
     if (status < 0)
