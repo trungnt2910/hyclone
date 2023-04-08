@@ -14,12 +14,15 @@ int SocketFamilyBToLinux(int family)
     switch (family)
     {
 #define SUPPORTED_SOCKET_FAMILY(name) case HAIKU_##name: return name;
-#define UNSUPPORTED_SOCKET_FAMILY(name) case HAIKU_##name: trace("Unsupported socket family: "#name); return -1;
+#define UNSUPPORTED_SOCKET_FAMILY(name) case HAIKU_##name: \
+    GET_SERVERCALLS()->debug_output("Unsupported socket family: "#name, \
+    sizeof("Unsupported socket family: "#name)); \
+    return -1;
 #include "socket_values.h"
 #undef SUPPORTED_SOCKET_FAMILY
 #undef UNSUPPORTED_SOCKET_FAMILY
         default:
-            trace("Unsupported socket family.");
+            GET_SERVERCALLS()->debug_output("Unsupported socket family.", sizeof("Unsupported socket family."));
             return -1;
     }
 }
