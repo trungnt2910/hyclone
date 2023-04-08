@@ -174,6 +174,11 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
         return status;
     }
 
+    status = ProcessMmapArgs(baseAddr, addressSpec, size,
+        lock, protection, REGION_PRIVATE_MAP,
+        0, sourceArea,
+        hintAddr, mmap_flags, mmap_prot, open_flags);
+
     int fd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
     if (fd < 0)
     {
@@ -181,11 +186,6 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
     }
 
     LINUX_SYSCALL1(__NR_fsync, fd);
-
-    status = ProcessMmapArgs(baseAddr, addressSpec, size,
-        lock, protection, REGION_PRIVATE_MAP,
-        fd, sourceArea,
-        hintAddr, mmap_flags, mmap_prot, open_flags);
 
     if (status != B_OK)
     {

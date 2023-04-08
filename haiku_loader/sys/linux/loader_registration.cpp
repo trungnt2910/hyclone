@@ -145,8 +145,6 @@ bool loader_register_builtin_areas(void* commpage, char** args)
     return true;
 }
 
-#include <iostream>
-
 bool loader_register_existing_fds()
 {
     int dirfd = open("/proc/self/fd", O_RDONLY | O_DIRECTORY);
