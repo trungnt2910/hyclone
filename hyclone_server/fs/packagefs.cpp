@@ -230,18 +230,23 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                     info->directoryDeviceID = dirst.st_dev;
                     info->directoryNodeID = dirst.st_ino;
 
+                    auto installedPackagePath = _root / "system" / "packages" / package.path().filename();
+
                     haiku_stat st;
-                    status = server_read_stat(package.path(), st);
+                    status = vfsService.ReadStat(installedPackagePath, st, false);
 
                     if (status != B_OK)
                     {
-                        return status;
+                        assert(server_read_stat(package.path(), st) == B_OK);
                     }
 
                     info->packageDeviceID = st.st_dev;
                     info->packageNodeID = st.st_ino;
 
-                    vfsService.RegisterEntryRef(EntryRef(st.st_dev, st.st_ino), _root / "system" / "packages" / package.path().filename());
+                    if (status == B_OK)
+                    {
+                        vfsService.RegisterEntryRef(EntryRef(st.st_dev, st.st_ino), installedPackagePath);
+                    }
                 }
 
                 auto name = package.path().filename().string();
