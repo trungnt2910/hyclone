@@ -7,12 +7,11 @@
 // rootfs, systemfs, devfs and even the current "packagefs" should subclass this.
 class HostfsDevice : public VfsDevice, private std::enable_shared_from_this<HostfsDevice>
 {
-private:
-    static haiku_ino_t _Hash(uint64_t hostDev, uint64_t hostIno);
 protected:
     std::filesystem::path _hostRoot;
     virtual bool _IsBlacklisted(const std::filesystem::path& path) const { return false; }
     virtual bool _IsBlacklisted(const std::filesystem::directory_entry& entry) const { return false; }
+    static haiku_ino_t _Hash(uint64_t hostDev, uint64_t hostIno);
 public:
     HostfsDevice(const std::filesystem::path& root, const std::filesystem::path& hostRoot);
     virtual ~HostfsDevice() override = default;
@@ -22,6 +21,8 @@ public:
     virtual status_t WriteStat(std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool& isSymlink) override;
     virtual status_t TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent) override;
+
+    // TODO: Override extended attributes functions to read from the host filesystem.
 
     const std::filesystem::path& GetHostRoot() const { return _hostRoot; }
 };

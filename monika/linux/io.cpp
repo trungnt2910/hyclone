@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <utility>
 
 #include <fcntl.h>
 #include <linux/xattr.h>
@@ -1246,149 +1247,97 @@ status_t MONIKA_EXPORT _kern_entry_ref_to_path(haiku_dev_t device, haiku_ino_t i
 ssize_t MONIKA_EXPORT _kern_read_attr(int fd, const char* attribute, off_t pos,
     void* buffer, size_t readBytes)
 {
-    if (buffer == NULL)
-    {
-        return B_BAD_ADDRESS;
-    }
-
-    if (attribute == NULL)
-    {
-        return B_BAD_VALUE;
-    }
-
-    long status = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, buffer, 0);
-    if (status < 0)
-    {
-        return LinuxToB(-status);
-    }
-
-    size_t attrSize = status;
-
-    if (pos >= attrSize)
-    {
-        return 0;
-    }
-
-    size_t memSize = (attrSize + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
-    status = LINUX_SYSCALL6(__NR_mmap, NULL, memSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-    if (status < 0)
-    {
-        return LinuxToB(-status);
-    }
-
-    void* mem = (void*)status;
-
-    status = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, mem, memSize);
-    if (status < 0)
-    {
-        LINUX_SYSCALL2(__NR_munmap, mem, memSize);
-        return LinuxToB(-status);
-    }
-
-    if (readBytes > attrSize - pos)
-    {
-        readBytes = attrSize - pos;
-    }
-
-    memcpy(buffer, (char*)mem + pos, readBytes);
-    LINUX_SYSCALL2(__NR_munmap, mem, memSize);
-
-    return readBytes;
+    return GET_SERVERCALLS()->read_attr(fd, attribute, strlen(attribute), pos, buffer, readBytes);
 }
 
 ssize_t MONIKA_EXPORT _kern_write_attr(int fd, const char* attribute, uint32 type,
     off_t pos, const void* buffer, size_t readBytes)
 {
-    if (buffer == NULL)
+    std::pair<const char*, size_t> attrAndSize(attribute, strlen(attribute));
+    return GET_SERVERCALLS()->write_attr(fd, &attrAndSize, type, pos, buffer, readBytes);
+}
+
+int MONIKA_EXPORT _kern_open_attr(int fd, const char* path, const char *name,
+    uint32 type, int openMode)
+{
+    if (name == NULL)
     {
         return B_BAD_ADDRESS;
     }
 
-    if (attribute == NULL)
+    if (*name == '\0')
     {
         return B_BAD_VALUE;
     }
 
-    // According to Haiku:
-    // The implementation of this function tries to stay compatible with
-	// BeOS in that it clobbers the existing attribute when you write at offset
-	// 0, but it also tries to support programs which continue to write more
-	// chunks.
-    if (pos == 0)
+    char hostPath[PATH_MAX];
+
+    std::pair<const char*, size_t> pathAndSize(path, path ? strlen(path) : 0);
+    std::pair<const char*, size_t> nameAndSize(name, strlen(name));
+    std::pair<char*, size_t> hostPathAndSize(hostPath, sizeof(hostPath));
+
+    long status = GET_SERVERCALLS()->get_attr_path(fd, &pathAndSize, &nameAndSize,
+        type, openMode, &hostPathAndSize);
+
+    if (status != B_OK)
     {
-        long status = LINUX_SYSCALL5(__NR_fsetxattr, fd, attribute, buffer, readBytes, 0);
-        if (status < 0)
-        {
-            return LinuxToB(-status);
-        }
-        return readBytes;
+        return status;
     }
-    else
+
+    int linuxMode = OFlagsBToLinux(openMode & ~HAIKU_O_NOTRAVERSE);
+    int linuxPerms = 0777;
+
+    status = LINUX_SYSCALL3(__NR_open, hostPath, linuxMode, linuxPerms);
+
+    if (status < 0)
     {
-        long status = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, NULL, 0);
-        if (status < 0)
-        {
-            return LinuxToB(-status);
-        }
-
-        size_t attrSize = std::max((size_t)status, (size_t)pos + readBytes);
-
-        size_t memSize = (attrSize + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
-        status = LINUX_SYSCALL6(__NR_mmap, NULL, memSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-        if (status < 0)
-        {
-            return LinuxToB(-status);
-        }
-
-        void* mem = (void*)status;
-
-        status = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, mem, memSize);
-        if (status < 0)
-        {
-            LINUX_SYSCALL2(__NR_munmap, mem, memSize);
-            return LinuxToB(-status);
-        }
-
-        memcpy((char*)mem + pos, buffer, readBytes);
-        status = LINUX_SYSCALL5(__NR_fsetxattr, fd, attribute, mem, attrSize, 0);
-        if (status < 0)
-        {
-            LINUX_SYSCALL2(__NR_munmap, mem, memSize);
-            return LinuxToB(-status);
-        }
-
-        LINUX_SYSCALL2(__NR_munmap, mem, memSize);
-
-        return readBytes;
+        return LinuxToB(-status);
     }
-}
 
-int MONIKA_EXPORT _kern_open_attr(int fd, const char* path, const char *name, 
-    uint32 type, int openMode)
-{
-    trace("attribute file descriptors are not implemented yet.");
-    return B_UNSUPPORTED;
+    GET_SERVERCALLS()->register_attr_fd(status, fd, &pathAndSize,
+        &nameAndSize, !(openMode & HAIKU_O_NOTRAVERSE));
+
+    return status;
 }
 
 int MONIKA_EXPORT _kern_open_attr_dir(int fd, const char* path, bool traverseLeafLink)
 {
-   trace("attribute directories are not implemented yet.");
-   // This is returned on most Haiku filesystems.
-   return B_UNSUPPORTED;
+    char hostPath[PATH_MAX];
+
+    std::pair<const char*, size_t> pathAndSize(path, path ? strlen(path) : 0);
+    std::pair<const char*, size_t> nameAndSize(NULL, 0);
+    std::pair<char*, size_t> hostPathAndSize(hostPath, sizeof(hostPath));
+
+    long status = GET_SERVERCALLS()->get_attr_path(fd, &pathAndSize, &nameAndSize,
+        0, (traverseLeafLink) ? 0 : HAIKU_O_NOTRAVERSE, &hostPathAndSize);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    status = LINUX_SYSCALL2(__NR_open, hostPath, O_DIRECTORY);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    GET_HOSTCALLS()->opendir(status);
+    GET_SERVERCALLS()->register_attr_fd(status, fd, &pathAndSize,
+        &nameAndSize, traverseLeafLink);
+
+    return status;
+}
+
+int MONIKA_EXPORT _kern_remove_attr(int fd, const char* name)
+{
+    return GET_SERVERCALLS()->remove_attr(fd, name, strlen(name));
 }
 
 int MONIKA_EXPORT _kern_stat_attr(int fd, const char* attribute, struct haiku_attr_info *attrInfo)
 {
-    long result = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, NULL, 0);
-    if (result < 0)
-    {
-        return LinuxToB(-result);
-    }
-    attrInfo->size = result;
-    attrInfo->type = 0;
-    return B_OK;
+    return GET_SERVERCALLS()->stat_attr(fd, attribute, strlen(attribute), attrInfo);
 }
 
 // The functions below are clearly impossible

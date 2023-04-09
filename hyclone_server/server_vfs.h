@@ -13,6 +13,7 @@
 #include "entry_ref.h"
 #include "haiku_dirent.h"
 #include "haiku_errors.h"
+#include "haiku_fs_attr.h"
 #include "haiku_fs_info.h"
 #include "haiku_stat.h"
 #include "id_map.h"
@@ -29,10 +30,20 @@ public:
 
     // If the initial value if isSymlink is true, the function will traverse the symlinks.
     virtual status_t GetPath(std::filesystem::path& path, bool& isSymlink) = 0;
+    virtual status_t GetAttrPath(std::filesystem::path& path, const std::string& name,
+        uint32 type, bool createNew, bool& isSymlink) { return B_UNSUPPORTED; }
     virtual status_t ReadStat(std::filesystem::path& path, haiku_stat& stat, bool& isSymlink) = 0;
     virtual status_t WriteStat(std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool& isSymlink) = 0;
+    virtual status_t StatAttr(const std::filesystem::path& path, const std::string& name,
+        haiku_attr_info& info) { return B_UNSUPPORTED; }
     virtual status_t TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent) = 0;
+    virtual haiku_ssize_t ReadAttr(const std::filesystem::path& path, const std::string& name, size_t pos,
+        void* buffer, size_t size) { return B_UNSUPPORTED; }
+    virtual haiku_ssize_t WriteAttr(const std::filesystem::path& path, const std::string& name, uint32 type,
+        size_t pos, const void* buffer, size_t size) { return B_UNSUPPORTED; }
+    virtual haiku_ssize_t RemoveAttr(const std::filesystem::path& path, const std::string& name)
+        { return B_UNSUPPORTED; }
     virtual status_t Ioctl(const std::filesystem::path& path, unsigned int cmd,
         void* addr, void* buffer, size_t size) { return B_BAD_VALUE; }
 
@@ -60,9 +71,61 @@ private:
     IdMap<std::shared_ptr<VfsDevice>, haiku_dev_t> _devices;
     std::unordered_map<std::filesystem::path, std::shared_ptr<VfsDevice>, PathHash> _deviceMounts;
 
-    typedef std::function<status_t(std::filesystem::path&, const std::shared_ptr<VfsDevice>&, bool&)> callback_t;
-    status_t _DoWork(std::filesystem::path&, bool traverseLink, const callback_t& work);
-    status_t _DoWork(const std::filesystem::path&, bool traverseLink, const callback_t& work);
+    template <typename T = status_t>
+    struct Callback
+    {
+        typedef std::function<T(std::filesystem::path&, const std::shared_ptr<VfsDevice>&, bool&)> Type;
+    };
+
+    template <typename T = status_t>
+    T _DoWork(std::filesystem::path& path, bool traverseLink, const Callback<T>::Type& work)
+    {
+        path = path.lexically_normal();
+        bool isSymlink = traverseLink;
+
+        do
+        {
+            std::filesystem::path drivePath = path;
+
+            while (drivePath.has_parent_path() && !_deviceMounts.contains(drivePath))
+            {
+                drivePath = drivePath.parent_path();
+            }
+
+            if (_deviceMounts.contains(drivePath))
+            {
+                auto device = _deviceMounts[drivePath];
+                T status = work(path, device, isSymlink);
+                if (status != B_OK)
+                {
+                    return status;
+                }
+            }
+            else
+            {
+                return B_ENTRY_NOT_FOUND;
+            }
+        }
+        while (isSymlink);
+
+        return B_OK;
+    }
+    template <typename T = status_t>
+    T _DoWork(const std::filesystem::path& path, bool traverseLink, const Callback<T>::Type& work)
+    {
+        auto tmp = path;
+        return _DoWork<T>(tmp, traverseLink, work);
+    }
+    template <typename T = status_t>
+    T _DoWork(std::filesystem::path& path, const Callback<T>::Type& work)
+    {
+        return _DoWork<T>(path, false, work);
+    }
+    template <typename T = status_t>
+    T _DoWork(const std::filesystem::path& path, const Callback<T>::Type& work)
+    {
+        return _DoWork<T>(path, false, work);
+    }
 public:
     VfsService();
     ~VfsService() = default;
@@ -79,11 +142,19 @@ public:
     // Gets the host path for the given VFS path.
     // The VFS path MUST be absolute.
     status_t GetPath(std::filesystem::path& path, bool traverseLink = true);
+    status_t GetAttrPath(std::filesystem::path& path, const std::string& name, uint32 type,
+        bool createNew, bool traverseLink = true);
     status_t RealPath(std::filesystem::path& path);
     status_t ReadStat(const std::filesystem::path& path, haiku_stat& stat, bool traverseLink = true);
     status_t WriteStat(const std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool traverseLink = true);
+    status_t StatAttr(const std::filesystem::path& path, const std::string& name, haiku_attr_info& info);
     status_t TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent);
+    haiku_ssize_t ReadAttr(const std::filesystem::path& path, const std::string& name, size_t pos,
+        void* buffer, size_t size);
+    haiku_ssize_t WriteAttr(const std::filesystem::path& path, const std::string& name, uint32 type,
+        size_t pos, const void* buffer, size_t size);
+    status_t RemoveAttr(const std::filesystem::path& path, const std::string& name);
     status_t Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size);
 
     std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }

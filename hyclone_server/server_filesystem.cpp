@@ -3,9 +3,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "haiku_errors.h"
 #include "haiku_fcntl.h"
+#include "haiku_fs_attr.h"
 #include "haiku_fs_info.h"
 #include "process.h"
 #include "server_filesystem.h"
@@ -207,6 +209,59 @@ intptr_t server_hserver_call_write_stat(hserver_context& context, int fd, const 
     return B_OK;
 }
 
+intptr_t server_hserver_call_stat_attr(hserver_context& context, int fd, const char* userName, size_t userNameSize,
+    void* userAttrInfo)
+{
+    std::string name(userNameSize, '\0');
+    haiku_attr_info info;
+    std::filesystem::path requestPath;
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->ReadMemory((void*)userName, name.data(), userNameSize) != userNameSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (context.process->ReadMemory((void*)userAttrInfo, &info, sizeof(haiku_attr_info)) != sizeof(haiku_attr_info))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (!context.process->IsValidFd(fd))
+        {
+            return HAIKU_POSIX_EBADF;
+        }
+
+        requestPath = context.process->GetFd(fd);
+    }
+
+    status_t status;
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        status = vfsService.StatAttr(requestPath, name, info);
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->WriteMemory((void*)userAttrInfo, &info, sizeof(haiku_attr_info)) != sizeof(haiku_attr_info))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_transform_dirent(hserver_context& context, int fd, void* userEntry, size_t userEntrySize)
 {
     std::vector<char> buffer(userEntrySize);
@@ -228,11 +283,29 @@ intptr_t server_hserver_call_transform_dirent(hserver_context& context, int fd, 
 
     lock.unlock();
 
+    status_t status;
+
     {
         auto& vfsService = System::GetInstance().GetVfsService();
         auto lock = vfsService.Lock();
-        return vfsService.TransformDirent(requestPath, *entry);
+        status = vfsService.TransformDirent(requestPath, *entry);
     }
+
+    if (status < 0)
+    {
+        return status;
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->WriteMemory(userEntry, entry, status) != status)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return status;
 }
 
 intptr_t server_hserver_call_vchroot_expandat(hserver_context& context, int fd, const char* userPath, size_t userPathSize,
@@ -281,6 +354,225 @@ intptr_t server_hserver_call_vchroot_expandat(hserver_context& context, int fd, 
     }
 
     return status;
+}
+
+intptr_t server_hserver_call_get_attr_path(hserver_context& context, int fd, void* userPathAndSize, void* userNameAndSize,
+    unsigned int type, int openMode, void* userHostPathAndSize)
+{
+    std::string name;
+    std::filesystem::path requestPath;
+    status_t status;
+
+    bool traverseSymlink = !(openMode & HAIKU_O_NOTRAVERSE);
+    bool createNew = openMode & HAIKU_O_CREAT;
+
+    {
+        auto lock = context.process->Lock();
+
+        std::pair<const char*, size_t> pathAndSize;
+        std::pair<const char*, size_t> nameAndSize;
+
+        if (context.process->ReadMemory(userPathAndSize, &pathAndSize, sizeof(pathAndSize)) != sizeof(pathAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        status = context.process->ReadDirFd(fd, pathAndSize.first, pathAndSize.second, traverseSymlink, requestPath);
+
+        if (status != B_OK)
+        {
+            return status;
+        }
+
+        if (context.process->ReadMemory(userNameAndSize, &nameAndSize, sizeof(nameAndSize)) != sizeof(nameAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        name.resize(nameAndSize.second);
+
+        if (context.process->ReadMemory((void*)nameAndSize.first, name.data(), nameAndSize.second) != nameAndSize.second)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        status = vfsService.GetAttrPath(requestPath, name, type, createNew, traverseSymlink);
+
+        if (status != B_OK)
+        {
+            return status;
+        }
+
+        status = vfsService.GetPath(requestPath, false);
+
+        if (status != B_OK && status != B_ENTRY_NOT_FOUND)
+        {
+            return status;
+        }
+
+        if (status == B_ENTRY_NOT_FOUND && !createNew)
+        {
+            return status;
+        }
+
+        status = 0;
+    }
+
+    std::string resultString = requestPath.string();
+
+    {
+        auto lock = context.process->Lock();
+
+        std::pair<char*, size_t> hostPathAndSize;
+
+        if (context.process->ReadMemory(userHostPathAndSize, &hostPathAndSize, sizeof(hostPathAndSize)) != sizeof(hostPathAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (resultString.size() >= hostPathAndSize.second)
+        {
+            return B_NAME_TOO_LONG;
+        }
+
+        size_t writeSize = resultString.size() + 1;
+
+        if (context.process->WriteMemory(hostPathAndSize.first, resultString.data(), writeSize) != writeSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return status;
+}
+
+intptr_t server_hserver_call_read_attr(hserver_context& context, int fd, const char* userName, size_t userNameSize,
+    size_t pos, void* userBuffer, size_t userBufferSize)
+{
+    std::string name;
+    std::filesystem::path requestPath;
+    intptr_t status;
+
+    {
+        auto lock = context.process->Lock();
+
+        if (!context.process->IsValidFd(fd))
+        {
+            return HAIKU_POSIX_EBADF;
+        }
+
+        requestPath = context.process->GetFd(fd);
+
+        name.resize(userNameSize);
+
+        if (context.process->ReadMemory((void*)userName, name.data(), userNameSize) != userNameSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    std::vector<char> buffer(userBufferSize);
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        status = vfsService.ReadAttr(requestPath, name, pos, buffer.data(), userBufferSize);
+    }
+
+    if (status < 0)
+    {
+        return status;
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->WriteMemory(userBuffer, buffer.data(), userBufferSize) != userBufferSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return status;
+}
+
+intptr_t server_hserver_call_write_attr(hserver_context& context, int fd, void* userNameAndSize, unsigned int type,
+    size_t pos, const void* userBuffer, size_t userBufferSize)
+{
+    std::string name;
+    std::filesystem::path requestPath;
+    std::vector<char> buffer;
+
+    {
+        auto lock = context.process->Lock();
+
+        if (!context.process->IsValidFd(fd))
+        {
+            return HAIKU_POSIX_EBADF;
+        }
+
+        requestPath = context.process->GetFd(fd);
+
+        std::pair<const char*, size_t> nameAndSize;
+        if (context.process->ReadMemory(userNameAndSize, &nameAndSize, sizeof(nameAndSize)) != sizeof(nameAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        name.resize(nameAndSize.second);
+
+        if (context.process->ReadMemory((void*)nameAndSize.first, name.data(), nameAndSize.second) != nameAndSize.second)
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        buffer.resize(userBufferSize);
+
+        if (context.process->ReadMemory((void*)userBuffer, buffer.data(), userBufferSize) != userBufferSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        return vfsService.WriteAttr(requestPath, name, type, pos, buffer.data(), userBufferSize);
+    }
+}
+
+intptr_t server_hserver_call_remove_attr(hserver_context& context, int fd, const char* userName, size_t userNameSize)
+{
+    std::string name;
+    std::filesystem::path requestPath;
+
+    {
+        auto lock = context.process->Lock();
+
+        if (!context.process->IsValidFd(fd))
+        {
+            return HAIKU_POSIX_EBADF;
+        }
+
+        requestPath = context.process->GetFd(fd);
+
+        name.resize(userNameSize);
+
+        if (context.process->ReadMemory((void*)userName, name.data(), userNameSize) != userNameSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        return vfsService.RemoveAttr(requestPath, name);
+    }
 }
 
 intptr_t server_hserver_call_ioctl(hserver_context& context, int fd, unsigned int op, void* userBuffer, size_t userBufferSize)

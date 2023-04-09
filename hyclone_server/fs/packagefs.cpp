@@ -7,14 +7,20 @@
 #include <hpkgvfs/Package.h>
 
 #include "fs/packagefs.h"
+#include "server_errno.h"
 #include "server_filesystem.h"
 #include "server_native.h"
 #include "system.h"
+
+std::filesystem::path PackagefsDevice::_relativeAttributesPath = std::filesystem::path(".hyclone.pkgfsattrs");
 
 PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     const std::filesystem::path& hostRoot)
     : HostfsDevice(root, hostRoot)
 {
+    std::filesystem::create_directories(hostRoot / _relativeAttributesPath);
+    // TODO: Clean stale attributes.
+
     using namespace HpkgVfs;
 
     std::filesystem::path packagesPath = hostRoot / "system" / "packages";
@@ -146,9 +152,94 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     server_fill_fs_info(hostRoot, &_info);
 }
 
+std::filesystem::path PackagefsDevice::_GetAttrPathInternal(const std::filesystem::path& path, const std::string& name)
+{
+    std::filesystem::path result = _relativeAttributesPath;
+
+    for (const auto& part : path)
+    {
+        result /= (char)PACKAGEFS_ATTREMU_FILE + part.string();
+    }
+
+    if (name.empty())
+    {
+        return result;
+    }
+
+    std::string resultName(1, (char)PACKAGEFS_ATTREMU_ATTR);
+
+    for (const auto& c : name)
+    {
+        switch (c)
+        {
+            case '/':
+                resultName += "_s";
+            break;
+            case '.':
+                resultName += "_d";
+            break;
+            case '_':
+                resultName += "_u";
+            default:
+                resultName += c;
+                break;
+        }
+    }
+
+    result /= resultName;
+
+    return result;
+}
+
+std::string PackagefsDevice::_UnescapeAttrName(const std::string& name)
+{
+    std::string result;
+
+    for (size_t i = 1; i < name.size(); ++i)
+    {
+        if (name[i] == '_')
+        {
+            if (i + 1 >= name.size())
+            {
+                result += '_';
+                break;
+            }
+
+            switch (name[i + 1])
+            {
+                case 's':
+                    result += '/';
+                    break;
+                case 'd':
+                    result += '.';
+                    break;
+                case 'u':
+                    result += '_';
+                    break;
+                default:
+                    result += '_';
+                    result += name[i + 1];
+                    break;
+            }
+
+            ++i;
+        }
+        else
+        {
+            result += name[i];
+        }
+    }
+
+    return result;
+}
+
 bool PackagefsDevice::_IsBlacklisted(const std::filesystem::path& hostPath) const
 {
     if (hostPath.lexically_relative(_hostRoot) == _relativeInstalledPackagesPath)
+    {
+        return true;
+    }
+    if (hostPath.lexically_relative(_hostRoot) == _relativeAttributesPath)
     {
         return true;
     }
@@ -158,6 +249,96 @@ bool PackagefsDevice::_IsBlacklisted(const std::filesystem::path& hostPath) cons
 bool PackagefsDevice::_IsBlacklisted(const std::filesystem::directory_entry& entry) const
 {
     return _IsBlacklisted(entry.path());
+}
+
+status_t PackagefsDevice::GetAttrPath(std::filesystem::path& path, const std::string& name,
+    uint32 type, bool createNew, bool& isSymlink)
+{
+    status_t status = GetPath(path, isSymlink);
+
+    if (isSymlink || status != B_OK)
+    {
+        return status;
+    }
+
+    auto relativePath = path.lexically_relative(_hostRoot);
+    auto attrRelativePath = _GetAttrPathInternal(relativePath, name);
+    auto attrHostPath = _hostRoot / attrRelativePath;
+
+    if (name.empty())
+    {
+        std::filesystem::create_directories(attrHostPath);
+    }
+    else if (createNew && !std::filesystem::exists(attrHostPath))
+    {
+        std::filesystem::create_directories(attrHostPath.parent_path());
+        auto attrTypeName = attrHostPath.filename().string();
+        attrTypeName[0] = PACKAGEFS_ATTREMU_TYPE;
+        std::ofstream fout(attrHostPath.parent_path() / attrTypeName);
+        fout.write((char*)&type, sizeof(type));
+    }
+
+    path = _root / attrRelativePath;
+
+    return B_OK;
+}
+
+status_t PackagefsDevice::StatAttr(const std::filesystem::path& path, const std::string& name,
+    haiku_attr_info& info)
+{
+    auto relativePath = path.lexically_relative(_root);
+    auto attrRelativePath = _GetAttrPathInternal(relativePath, name);
+
+    auto attrHostPath = _hostRoot / attrRelativePath;
+
+    if (!std::filesystem::exists(attrHostPath))
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
+
+    auto attrTypeName = attrHostPath.filename().string();
+    attrTypeName[0] = PACKAGEFS_ATTREMU_TYPE;
+    std::ifstream fin(attrHostPath.parent_path() / attrTypeName);
+    fin.read((char*)&info.type, sizeof(info.type));
+
+    fin.close();
+    fin.open(attrHostPath, std::ios::binary | std::ios::ate);
+    info.size = fin.tellg();
+
+    return B_OK;
+}
+
+status_t PackagefsDevice::TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent)
+{
+    auto relativePath = path.lexically_relative(_root);
+
+    auto relativeAttributesPathString = _relativeAttributesPath.string();
+
+    if (relativePath.string().compare(0, relativeAttributesPathString.size(), relativeAttributesPathString) != 0)
+    {
+        return HostfsDevice::TransformDirent(path, dirent);
+    }
+
+    dirent.d_ino = _Hash(dirent.d_dev, dirent.d_ino);
+    dirent.d_dev = _info.dev;
+
+    if (strcmp(dirent.d_name, ".") == 0 || strcmp(dirent.d_name, "..") == 0)
+    {
+        return B_BAD_VALUE;
+    }
+
+    if (dirent.d_name[0] != PACKAGEFS_ATTREMU_ATTR)
+    {
+        return B_BAD_VALUE;
+    }
+
+    std::string name = dirent.d_name;
+    std::string unescapedName = _UnescapeAttrName(name);
+
+    dirent.d_reclen -= name.size() - unescapedName.size();
+    strcpy(dirent.d_name, unescapedName.c_str());
+
+    return dirent.d_reclen;
 }
 
 status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size)
@@ -386,4 +567,92 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
             return HostfsDevice::Ioctl(path, cmd, addr, buffer, size);
         }
     }
+}
+
+haiku_ssize_t PackagefsDevice::ReadAttr(const std::filesystem::path& path, const std::string& name, size_t pos,
+    void* buffer, size_t size)
+{
+    auto relativePath = path.lexically_relative(_root);
+    auto attrRelativePath = _GetAttrPathInternal(relativePath, name);
+
+    auto attrHostPath = _hostRoot / attrRelativePath;
+
+    std::ifstream fin(attrHostPath, std::ios::binary);
+    if (!fin.is_open())
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
+
+    fin.seekg(pos, std::ios::beg);
+    fin.read((char*)buffer, size);
+
+    return fin.gcount();
+}
+
+haiku_ssize_t PackagefsDevice::WriteAttr(const std::filesystem::path& path, const std::string& name, uint32 type,
+    size_t pos, const void* buffer, size_t size)
+{
+    auto relativePath = path.lexically_relative(_root);
+    auto attrRelativePath = _GetAttrPathInternal(relativePath, name);
+
+    auto attrHostPath = _hostRoot / attrRelativePath;
+
+    auto attrTypeName = attrHostPath.filename().string();
+    attrTypeName[0] = PACKAGEFS_ATTREMU_TYPE;
+    auto attrTypeHostPath = attrHostPath.parent_path() / attrTypeName;
+
+    auto attrHostParentPath = attrHostPath.parent_path();
+    if (!std::filesystem::exists(attrHostParentPath))
+    {
+        std::filesystem::create_directories(attrHostParentPath);
+    }
+
+    if (pos == 0)
+    {
+        std::ofstream fout(attrHostPath, std::ios::binary);
+        if (!fout.is_open())
+        {
+            return B_ENTRY_NOT_FOUND;
+        }
+
+        fout.write((const char*)buffer, size);
+    }
+    else
+    {
+        std::ofstream fout(attrHostPath, std::ios::binary | std::ios::app);
+        if (!fout.is_open())
+        {
+            return B_ENTRY_NOT_FOUND;
+        }
+
+        fout.seekp(pos, std::ios::beg);
+        fout.write((const char*)buffer, size);
+    }
+
+    std::ofstream fout(attrTypeHostPath, std::ios::binary);
+    fout.write((const char*)&type, sizeof(type));
+
+    return size;
+}
+
+haiku_ssize_t PackagefsDevice::RemoveAttr(const std::filesystem::path& path, const std::string& name)
+{
+    auto relativePath = path.lexically_relative(_root);
+    auto attrRelativePath = _GetAttrPathInternal(relativePath, name);
+
+    auto attrHostPath = _hostRoot / attrRelativePath;
+    auto attrTypeName = attrHostPath.filename().string();
+    attrTypeName[0] = PACKAGEFS_ATTREMU_TYPE;
+    auto attrTypeHostPath = attrHostPath.parent_path() / attrTypeName;
+
+    std::error_code ec;
+    std::filesystem::remove(attrHostPath, ec);
+
+    if (ec)
+    {
+        return CppToB(ec);
+    }
+
+    std::filesystem::remove(attrTypeHostPath, ec);
+    return B_OK;
 }

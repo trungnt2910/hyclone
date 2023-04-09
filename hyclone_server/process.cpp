@@ -1,4 +1,5 @@
 #include <cstring>
+#include <utility>
 
 #include "area.h"
 #include "haiku_errors.h"
@@ -399,6 +400,62 @@ intptr_t server_hserver_call_register_dup_fd(hserver_context& context, int fd, i
         return HAIKU_POSIX_EBADF;
     }
     context.process->RegisterFd(fd, context.process->GetFd(oldFd));
+    return B_OK;
+}
+
+intptr_t server_hserver_call_register_attr_fd(hserver_context& context, int fd, int parentFd,
+    void* userPathAndSize, void* userNameAndSize, bool traverseSymlink)
+{
+    std::pair<const char*, size_t> pathAndSize;
+    std::pair<const char*, size_t> nameAndSize;
+    std::filesystem::path requestPath;
+    std::string name;
+
+    status_t status;
+
+    {
+        auto lock = context.process->Lock();
+        if (context.process->ReadMemory(userPathAndSize, &pathAndSize, sizeof(pathAndSize)) != sizeof(pathAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        status = context.process->ReadDirFd(parentFd, pathAndSize.first, pathAndSize.second, traverseSymlink, requestPath);
+
+        if (status != B_OK)
+        {
+            return status;
+        }
+
+        if (context.process->ReadMemory(userNameAndSize, &nameAndSize, sizeof(nameAndSize)) != sizeof(nameAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        name.resize(nameAndSize.second);
+        if (context.process->ReadMemory((void*)nameAndSize.first, name.data(), name.size()) != name.size())
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+
+        status = vfsService.GetAttrPath(requestPath, name, 0, false, false);
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    {
+        auto lock = context.process->Lock();
+        context.process->RegisterFd(fd, requestPath);
+    }
+
     return B_OK;
 }
 

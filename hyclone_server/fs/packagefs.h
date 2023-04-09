@@ -105,13 +105,35 @@ class PackagefsDevice : public HostfsDevice
 private:
     std::mutex _updateMutex;
     std::filesystem::path _relativeInstalledPackagesPath = std::filesystem::path("system/.hpkgvfsPackages");
+    static std::filesystem::path _relativeAttributesPath;
     PackageFSMountType _mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM;
+    static std::filesystem::path _GetAttrPathInternal(
+        const std::filesystem::path& path, const std::string& name);
+    static std::string _UnescapeAttrName(const std::string& name);
+
+    enum
+    {
+        PACKAGEFS_ATTREMU_FILE = 'f',
+        PACKAGEFS_ATTREMU_ATTR = 'a',
+        PACKAGEFS_ATTREMU_TYPE = 't'
+    };
 protected:
     bool _IsBlacklisted(const std::filesystem::path& path) const override;
     bool _IsBlacklisted(const std::filesystem::directory_entry& entry) const override;
 public:
     PackagefsDevice(const std::filesystem::path& root,
         const std::filesystem::path& hostRoot);
+    virtual status_t GetAttrPath(std::filesystem::path& path, const std::string& name,
+        uint32 type, bool createNew, bool& isSymlink) override;
+    virtual status_t StatAttr(const std::filesystem::path& path, const std::string& name,
+        haiku_attr_info& info) override;
+    virtual status_t TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent) override;
+    virtual haiku_ssize_t ReadAttr(const std::filesystem::path& path, const std::string& name, size_t pos,
+        void* buffer, size_t size) override;
+    virtual haiku_ssize_t WriteAttr(const std::filesystem::path& path, const std::string& name, uint32 type,
+        size_t pos, const void* buffer, size_t size) override;
+    virtual haiku_ssize_t RemoveAttr(const std::filesystem::path& path, const std::string& name)
+        override;
     virtual status_t Ioctl(const std::filesystem::path& path, unsigned int cmd,
         void* addr, void* buffer, size_t size) override;
 };

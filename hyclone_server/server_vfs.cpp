@@ -88,6 +88,16 @@ status_t VfsService::GetPath(std::filesystem::path& path, bool traverseLink)
     });
 }
 
+status_t VfsService::GetAttrPath(std::filesystem::path& path, const std::string& name, uint32 type,
+    bool createNew, bool traverseLink)
+{
+    return _DoWork(path, traverseLink, [&](std::filesystem::path& currentPath,
+        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+    {
+        return device->GetAttrPath(currentPath, name, type, createNew, isSymlink);
+    });
+}
+
 status_t VfsService::RealPath(std::filesystem::path& path)
 {
     auto tempPath = path;
@@ -122,85 +132,59 @@ status_t VfsService::WriteStat(const std::filesystem::path& path, const haiku_st
     });
 }
 
+status_t VfsService::StatAttr(const std::filesystem::path& path, const std::string& name,
+    haiku_attr_info& info)
+{
+    return _DoWork(path, [&](std::filesystem::path& currentPath,
+        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+    {
+        return device->StatAttr(currentPath, name, info);
+    });
+}
+
 status_t VfsService::TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent)
 {
-    auto currentPath = path.lexically_normal();
-
-    while (true)
+    return _DoWork(path, [&](std::filesystem::path& currentPath,
+        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
     {
-        auto device = GetDevice(currentPath).lock();
+        return device->TransformDirent(path, dirent);
+    });
+}
 
-        if (device)
-        {
-            return device->TransformDirent(path, dirent);
-        }
+haiku_ssize_t VfsService::ReadAttr(const std::filesystem::path& path, const std::string& name, size_t pos,
+    void* buffer, size_t size)
+{
+    return _DoWork<haiku_ssize_t>(path, [&](std::filesystem::path& currentPath,
+        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+    {
+        return device->ReadAttr(currentPath, name, pos, buffer, size);
+    });
+}
 
-        if (!currentPath.has_parent_path())
-        {
-            return B_ENTRY_NOT_FOUND;
-        }
+haiku_ssize_t VfsService::WriteAttr(const std::filesystem::path& path, const std::string& name,
+    uint32 type, size_t pos, const void* buffer, size_t size)
+{
+    return _DoWork<haiku_ssize_t>(path, [&](std::filesystem::path& currentPath,
+        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+    {
+        return device->WriteAttr(currentPath, name, type, pos, buffer, size);
+    });
+}
 
-        currentPath = currentPath.parent_path();
-    }
+status_t VfsService::RemoveAttr(const std::filesystem::path& path, const std::string& name)
+{
+    return _DoWork(path, [&](std::filesystem::path& currentPath,
+        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+    {
+        return device->RemoveAttr(currentPath, name);
+    });
 }
 
 status_t VfsService::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size)
 {
-    auto currentPath = path.lexically_normal();
-
-    while (true)
+    return _DoWork(path, [&](std::filesystem::path& currentPath,
+        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
     {
-        auto device = GetDevice(currentPath).lock();
-
-        if (device)
-        {
-            return device->Ioctl(path, cmd, addr, buffer, size);
-        }
-
-        if (!currentPath.has_parent_path())
-        {
-            return B_ENTRY_NOT_FOUND;
-        }
-
-        currentPath = currentPath.parent_path();
-    }
-}
-
-status_t VfsService::_DoWork(std::filesystem::path& path, bool traverseLink, const callback_t& work)
-{
-    path = path.lexically_normal();
-    bool isSymlink = traverseLink;
-
-    do
-    {
-        std::filesystem::path drivePath = path;
-
-        while (drivePath.has_parent_path() && !_deviceMounts.contains(drivePath))
-        {
-            drivePath = drivePath.parent_path();
-        }
-
-        if (_deviceMounts.contains(drivePath))
-        {
-            auto device = _deviceMounts[drivePath];
-            status_t status = work(path, device, isSymlink);
-            if (status != B_OK)
-            {
-                return status;
-            }
-        }
-        else
-        {
-            return B_ENTRY_NOT_FOUND;
-        }
-    }
-    while (isSymlink);
-
-    return B_OK;
-}
-
-status_t VfsService::_DoWork(const std::filesystem::path& path, bool traverseLink, const callback_t& work)
-{
-    auto tmp = path;
-    return _DoWork(tmp, traverseLink, work);
+        return device->Ioctl(path, cmd, addr, buffer, size);
+    });
 }
