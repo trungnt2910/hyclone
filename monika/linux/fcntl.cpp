@@ -3,6 +3,7 @@
 
 #include "errno_conversion.h"
 #include "export.h"
+#include "extended_commpage.h"
 #include "fcntl_conversion.h"
 #include "haiku_errors.h"
 #include "haiku_fcntl.h"
@@ -24,6 +25,15 @@ int MONIKA_EXPORT _kern_fcntl(int fd, int op, size_t argument)
     {
         case HAIKU_F_DUPFD:
             status = LINUX_SYSCALL3(__NR_fcntl, fd, F_DUPFD, argument);
+            if (status < 0)
+            {
+                return LinuxToB(-status);
+            }
+            else
+            {
+                GET_SERVERCALLS()->register_dup_fd(status, fd);
+                return status;
+            }
             break;
         case HAIKU_F_GETFD:
             status = LINUX_SYSCALL2(__NR_fcntl, fd, F_GETFD);
@@ -69,6 +79,15 @@ int MONIKA_EXPORT _kern_fcntl(int fd, int op, size_t argument)
         }
         case HAIKU_F_DUPFD_CLOEXEC:
             status = LINUX_SYSCALL3(__NR_fcntl, fd, F_DUPFD_CLOEXEC, argument);
+            if (status < 0)
+            {
+                return LinuxToB(-status);
+            }
+            else
+            {
+                GET_SERVERCALLS()->register_dup_fd(status, fd);
+                return status;
+            }
             break;
         default:
             trace("Unsupported fcntl");
