@@ -37,11 +37,10 @@ RootfsDevice::RootfsDevice(const std::filesystem::path& hostRoot)
 
 bool RootfsDevice::_IsBlacklisted(const std::filesystem::path& hostPath) const
 {
-    if (hostPath.parent_path() == _hostRoot && hostPath.filename().string().starts_with(".hyclone"))
-    {
-        return true;
-    }
-    return false;
+    std::string path = hostPath.lexically_normal().string();
+    std::string blacklistedPrefix = (_hostRoot / ".hyclone").string();
+
+    return path.compare(0, blacklistedPrefix.size(), blacklistedPrefix) == 0;
 }
 
 bool RootfsDevice::_IsBlacklisted(const std::filesystem::directory_entry& entry) const
