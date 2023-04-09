@@ -17,8 +17,6 @@
 #include "haiku_stat.h"
 #include "id_map.h"
 
-struct VfsDir;
-
 class VfsDevice
 {
 protected:
@@ -34,10 +32,7 @@ public:
     virtual status_t ReadStat(std::filesystem::path& path, haiku_stat& stat, bool& isSymlink) = 0;
     virtual status_t WriteStat(std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool& isSymlink) = 0;
-    virtual status_t OpenDir(std::filesystem::path& path, VfsDir& dir, bool& isSymlink) = 0;
-    // Length of dirent passed in dirent->reclen.
-    virtual status_t ReadDir(VfsDir& dir, haiku_dirent& dirent) = 0;
-    virtual status_t RewindDir(VfsDir& dir) = 0;
+    virtual status_t TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent) = 0;
     virtual status_t Ioctl(const std::filesystem::path& path, unsigned int cmd,
         void* addr, void* buffer, size_t size) { return B_BAD_VALUE; }
 
@@ -45,18 +40,6 @@ public:
     haiku_fs_info& GetInfo() { return _info; }
     const std::filesystem::path& GetRoot() const { return _root; }
     int GetId() const { return _info.dev; }
-};
-
-// Equivalent to the POSIX DIR type.
-struct VfsDir
-{
-    std::filesystem::directory_iterator dir;
-    std::filesystem::path hostPath;
-    std::filesystem::path path;
-    std::weak_ptr<VfsDevice> device;
-    size_t cookie;
-    haiku_dev_t dev;
-    haiku_ino_t ino;
 };
 
 class VfsService
@@ -100,9 +83,7 @@ public:
     status_t ReadStat(const std::filesystem::path& path, haiku_stat& stat, bool traverseLink = true);
     status_t WriteStat(const std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool traverseLink = true);
-    status_t OpenDir(const std::filesystem::path& path, VfsDir& dir, bool traverseLink = true);
-    status_t ReadDir(VfsDir& dir, haiku_dirent& dirent);
-    status_t RewindDir(VfsDir& dir);
+    status_t TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent);
     status_t Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size);
 
     std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }

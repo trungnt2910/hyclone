@@ -207,6 +207,34 @@ intptr_t server_hserver_call_write_stat(hserver_context& context, int fd, const 
     return B_OK;
 }
 
+intptr_t server_hserver_call_transform_dirent(hserver_context& context, int fd, void* userEntry, size_t userEntrySize)
+{
+    std::vector<char> buffer(userEntrySize);
+    haiku_dirent* entry = (haiku_dirent*)buffer.data();
+
+    auto lock = context.process->Lock();
+
+    if (context.process->ReadMemory(userEntry, entry, userEntrySize) != userEntrySize)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    if (!context.process->IsValidFd(fd))
+    {
+        return HAIKU_POSIX_EBADF;
+    }
+
+    const auto& requestPath = context.process->GetFd(fd);
+
+    lock.unlock();
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        return vfsService.TransformDirent(requestPath, *entry);
+    }
+}
+
 intptr_t server_hserver_call_vchroot_expandat(hserver_context& context, int fd, const char* userPath, size_t userPathSize,
     bool traverseSymlink, char* userBuffer, size_t userBufferSize)
 {

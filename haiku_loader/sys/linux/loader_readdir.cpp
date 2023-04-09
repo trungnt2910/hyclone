@@ -82,33 +82,21 @@ int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
         struct haiku_dirent* haikuEntry = (struct haiku_dirent*)bufferOffset;
         haikuEntry->d_pdev = it->second.dev;
         haikuEntry->d_pino = it->second.ino;
-        haikuEntry->d_reclen = haikuEntrySize;
         strcpy(haikuEntry->d_name, entry->d_name);
+        haikuEntry->d_reclen = haikuEntrySize;
 
-        struct haiku_stat st;
-        if (loader_hserver_call_read_stat(fd,
-            entry->d_name, strlen(entry->d_name), false, &st, sizeof(st)) == B_OK)
+        haikuEntrySize = (size_t)
+            loader_hserver_call_transform_dirent(fd, haikuEntry, haikuEntrySize);
+
+        if ((ssize_t)haikuEntrySize < 0)
         {
-            haikuEntry->d_dev = st.st_dev;
-            haikuEntry->d_ino = st.st_ino;
-        }
-        else
-        {
-            // Probably a blacklisted entry.
+            // Skip this entry. It is probably blacklisted.
             continue;
         }
 
         bufferOffset += haikuEntrySize;
         bufferSizeLeft -= haikuEntrySize;
         ++count;
-
-        if (strcmp(entry->d_name, "..") && strcmp(entry->d_name, "."))
-        {
-            loader_hserver_call_register_entry_ref_child(it->second.dev, it->second.ino,
-                haikuEntry->d_dev, haikuEntry->d_ino, haikuEntry->d_name,
-                // For glibc, sizeof entry->d_name is fixed.
-                sizeof(entry->d_name));
-        }
     }
 
     return count;

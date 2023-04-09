@@ -21,9 +21,7 @@ public:
     virtual status_t ReadStat(std::filesystem::path& path, haiku_stat& stat, bool& isSymlink) override;
     virtual status_t WriteStat(std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool& isSymlink) override;
-    virtual status_t OpenDir(std::filesystem::path& path, VfsDir& dir, bool& isSymlink) override;
-    virtual status_t ReadDir(VfsDir& dir, haiku_dirent& dirent) override;
-    virtual status_t RewindDir(VfsDir& dir) override;
+    virtual status_t TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent) override;
 
     const std::filesystem::path& GetHostRoot() const { return _hostRoot; }
 };

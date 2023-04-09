@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "haiku_errors.h"
 #include "hostfs.h"
 #include "server_errno.h"
@@ -182,109 +184,31 @@ status_t HostfsDevice::WriteStat(std::filesystem::path& path, const haiku_stat& 
     return server_write_stat(path, stat, statMask);
 }
 
-status_t HostfsDevice::OpenDir(std::filesystem::path& path, VfsDir& dir, bool& isSymlink)
+status_t HostfsDevice::TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent)
 {
     assert(path.is_absolute());
     assert(path.lexically_normal() == path);
 
-    status_t status = GetPath(path, isSymlink);
+    auto filePath = (path / dirent.d_name).lexically_normal();
 
-    if (isSymlink || status != B_OK)
-    {
-        return status;
-    }
+    auto& vfsService = System::GetInstance().GetVfsService();
+    auto lock = vfsService.Lock();
 
-    auto relativePath = path.lexically_relative(_hostRoot);
-    dir.path = _root / relativePath;
-
-    dir.cookie = 0;
-    dir.device = std::weak_ptr<VfsDevice>(shared_from_this());
-    dir.hostPath = path;
-
-    std::error_code ec;
-    dir.dir = std::filesystem::directory_iterator(path, ec);
-
-    if (ec)
-    {
-        return CppToB(ec);
-    }
-
-    struct haiku_stat stat;
-    status = server_read_stat(path, stat);
+    haiku_stat stat;
+    status_t status = vfsService.ReadStat(filePath, stat, false);
 
     if (status != B_OK)
     {
         return status;
     }
 
-    dir.ino = _Hash(stat.st_dev, stat.st_ino);
-    dir.dev = _info.dev;
+    dirent.d_dev = stat.st_dev;
+    dirent.d_ino = stat.st_ino;
 
-    return B_OK;
-}
-
-status_t HostfsDevice::ReadDir(VfsDir& dir, haiku_dirent& dirent)
-{
-    while (dir.dir != std::filesystem::directory_iterator())
+    if (strcmp(dirent.d_name, ".") && strcmp(dirent.d_name, ".."))
     {
-        auto& entry = *dir.dir;
-
-        if (_IsBlacklisted(entry))
-        {
-            ++dir.dir;
-            continue;
-        }
-
-        size_t maxFileNameLength = dirent.d_reclen - sizeof(haiku_dirent);
-        std::string fileName = entry.path().filename().string();
-        if (fileName.length() >= maxFileNameLength)
-        {
-            return B_BUFFER_OVERFLOW;
-        }
-
-        std::shared_ptr<VfsDevice> device;
-        {
-            auto& vfsService = System::GetInstance().GetVfsService();
-            auto lock = vfsService.Lock();
-            device = vfsService.GetDevice(entry.path()).lock();
-        }
-
-        if (!device)
-        {
-            device = dir.device.lock();
-        }
-
-        if (!device)
-        {
-            return B_ENTRY_NOT_FOUND;
-        }
-
-        struct haiku_stat stat;
-        status_t status = server_read_stat(entry.path(), stat);
-
-        if (status != B_OK)
-        {
-            return status;
-        }
-
-        dirent.d_ino = _Hash(stat.st_dev, stat.st_ino);
-        dirent.d_dev = device->GetInfo().dev;
-        dirent.d_pdev = dir.dev;
-        dirent.d_pino = dir.ino;
-        dirent.d_reclen = sizeof(haiku_dirent) + fileName.length();
-        fileName.copy(dirent.d_name, fileName.length());
-        dirent.d_name[fileName.length()] = '\0';
-
-        ++dir.dir;
-        return B_OK;
+        vfsService.RegisterEntryRef(EntryRef(stat.st_dev, stat.st_ino), filePath);
     }
 
-    return B_ENTRY_NOT_FOUND;
-}
-
-status_t HostfsDevice::RewindDir(VfsDir& dir)
-{
-    dir.cookie = 0;
-    dir.dir = std::filesystem::directory_iterator(dir.hostPath);
-    return B_OK;
+    return dirent.d_reclen;
 }

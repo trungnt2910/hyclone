@@ -122,103 +122,26 @@ status_t VfsService::WriteStat(const std::filesystem::path& path, const haiku_st
     });
 }
 
-status_t VfsService::OpenDir(const std::filesystem::path& path, VfsDir& dir, bool traverseLink)
+status_t VfsService::TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent)
 {
-    status_t status = _DoWork(path, traverseLink, [&](std::filesystem::path& currentPath,
-        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+    auto currentPath = path.lexically_normal();
+
+    while (true)
     {
-        return device->OpenDir(currentPath, dir, isSymlink);
-    });
-    if (status == B_OK)
-    {
-        dir.cookie = (size_t)-3;
+        auto device = GetDevice(currentPath).lock();
+
+        if (device)
+        {
+            return device->TransformDirent(path, dirent);
+        }
+
+        if (!currentPath.has_parent_path())
+        {
+            return B_ENTRY_NOT_FOUND;
+        }
+
+        currentPath = currentPath.parent_path();
     }
-    return status;
-}
-
-status_t VfsService::ReadDir(VfsDir& dir, haiku_dirent& dirent)
-{
-    auto device = dir.device.lock();
-    if (!device)
-    {
-        return B_ENTRY_NOT_FOUND;
-    }
-    if (dir.cookie == (size_t)-3 || dir.cookie == (size_t)-2)
-    {
-        std::filesystem::path path;
-        std::string name;
-        if (dir.cookie == (size_t)-3)
-        {
-            path = dir.path;
-            name = ".";
-        }
-        else
-        {
-            path = dir.path.parent_path();
-            name = "..";
-        }
-
-        auto parentPath = path.parent_path();
-
-        size_t maxFileNameLen = dirent.d_reclen - sizeof(haiku_dirent);
-
-        if (name.size() >= maxFileNameLen)
-        {
-            return B_BUFFER_OVERFLOW;
-        }
-
-        haiku_stat stat;
-        status_t status = ReadStat(path, stat, false);
-        if (status != B_OK)
-        {
-            return status;
-        }
-
-        haiku_stat pstat;
-        status = ReadStat(parentPath, pstat, false);
-        if (status != B_OK)
-        {
-            return status;
-        }
-
-        dirent.d_dev = stat.st_dev;
-        dirent.d_ino = stat.st_ino;
-        dirent.d_pdev = pstat.st_dev;
-        dirent.d_pino = pstat.st_ino;
-        dirent.d_reclen = sizeof(haiku_dirent) + name.size() + 1;
-        name.copy(dirent.d_name, name.size());
-        dirent.d_name[name.size()] = '\0';
-
-        if (dir.cookie == (size_t)-3)
-        {
-            dir.cookie = (size_t)-2;
-        }
-        else
-        {
-            dir.cookie = 0;
-        }
-
-        return B_OK;
-    }
-    else
-    {
-        return device->ReadDir(dir, dirent);
-    }
-}
-
-status_t VfsService::RewindDir(VfsDir& dir)
-{
-    auto device = dir.device.lock();
-    if (!device)
-    {
-        return B_ENTRY_NOT_FOUND;
-    }
-    status_t status = device->RewindDir(dir);
-    if (status == B_OK)
-    {
-        dir.cookie = (size_t)-3;
-    }
-    return status;
 }
 
 status_t VfsService::Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size)

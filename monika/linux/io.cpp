@@ -19,9 +19,11 @@
 #include "export.h"
 #include "extended_commpage.h"
 #include "fcntl_conversion.h"
+#include "haiku_dirent.h"
 #include "haiku_errors.h"
 #include "haiku_fcntl.h"
 #include "haiku_file.h"
+#include "haiku_fs_attr.h"
 #include "haiku_poll.h"
 #include "haiku_signal.h"
 #include "haiku_stat.h"
@@ -38,26 +40,6 @@
 #define HAIKU_W_OK          2
 #define HAIKU_X_OK          1
 #define HAIKU_F_OK          0
-
-typedef struct haiku_dirent
-{
-    haiku_dev_t             d_dev;      /* device */
-    haiku_dev_t             d_pdev;     /* parent device (only for queries) */
-    haiku_ino_t             d_ino;      /* inode number */
-    haiku_ino_t             d_pino;     /* parent inode (only for queries) */
-    unsigned short          d_reclen;   /* length of this record, not the name */
-#if __GNUC__ == 2
-    char                    d_name[0];  /* name of the entry (null byte terminated) */
-#else
-    char                    d_name[];   /* name of the entry (null byte terminated) */
-#endif
-} haiku_dirent_t;
-
-typedef struct attr_info
-{
-    uint32_t    type;
-    haiku_off_t size;
-} attr_info;
 
 struct linux_dirent
 {
@@ -730,25 +712,6 @@ int MONIKA_EXPORT _kern_unlink(int fd, const char* path)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_open_attr_dir(int fd, const char* path, bool traverseLeafLink)
-{
-   trace("attribute directories are not implemented yet.");
-   // This is returned on most Haiku filesystems.
-   return B_UNSUPPORTED;
-}
-
-int MONIKA_EXPORT _kern_stat_attr(int fd, const char* attribute, struct attr_info *attrInfo)
-{
-    long result = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, NULL, 0);
-    if (result < 0)
-    {
-        return LinuxToB(-result);
-    }
-    attrInfo->size = result;
-    attrInfo->type = 0;
-    return B_OK;
-}
-
 int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
 {
     if (fd == HAIKU_AT_FDCWD)
@@ -1400,6 +1363,32 @@ ssize_t MONIKA_EXPORT _kern_write_attr(int fd, const char* attribute, uint32 typ
 
         return readBytes;
     }
+}
+
+int MONIKA_EXPORT _kern_open_attr(int fd, const char* path, const char *name, 
+    uint32 type, int openMode)
+{
+    trace("attribute file descriptors are not implemented yet.");
+    return B_UNSUPPORTED;
+}
+
+int MONIKA_EXPORT _kern_open_attr_dir(int fd, const char* path, bool traverseLeafLink)
+{
+   trace("attribute directories are not implemented yet.");
+   // This is returned on most Haiku filesystems.
+   return B_UNSUPPORTED;
+}
+
+int MONIKA_EXPORT _kern_stat_attr(int fd, const char* attribute, struct haiku_attr_info *attrInfo)
+{
+    long result = LINUX_SYSCALL4(__NR_fgetxattr, fd, attribute, NULL, 0);
+    if (result < 0)
+    {
+        return LinuxToB(-result);
+    }
+    attrInfo->size = result;
+    attrInfo->type = 0;
+    return B_OK;
 }
 
 // The functions below are clearly impossible
