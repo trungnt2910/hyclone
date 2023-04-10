@@ -338,6 +338,19 @@ size_t loader_next_reserved_range(void* address, void** nextAddress)
         ++it;
     }
 
+    if (it == sReservedRanges.end())
+    {
+        return 0;
+    }
+
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
+    std::stringstream ss;
+    ss << "next_reserved_range(" << address << "): ";
+    ss << (void*)it->first.address << " " << (void*)(it->first.address + it->first.size) << std::endl;
+    std::cerr << ss.str() << std::endl;
+    loader_reserved_range_debug();
+#endif
+
     *nextAddress = it->first.address;
     return it->first.size;
 }
