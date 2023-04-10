@@ -628,6 +628,18 @@ int MONIKA_EXPORT _kern_create_pipe(int *fds)
         return LinuxToB(-result);
     }
 
+    int pid = LINUX_SYSCALL0(__NR_getpid);
+    char hostPath[64];
+    char path[PATH_MAX];
+
+    GET_HOSTCALLS()->snprintf(hostPath, sizeof(hostPath), "/proc/%d/fd/%d", pid, fds[0]);
+    GET_HOSTCALLS()->vchroot_unexpand(hostPath, path, sizeof(path));
+    GET_SERVERCALLS()->register_fd(fds[0], HAIKU_AT_FDCWD, path, sizeof(path), false);
+
+    GET_HOSTCALLS()->snprintf(hostPath, sizeof(hostPath), "/proc/%d/fd/%d", pid, fds[1]);
+    GET_HOSTCALLS()->vchroot_unexpand(hostPath, path, sizeof(path));
+    GET_SERVERCALLS()->register_fd(fds[1], HAIKU_AT_FDCWD, path, sizeof(path), false);
+
     return B_OK;
 }
 

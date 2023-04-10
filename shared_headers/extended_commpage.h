@@ -104,6 +104,7 @@ struct hostcalls
     // Hooks
     void (*at_exit)(int value);
     int (*printf)(const char* format, ...);
+    int (*snprintf)(char* buffer, size_t size, const char* format, ...);
 };
 
 // After the real Haiku commpage, we put a page
