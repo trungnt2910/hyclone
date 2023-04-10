@@ -20,6 +20,16 @@ namespace HpkgVfs
         std::vector<uint8_t> Data;
     };
 
+    class EntryWriter
+    {
+    public:
+        virtual void SetDateModifed(const std::filesystem::path& path, const std::filesystem::file_time_type& time);
+        virtual void SetDateAccess(const std::filesystem::path& path, const std::filesystem::file_time_type& time);
+        virtual void SetDateCreate(const std::filesystem::path& path, const std::filesystem::file_time_type& time);
+        virtual void SetOwner(const std::filesystem::path& path, const std::string& user, const std::string& group);
+        virtual void WriteExtendedAttributes(const std::filesystem::path& path, const std::vector<ExtendedAttribute>& attributes);
+    };
+
     class Entry: public std::enable_shared_from_this<Entry>
     {
     private:
@@ -107,6 +117,8 @@ namespace HpkgVfs
         void Merge(const std::shared_ptr<Entry>& other);
 
         void WriteToDisk(const std::filesystem::path& rootPath);
+        void WriteToDisk(const std::filesystem::path& rootPath, EntryWriter& writer);
+
         // Removes the data associated with this entry.
         void Drop(bool force = false);
 

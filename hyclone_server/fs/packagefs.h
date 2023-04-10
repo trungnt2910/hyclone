@@ -102,21 +102,25 @@ struct PackageFSActivationChangeRequest
 
 class PackagefsDevice : public HostfsDevice
 {
+    friend class PackagefsEntryWriter;
 private:
-    std::mutex _updateMutex;
-    std::filesystem::path _relativeInstalledPackagesPath = std::filesystem::path("system/.hpkgvfsPackages");
-    static std::filesystem::path _relativeAttributesPath;
-    PackageFSMountType _mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM;
-    static std::filesystem::path _GetAttrPathInternal(
-        const std::filesystem::path& path, const std::string& name);
-    static std::string _UnescapeAttrName(const std::string& name);
-
     enum
     {
         PACKAGEFS_ATTREMU_FILE = 'f',
         PACKAGEFS_ATTREMU_ATTR = 'a',
         PACKAGEFS_ATTREMU_TYPE = 't'
     };
+
+    static std::filesystem::path _relativeInstalledPackagesPath;
+    static std::filesystem::path _relativeAttributesPath;
+    static std::filesystem::path _GetAttrPathInternal(
+        const std::filesystem::path& path, const std::string& name);
+    static std::string _UnescapeAttrName(const std::string& name);
+
+    std::mutex _updateMutex;
+    PackageFSMountType _mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM;
+
+    void _CleanupAttributes();
 protected:
     bool _IsBlacklisted(const std::filesystem::path& path) const override;
     bool _IsBlacklisted(const std::filesystem::directory_entry& entry) const override;

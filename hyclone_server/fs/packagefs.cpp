@@ -13,13 +13,35 @@
 #include "system.h"
 
 std::filesystem::path PackagefsDevice::_relativeAttributesPath = std::filesystem::path(".hyclone.pkgfsattrs");
+std::filesystem::path PackagefsDevice::_relativeInstalledPackagesPath = std::filesystem::path("system/.hpkgvfsPackages");
+
+class PackagefsEntryWriter : public HpkgVfs::EntryWriter
+{
+private:
+    PackagefsDevice& _device;
+public:
+    PackagefsEntryWriter(PackagefsDevice& device)
+        : _device(device)
+    {
+    }
+
+    virtual void WriteExtendedAttributes(const std::filesystem::path& path,
+        const std::vector<HpkgVfs::ExtendedAttribute>& attributes) override
+    {
+        auto relativePath = path.lexically_relative(_device._hostRoot);
+
+        for (const auto& attr : attributes)
+        {
+            _device.WriteAttr(_device._root / relativePath, attr.Name, attr.Type, 0, attr.Data.data(), attr.Data.size());
+        }
+    }
+};
 
 PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     const std::filesystem::path& hostRoot)
     : HostfsDevice(root, hostRoot)
 {
     std::filesystem::create_directories(hostRoot / _relativeAttributesPath);
-    // TODO: Clean stale attributes.
 
     using namespace HpkgVfs;
 
@@ -97,6 +119,8 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         std::filesystem::rename(oldName, newName);
     }
 
+    PackagefsEntryWriter writer(*this);
+
     for (const auto& kvp: installedPackages)
     {
         auto it = enabledPackages.find(kvp.first);
@@ -104,7 +128,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         {
             std::cerr << "Uninstalling package: " << kvp.first << std::endl;
             boot->RemovePackage(kvp.first);
-            boot->WriteToDisk(hostRoot.parent_path());
+            boot->WriteToDisk(hostRoot.parent_path(), writer);
         }
         else if (it->second > kvp.second)
         {
@@ -113,7 +137,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
             Package package((packagesPath / (it->first + ".hpkg")).string());
             std::shared_ptr<Entry> entry = package.GetRootEntry();
             system->Merge(entry);
-            boot->WriteToDisk(hostRoot.parent_path());
+            boot->WriteToDisk(hostRoot.parent_path(), writer);
             boot->Drop();
         }
         else
@@ -133,11 +157,13 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         Package package((packagesPath / (pkg.first + ".hpkg")).string());
         std::shared_ptr<Entry> entry = package.GetRootEntry();
         system->Merge(entry);
-        boot->WriteToDisk(hostRoot.parent_path());
+        boot->WriteToDisk(hostRoot.parent_path(), writer);
         boot->Drop();
     }
 
     std::cerr << "Done extracting packagefs." << std::endl;
+
+    _CleanupAttributes();
 
     _info.flags = B_FS_IS_PERSISTENT | B_FS_IS_SHARED | B_FS_HAS_ATTR;
     _info.block_size = 0;
@@ -231,6 +257,47 @@ std::string PackagefsDevice::_UnescapeAttrName(const std::string& name)
     }
 
     return result;
+}
+
+void PackagefsDevice::_CleanupAttributes()
+{
+    for (auto it = std::filesystem::recursive_directory_iterator(_hostRoot / _relativeAttributesPath);
+        it != std::filesystem::recursive_directory_iterator(); )
+    {
+        auto& entry = *it;
+
+        if (!entry.is_directory())
+        {
+            ++it;
+            continue;
+        }
+
+        auto attrPath = entry.path();
+        auto relativePath = attrPath.lexically_relative(_hostRoot / _relativeAttributesPath);
+        auto filePath = _hostRoot;
+
+        for (const auto& part : relativePath)
+        {
+            filePath /= part.string().substr(1);
+        }
+
+        if (!std::filesystem::exists(filePath))
+        {
+            it.disable_recursion_pending();
+            ++it;
+            std::cerr << "Removing stale attribute directory: " << attrPath << " as " << filePath << " does not exist" << std::endl;
+            std::error_code ec;
+            std::filesystem::remove_all(attrPath, ec);
+            if (ec)
+            {
+                std::cerr << "Failed to remove stale attribute directory: " << attrPath << std::endl;
+            }
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
 bool PackagefsDevice::_IsBlacklisted(const std::filesystem::path& hostPath) const
@@ -509,6 +576,8 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                 system->Merge(entry);
             }
 
+            PackagefsEntryWriter writer(*this);
+
             for (uint32 i = 0; i < itemCount; ++i)
             {
                 PackageFSActivationChangeItem& item = request->items[i];
@@ -527,7 +596,7 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                     Package package((packagesPath / (name.string() + ".hpkg")).string());
                     std::shared_ptr<Entry> entry = package.GetRootEntry();
                     system->Merge(entry);
-                    boot->WriteToDisk(_hostRoot.parent_path());
+                    boot->WriteToDisk(_hostRoot.parent_path(), writer);
                     boot->Drop();
                 }
                 else
@@ -536,7 +605,7 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                     {
                         std::cerr << "Uninstalling package: " << *it << std::endl;
                         boot->RemovePackage(*it);
-                        boot->WriteToDisk(_hostRoot.parent_path());
+                        boot->WriteToDisk(_hostRoot.parent_path(), writer);
                     }
                     else if (item.type == PACKAGE_FS_REACTIVATE_PACKAGE)
                     {
@@ -545,7 +614,7 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                         Package package((packagesPath / (*it + ".hpkg")).string());
                         std::shared_ptr<Entry> entry = package.GetRootEntry();
                         system->Merge(entry);
-                        boot->WriteToDisk(_hostRoot.parent_path());
+                        boot->WriteToDisk(_hostRoot.parent_path(), writer);
                         boot->Drop();
                     }
                     else if (item.type == PACKAGE_FS_ACTIVATE_PACKAGE)
@@ -560,6 +629,9 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
             }
 
             std::cerr << "Done updating packagefs." << std::endl;
+
+            _CleanupAttributes();
+
             return B_OK;
         }
         default:

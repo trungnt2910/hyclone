@@ -26,6 +26,31 @@ namespace HpkgVfs
         extern void WriteExtendedAttributes(const std::filesystem::path& path, const std::vector<ExtendedAttribute>& attributes);
     }
 
+    void EntryWriter::SetDateModifed(const std::filesystem::path& path, const std::filesystem::file_time_type& time)
+    {
+        return Platform::SetDateModifed(path, time);
+    }
+
+    void EntryWriter::SetDateAccess(const std::filesystem::path& path, const std::filesystem::file_time_type& time)
+    {
+        return Platform::SetDateAccess(path, time);
+    }
+
+    void EntryWriter::SetDateCreate(const std::filesystem::path& path, const std::filesystem::file_time_type& time)
+    {
+        return Platform::SetDateCreate(path, time);
+    }
+
+    void EntryWriter::SetOwner(const std::filesystem::path& path, const std::string& user, const std::string& group)
+    {
+        return Platform::SetOwner(path, user, group);
+    }
+
+    void EntryWriter::WriteExtendedAttributes(const std::filesystem::path& path, const std::vector<ExtendedAttribute>& attributes)
+    {
+        return Platform::WriteExtendedAttributes(path, attributes);
+    }
+
     enum HpkgFileType
     {
         FILE = 0,
@@ -627,6 +652,12 @@ namespace HpkgVfs
 
     void Entry::WriteToDisk(const std::filesystem::path& rootPath)
     {
+        EntryWriter writer;
+        WriteToDisk(rootPath, writer);
+    }
+
+    void Entry::WriteToDisk(const std::filesystem::path& rootPath, EntryWriter& writer)
+    {
         if (_updated)
         {
             return;
@@ -760,12 +791,12 @@ namespace HpkgVfs
             }
         }
 
-        Platform::SetDateModifed(path, _modified);
-        Platform::SetDateAccess(path, _access);
-        Platform::SetDateCreate(path, _create);
+        writer.SetDateModifed(path, _modified);
+        writer.SetDateAccess(path, _access);
+        writer.SetDateCreate(path, _create);
 
-        Platform::SetOwner(path, _user, _group);
-        Platform::WriteExtendedAttributes(path, _extendedAttributes);
+        writer.SetOwner(path, _user, _group);
+        writer.WriteExtendedAttributes(path, _extendedAttributes);
 
         _updated = true;
     }
