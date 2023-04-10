@@ -363,7 +363,9 @@ intptr_t server_hserver_call_get_attr_path(hserver_context& context, int fd, voi
     std::filesystem::path requestPath;
     status_t status;
 
-    bool traverseSymlink = !(openMode & HAIKU_O_NOTRAVERSE);
+    // bool traverseSymlink = !(openMode & HAIKU_O_NOTRAVERSE);
+    // It seems that Haiku never traverses symlinks when opening an attribute.
+    bool traverseSymlink = false;
     bool createNew = openMode & HAIKU_O_CREAT;
 
     {
