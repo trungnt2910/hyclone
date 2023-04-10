@@ -267,17 +267,22 @@ intptr_t server_hserver_call_find_port(hserver_context& context, const char *por
 
 intptr_t server_hserver_call_get_port_info(hserver_context& context, port_id id, void *info)
 {
+    std::shared_ptr<Port> port;
+
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
 
-        auto port = system.GetPort(id).lock();
+        port = system.GetPort(id).lock();
+    }
 
-        if (!port)
-        {
-            return B_BAD_PORT_ID;
-        }
+    if (!port)
+    {
+        return B_BAD_PORT_ID;
+    }
 
+    {
+        auto lock = context.process->Lock();
         if (server_write_process_memory(context.pid, info, &port->GetInfo(), sizeof(haiku_port_info))
             != sizeof(haiku_port_info))
         {
@@ -290,19 +295,21 @@ intptr_t server_hserver_call_get_port_info(hserver_context& context, port_id id,
 
 intptr_t server_hserver_call_port_count(hserver_context& context, port_id id)
 {
+    std::shared_ptr<Port> port;
+
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
 
-        auto port = system.GetPort(id).lock();
-
-        if (!port)
-        {
-            return B_BAD_PORT_ID;
-        }
-
-        return port->GetInfo().queue_count;
+        port = system.GetPort(id).lock();
     }
+
+    if (!port)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    return port->GetInfo().queue_count;
 }
 
 intptr_t server_hserver_call_port_buffer_size_etc(hserver_context& context, port_id id,

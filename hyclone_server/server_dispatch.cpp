@@ -12,41 +12,44 @@ intptr_t server_dispatch(intptr_t conn_id, intptr_t call_id,
     hserver_context context;
     context.conn_id = conn_id;
 
-    auto& system = System::GetInstance();
-    auto lock = system.Lock();
-
-    switch (call_id)
     {
-        case SERVERCALL_ID_connect:
-        case SERVERCALL_ID_request_ack:
-            std::tie(context.pid, context.tid) = std::tie(a1, a2);
-        break;
-        default:
-            const auto [pid, tid, isPrimary] = system.GetThreadFromConnection(conn_id);
-            std::tie(context.pid, context.tid) = std::tie(pid, tid);
-        break;
-    }
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
 
-    // For SERVERCALL_ID_connect, the process and thread hasn't been registered
-    // in HyClone server yet.
-    if (call_id != SERVERCALL_ID_connect)
-    {
-        context.process = system.GetProcess(context.pid).lock();
-        if (!context.process)
+        switch (call_id)
         {
-            return B_BAD_VALUE;
+            case SERVERCALL_ID_connect:
+            case SERVERCALL_ID_request_ack:
+                std::tie(context.pid, context.tid) = std::tie(a1, a2);
+            break;
+            default:
+                const auto [pid, tid, isPrimary] = system.GetThreadFromConnection(conn_id);
+                std::tie(context.pid, context.tid) = std::tie(pid, tid);
+            break;
         }
-        {
-            auto procLock = context.process->Lock();
-            context.thread = context.process->GetThread(context.tid).lock();
 
-            if (!context.thread)
+        // For SERVERCALL_ID_connect, the process and thread hasn't been registered
+        // in HyClone server yet.
+        if (call_id != SERVERCALL_ID_connect)
+        {
+            context.process = system.GetProcess(context.pid).lock();
+            if (!context.process)
             {
                 return B_BAD_VALUE;
             }
         }
     }
-    lock.unlock();
+
+    if (context.process)
+    {
+        auto procLock = context.process->Lock();
+        context.thread = context.process->GetThread(context.tid).lock();
+
+        if (!context.thread)
+        {
+            return B_BAD_VALUE;
+        }
+    }
 
 #define HYCLONE_SERVERCALL0(name) \
     case SERVERCALL_ID_##name: \

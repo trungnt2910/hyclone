@@ -10,6 +10,7 @@
 #include "server_native.h"
 #include "server_requests.h"
 #include "server_servercalls.h"
+#include "server_workers.h"
 #include "system.h"
 #include "thread.h"
 
@@ -49,7 +50,10 @@ void Thread::Resume()
 
 void Thread::WaitForResume()
 {
-    _suspended.wait(true);
+    server_worker_run_wait([&]()
+    {
+        _suspended.wait(true);
+    });
 }
 
 std::shared_future<intptr_t> Thread::SendRequest(std::shared_ptr<Request> request)
