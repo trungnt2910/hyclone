@@ -226,10 +226,10 @@ intptr_t server_hserver_call_delete_port(hserver_context& context, int portId)
         if (!owner)
         {
             std::cerr << "Port #" << port->GetId() << " (" << port->GetName() << ") owned by dead process " << port->GetInfo().team << std::endl;
-            return B_BAD_PORT_ID;
         }
     }
 
+    if (owner)
     {
         auto lock = owner->Lock();
         owner->RemoveOwningPort(portId);

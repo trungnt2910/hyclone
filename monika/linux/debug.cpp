@@ -1,6 +1,5 @@
 #include <cstddef>
 #include <string.h>
-#include <signal.h>
 
 #include "BeDefs.h"
 #include "debugbreak.h"
@@ -14,10 +13,7 @@
 #include "servercalls.h"
 #include "thread_defs.h"
 
-static bool sIsProcessDebugged = false;
 static int sDebugSubsystemLock = HYCLONE_SUBSYSTEM_LOCK_UNINITIALIZED;
-
-static int32 NubThreadEntry(void* arg1, void* arg2);
 
 extern "C"
 {
@@ -35,71 +31,30 @@ void MONIKA_EXPORT _kern_debug_output(const char* userString)
 
 void MONIKA_EXPORT _kern_debugger(const char* userString)
 {
-    if (!sIsProcessDebugged)
-    {
-        size_t len = strlen(userString);
-        const char prefix[] = "_kern_debugger: ";
-        LINUX_SYSCALL3(__NR_write, 2, prefix, sizeof(prefix));
-        LINUX_SYSCALL3(__NR_write, 2, userString, len);
-        LINUX_SYSCALL3(__NR_write, 2, "\n", 1);
-    }
+    size_t len = strlen(userString);
+    const char prefix[] = "_kern_debugger: ";
+    LINUX_SYSCALL3(__NR_write, 2, prefix, sizeof(prefix));
+    LINUX_SYSCALL3(__NR_write, 2, userString, len);
+    LINUX_SYSCALL3(__NR_write, 2, "\n", 1);
 
-    if (sIsProcessDebugged || GET_HOSTCALLS()->is_debugger_present())
+    if (GET_HOSTCALLS()->is_debugger_present())
     {
         debug_break();
     }
-}
-
-status_t MONIKA_EXPORT __monika_spawn_nub_thread(port_id id)
-{
+    else
     {
-        auto lock = SubsystemLock(sDebugSubsystemLock);
-        if (sIsProcessDebugged)
+        GET_HOSTCALLS()->at_exit(1);
+
+        while (true)
         {
-            return B_NOT_ALLOWED;
+            LINUX_SYSCALL1(__NR_exit_group, 1);
         }
-
-        sIsProcessDebugged = true;
     }
-    struct thread_creation_attributes attributes;
-    memset(&attributes, 0, sizeof(attributes));
-
-    attributes.args1 = (void*)(intptr_t)id;
-    attributes.name = "team debug task";
-    attributes.entry = NubThreadEntry;
-
-    thread_id thread_id = _kern_spawn_thread(&attributes);
-    _kern_resume_thread(id);
-
-    int tid = LINUX_SYSCALL0(__NR_gettid);
-
-    LINUX_SYSCALL3(__NR_tgkill, -1, tid, SIGINT);
-
-    return B_OK;
 }
 
-}
-
-// Forwards everything back to the server.
-// On Haiku, the nub thread should be an in-process
-// thread that handles these operation, the fact that
-// this function forwards the operations to the kernel server
-// is Hyclone's implementation detail.
-int NubThreadEntry(void* arg1, void* arg2)
+port_id MONIKA_EXPORT _kern_install_team_debugger(team_id team, port_id debuggerPort)
 {
-    port_id port = (port_id)(intptr_t)arg1;
+    return GET_SERVERCALLS()->install_team_debugger(team, debuggerPort);
+}
 
-    while (sIsProcessDebugged)
-    {
-        int command;
-        debug_nub_message_data data;
-
-        if (_kern_read_port_etc(port, &command, &data, sizeof(data), 0, 0) < 0)
-        {
-            continue;
-        }
-
-        panic("NubThreadEntry: unimplemented");
-        // GET_SERVERCALLS()->debug_process_nub_message(command, &data);
-    }
 }

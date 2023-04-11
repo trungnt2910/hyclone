@@ -5,6 +5,7 @@
 #include "area.h"
 #include "entry_ref.h"
 #include "haiku_area.h"
+#include "haiku_debugger.h"
 #include "haiku_errors.h"
 #include "haiku_fs_info.h"
 #include "hsemaphore.h"
@@ -266,7 +267,7 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
 
     std::cerr << "Connection started: " << context.conn_id << " " << pid << " " << tid << std::endl;
 
-    // Might already be registered by fork().
+    // Might already be registered by fork() or left behind after an exec().
     auto process = system.GetProcess(pid).lock();
     if (!process)
     {
@@ -284,6 +285,8 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
 
     if (process)
     {
+        auto procLock = process->Lock();
+        process->FinishExec();
         auto thread = system.RegisterThread(pid, tid).lock();
         if (thread)
         {
@@ -297,49 +300,117 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
 
 intptr_t server_hserver_call_disconnect(hserver_context& context)
 {
-    auto& system = System::GetInstance();
-    auto lock = system.Lock();
+    std::shared_ptr<Port> debuggerPort;
+    std::shared_ptr<Semaphore> debuggerWriteLock;
+    std::vector<Port::Message> debuggerMessages;
 
-    const auto& connection = system.GetThreadFromConnection(context.conn_id);
-
-    if (connection.isPrimary)
     {
-        auto procLock = context.process->Lock();
-        // No more threads => Process dead.
-        if (!context.process->UnregisterThread(context.tid))
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+
+        const auto& connection = system.GetThreadFromConnection(context.conn_id);
+
+        if (connection.isPrimary)
         {
-            system.UnregisterProcess(context.pid);
-            for (const auto& s: context.process->GetOwningSemaphores())
+            auto procLock = context.process->Lock();
+            // No more threads => Process dead.
+            if (!context.process->UnregisterThread(context.tid))
             {
-                system.UnregisterSemaphore(s);
+                if (!context.process->IsExecutingExec())
+                {
+                    system.UnregisterProcess(context.pid);
+                }
+
+                for (const auto& s: context.process->GetOwningSemaphores())
+                {
+                    system.UnregisterSemaphore(s);
+                }
+
+                for (const auto& s: context.process->GetOwningPorts())
+                {
+                    system.UnregisterPort(s);
+                }
+
+                area_id area = -1;
+                while ((area = context.process->NextAreaId(area)) != -1)
+                {
+                    system.UnregisterArea(area);
+                }
+
+                {
+                    auto& msgService = system.GetMessagingService();
+                    auto msgLock = msgService.Lock();
+
+                    // Will silently fail if the process is not the registered
+                    // message server.
+                    msgService.UnregisterService(context.process);
+                }
+
+                if (context.process->GetDebuggerPort() != -1 && !context.process->IsExecutingExec())
+                {
+                    if (context.process->GetInfo().debugger_nub_port != -1)
+                    {
+                        system.UnregisterPort(context.process->GetInfo().debugger_nub_port);
+                    }
+
+                    Port::Message message;
+                    message.code = B_DEBUGGER_MESSAGE_TEAM_DELETED;
+                    message.data.resize(sizeof(debug_debugger_message_data));
+                    memset(&message.info, 0, sizeof(message.info));
+                    message.info.sender_team = context.pid;
+                    message.info.size = sizeof(debug_debugger_message_data);
+
+                    auto& debuggerMessage = *(debug_debugger_message_data*)message.data.data();
+                    debuggerMessage.team_deleted.origin.team = context.pid;
+                    debuggerMessage.team_deleted.origin.thread = -1;
+                    debuggerMessage.team_deleted.origin.nub_port = -1;
+
+                    debuggerMessages.emplace_back(std::move(message));
+                }
             }
 
-            for (const auto& s: context.process->GetOwningPorts())
+            system.UnregisterThread(context.tid);
+            if (context.tid != context.pid || !context.process->IsExecutingExec())
             {
-                system.UnregisterPort(s);
+                if (context.process->GetDebuggerPort() != -1)
+                {
+                    Port::Message message;
+                    message.code = B_DEBUGGER_MESSAGE_THREAD_DELETED;
+                    message.data.resize(sizeof(debug_debugger_message_data));
+                    memset(&message.info, 0, sizeof(message.info));
+                    message.info.sender_team = context.pid;
+                    message.info.size = sizeof(debug_debugger_message_data);
+
+                    auto& debuggerMessage = *(debug_debugger_message_data*)message.data.data();
+                    debuggerMessage.thread_deleted.origin.team = context.pid;
+                    debuggerMessage.thread_deleted.origin.thread = context.tid;
+                    debuggerMessage.thread_deleted.origin.nub_port = -1;
+                }
             }
 
-            area_id area = -1;
-            while ((area = context.process->NextAreaId(area)) != -1)
+            if (debuggerMessages.size())
             {
-                system.UnregisterArea(area);
-            }
-
-            {
-                auto& msgService = system.GetMessagingService();
-                auto msgLock = msgService.Lock();
-
-                // Will silently fail if the process is not the registered
-                // message server.
-                msgService.UnregisterService(context.process);
+                debuggerPort = system.GetPort(context.process->GetDebuggerPort()).lock();
+                debuggerWriteLock = system.GetSemaphore(context.process->GetDebuggerWriteLock()).lock();
             }
         }
-        system.UnregisterThread(context.tid);
+
+        system.UnregisterConnection(context.conn_id);
+
+        std::cerr << "Unregistered: " << context.conn_id << " " << context.pid << " " << context.tid << std::endl;
     }
 
-    system.UnregisterConnection(context.conn_id);
+    if (debuggerMessages.size() && debuggerPort && debuggerWriteLock)
+    {
+        debuggerWriteLock->Acquire(context.tid, 1);
 
-    std::cerr << "Unregistered: " << context.conn_id << " " << context.pid << " " << context.tid << std::endl;
+        for (auto& message: debuggerMessages)
+        {
+            debuggerPort->Write(std::move(message), B_INFINITE_TIMEOUT);
+        }
+
+        debuggerWriteLock->Release(1);
+    }
 
     return B_OK;
 }

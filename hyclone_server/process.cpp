@@ -21,6 +21,10 @@ Process::Process(int pid, int uid, int gid, int euid, int egid)
     _info.gid = gid;
     _info.debugger_nub_thread = -1;
     _info.debugger_nub_port = -1;
+
+    _debuggerPort = -1;
+    _debuggerPid = -1;
+    _debuggerWriteLock = -1;
 }
 
 std::weak_ptr<Thread> Process::RegisterThread(int tid)
@@ -215,6 +219,16 @@ void Process::Fork(Process& child)
     // child._owningSemaphores = _owningSemaphores;
 
     child._forkUnlocked = true;
+}
+
+void Process::Exec()
+{
+    _isExecutingExec = true;
+}
+
+void Process::FinishExec()
+{
+    _isExecutingExec = false;
 }
 
 size_t Process::ReadMemory(void* address, void* buffer, size_t size)

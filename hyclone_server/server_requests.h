@@ -31,9 +31,18 @@ class TransferAreaRequest : public Request
 {
     TransferAreaRequestArgs _args;
 public:
-    TransferAreaRequest(const TransferAreaRequestArgs& args) 
+    TransferAreaRequest(const TransferAreaRequestArgs& args)
         : _args(args) { _data = &_args; }
     virtual size_t Size() override { return sizeof(TransferAreaRequestArgs); }
+};
+
+class InstallTeamDebuggerRequest : public Request
+{
+    InstallTeamDebuggerRequestArgs _args;
+public:
+    InstallTeamDebuggerRequest(const InstallTeamDebuggerRequestArgs& args)
+        : _args(args) { _data = &_args; }
+    virtual size_t Size() override { return sizeof(InstallTeamDebuggerRequestArgs); }
 };
 
 #endif // __SERVER_REQUESTS_H__

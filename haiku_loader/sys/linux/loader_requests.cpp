@@ -6,16 +6,11 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "BeDefs.h"
-#include "haiku_area.h"
 #include "loader_requests.h"
-#include "loader_runtime.h"
 #include "loader_vchroot.h"
-#include "requests.h"
 #include "servercalls.h"
 
 static void loader_handle_request(int sig, siginfo_t* info, void* context);
-static intptr_t loader_handle_request(const TransferAreaRequestArgs& request);
 
 bool loader_init_requests()
 {
@@ -211,26 +206,10 @@ static void loader_handle_request(int sig, siginfo_t* info, void* context)
         case REQUEST_ID_transfer_area:
             requestContext.Reply(loader_handle_request(requestContext.Arguments<TransferAreaRequestArgs>()));
         break;
+        case REQUEST_ID_install_team_debugger:
+            requestContext.Reply(loader_handle_request(requestContext.Arguments<InstallTeamDebuggerRequestArgs>()));
+        break;
     }
 
     gServerConnection._socket = oldSocket;
-}
-
-extern intptr_t loader_hserver_call_get_area_info(int id, void* info);
-
-static intptr_t loader_handle_request(const TransferAreaRequestArgs& request)
-{
-    using kern_clone_area_t = area_id (*)(const char *, void **, uint32, uint32, area_id);
-    static kern_clone_area_t kern_clone_area = (kern_clone_area_t)loader_runtime_symbol("_kern_clone_area");
-
-    haiku_area_info info;
-    status_t status = loader_hserver_call_get_area_info(request.baseArea, &info);
-
-    if (status != B_OK)
-    {
-        return status;
-    }
-
-    void* address = request.address;
-    return kern_clone_area(info.name, &address, request.addressSpec, info.protection, request.transferredArea);
 }

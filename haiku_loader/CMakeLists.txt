@@ -15,6 +15,7 @@ add_executable(haiku_loader
     loader_idmap.cpp
     loader_lock.cpp
     loader_mutex.cpp
+    loader_requests.cpp
     loader_reservedrange.cpp
     loader_tls.cpp
 

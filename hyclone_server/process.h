@@ -22,7 +22,9 @@ private:
     haiku_team_info _info;
     int _pid;
     int _uid, _gid, _euid, _egid;
+    int _debuggerPid, _debuggerPort, _debuggerWriteLock;
     bool _forkUnlocked;
+    bool _isExecutingExec;
     std::filesystem::path _cwd;
 
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
@@ -74,10 +76,21 @@ public:
     void SetCwd(const std::filesystem::path& cwd) { _cwd = cwd; }
     void SetCwd(std::filesystem::path&& cwd) { _cwd = std::move(cwd); }
 
+    int GetDebuggerPid() const { return _debuggerPid; }
+    int GetDebuggerPort() const { return _debuggerPort; }
+    int GetDebuggerWriteLock() const { return _debuggerWriteLock; }
+    void SetDebuggerPid(int pid) { _debuggerPid = pid; }
+    void SetDebuggerPort(int port) { _debuggerPort = port; }
+    void SetDebuggerWriteLock(int lock) { _debuggerWriteLock = lock; }
+
     // Copies managed information to child.
     void Fork(Process& child);
     // Checks whether this child process has been unlocked by fork yet.
     bool IsForkUnlocked() const { return _forkUnlocked; }
+
+    void Exec();
+    void FinishExec();
+    bool IsExecutingExec() const { return _isExecutingExec; }
 
     const std::unordered_set<int>& GetOwningSemaphores() const { return _owningSemaphores; }
     void AddOwningSemaphore(int id) { _owningSemaphores.insert(id); }

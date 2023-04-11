@@ -40,11 +40,13 @@ void Thread::SuspendSelf()
 void Thread::SetSuspended(bool suspended)
 {
     _suspended = suspended;
+    _info.state = suspended ? B_THREAD_SUSPENDED : B_THREAD_RUNNING;
 }
 
 void Thread::Resume()
 {
     _suspended = false;
+    _info.state = B_THREAD_RUNNING;
     _suspended.notify_all();
 }
 

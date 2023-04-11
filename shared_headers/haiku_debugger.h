@@ -7,6 +7,7 @@
 
 #include "BeDefs.h"
 #include "haiku_image.h"
+#include "haiku_signal.h"
 
 // include architecture specific definitions
 #include <arch_debugger.h>
@@ -371,7 +372,7 @@ extern "C"
     typedef struct
     {
         int signal;               // the signal
-        struct sigaction handler; // the new signal handler
+        struct haiku_sigaction handler; // the new signal handler
     } debug_nub_set_signal_handler;
 
     // B_DEBUG_MESSAGE_GET_SIGNAL_HANDLER
@@ -385,7 +386,7 @@ extern "C"
     typedef struct
     {
         status_t error;           // B_OK, if the thread exists
-        struct sigaction handler; // the signal handler
+        struct haiku_sigaction handler; // the signal handler
     } debug_nub_get_signal_handler_reply;
 
     // B_DEBUG_MESSAGE_PREPARE_HANDOVER
@@ -548,7 +549,7 @@ extern "C"
     {
         debug_origin origin;
         int signal;               // the signal
-        struct sigaction handler; // the signal handler
+        struct haiku_sigaction handler; // the signal handler
         bool deadly;              // true, if handling the signal will kill
                                   // the team
     } debug_signal_received;
