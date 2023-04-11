@@ -43,13 +43,6 @@ add_library(monika_static STATIC ${monika_sources})
 target_compile_definitions(monika_static PRIVATE
     -DHYCLONE_MONIKA)
 
-add_custom_target(monika_implemented.txt ALL
-    DEPENDS monika_static
-    BYPRODUCTS ${CMAKE_BINARY_DIR}/monika_implemented.txt
-    COMMENT "Enumerating implemented syscalls"
-    COMMAND nm -a ${CMAKE_CURRENT_BINARY_DIR}/libmonika_static.a | grep \"_moni_\" | cut -f 3 -d \" \" | grep -v \"^$$\" | sort | uniq -u > ${CMAKE_BINARY_DIR}/monika_implemented.txt
-)
-
 add_library(monika_obj OBJECT ${monika_sources})
 
 target_compile_definitions(monika_obj PRIVATE
