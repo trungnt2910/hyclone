@@ -1,4 +1,5 @@
 #include <cstring>
+#include <iostream>
 #include <utility>
 
 #include "area.h"
@@ -246,6 +247,12 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
         }
         else
         {
+            if (_cwd.empty())
+            {
+                // TODO: This should not happen, but somehow it does when running python3.10
+                std::cerr << _info.team << " tried to access a VFS function before registering its cwd!" << std::endl;
+                return HAIKU_POSIX_EBADF;
+            }
             output = GetCwd();
         }
 
