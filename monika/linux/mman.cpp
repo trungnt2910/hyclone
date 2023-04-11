@@ -9,7 +9,6 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "haiku_area.h"
 #include "haiku_errors.h"
@@ -51,7 +50,7 @@ public:
 extern "C"
 {
 
-int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
+int32_t _moni_create_area(const char *name, void **address,
     uint32_t addressSpec, size_t size,
     uint32_t lock, uint32_t protection)
 {
@@ -158,7 +157,7 @@ int32_t MONIKA_EXPORT _kern_create_area(const char *name, void **address,
     return area_id;
 }
 
-area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
+area_id _moni_clone_area(const char *name, void **address,
     uint32 addressSpec, uint32 protection, area_id sourceArea)
 {
     void* baseAddr = *address;
@@ -286,7 +285,7 @@ area_id MONIKA_EXPORT _kern_clone_area(const char *name, void **address,
     return area_id;
 }
 
-int MONIKA_EXPORT _kern_delete_area(int area)
+int _moni_delete_area(int area)
 {
     CHECK_COMMPAGE();
 
@@ -324,7 +323,7 @@ int MONIKA_EXPORT _kern_delete_area(int area)
     return status;
 }
 
-area_id MONIKA_EXPORT _kern_transfer_area(area_id area, void **_address,
+area_id _moni_transfer_area(area_id area, void **_address,
     uint32 addressSpec, team_id target)
 {
     struct haiku_area_info info;
@@ -340,7 +339,7 @@ area_id MONIKA_EXPORT _kern_transfer_area(area_id area, void **_address,
     if (!(info.protection & B_CLONEABLE_AREA))
     {
         void* address = NULL;
-        status = _kern_create_area(info.name, &address,
+        status = _moni_create_area(info.name, &address,
             B_ANY_ADDRESS, info.size, B_NO_LOCK,
             info.protection | B_CLONEABLE_AREA | B_WRITE_AREA);
 
@@ -361,7 +360,7 @@ area_id MONIKA_EXPORT _kern_transfer_area(area_id area, void **_address,
 
     if (transferredArea != area)
     {
-        _kern_delete_area(transferredArea);
+        _moni_delete_area(transferredArea);
     }
 
     if (status != B_OK)
@@ -369,12 +368,12 @@ area_id MONIKA_EXPORT _kern_transfer_area(area_id area, void **_address,
         return status;
     }
 
-    _kern_delete_area(area);
+    _moni_delete_area(area);
 
     return status;
 }
 
-int MONIKA_EXPORT _kern_set_area_protection(int area, uint32_t newProtection)
+int _moni_set_area_protection(int area, uint32_t newProtection)
 {
     CHECK_COMMPAGE();
 
@@ -408,7 +407,7 @@ int MONIKA_EXPORT _kern_set_area_protection(int area, uint32_t newProtection)
     return status;
 }
 
-status_t MONIKA_EXPORT _kern_set_memory_protection(void *address, size_t size, uint32 protection)
+status_t _moni_set_memory_protection(void *address, size_t size, uint32 protection)
 {
     int mprotect_prot = 0;
     if (protection & B_READ_AREA)
@@ -546,7 +545,7 @@ status_t MONIKA_EXPORT _kern_set_memory_protection(void *address, size_t size, u
 // range, the behavior may vary.
 //
 // unreserve_address_range does not unmap any area.
-int MONIKA_EXPORT _kern_reserve_address_range(void **address, uint32_t addressSpec, size_t size)
+int _moni_reserve_address_range(void **address, uint32_t addressSpec, size_t size)
 {
     // The function requires hostcalls.
     CHECK_COMMPAGE();
@@ -618,7 +617,7 @@ int MONIKA_EXPORT _kern_reserve_address_range(void **address, uint32_t addressSp
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_unreserve_address_range(void* address, size_t size)
+int _moni_unreserve_address_range(void* address, size_t size)
 {
     // The function requires hostcalls.
     CHECK_COMMPAGE();
@@ -641,7 +640,7 @@ int MONIKA_EXPORT _kern_unreserve_address_range(void* address, size_t size)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_unmap_memory(void *address, size_t size)
+int _moni_unmap_memory(void *address, size_t size)
 {
     MmanLock mmanLock;
 
@@ -711,7 +710,7 @@ int MONIKA_EXPORT _kern_unmap_memory(void *address, size_t size)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
+int _moni_map_file(const char *name, void **address,
 	uint32_t addressSpec, size_t size, uint32_t protection,
 	uint32_t mapping, bool unmapAddressRange, int fd,
 	off_t offset)
@@ -755,9 +754,9 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
     {
         // Attempt to unmap the address range first.
 
-        // _kern_unmap_memory also acquires a lock.
+        // _moni_unmap_memory also acquires a lock.
         GET_HOSTCALLS()->unlock_reserved_range_data();
-        result = _kern_unmap_memory(*address, size);
+        result = _moni_unmap_memory(*address, size);
         GET_HOSTCALLS()->lock_reserved_range_data();
         if (result != B_OK)
         {
@@ -848,7 +847,7 @@ int MONIKA_EXPORT _kern_map_file(const char *name, void **address,
     return area_id;
 }
 
-int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
+int _moni_resize_area(int32_t area, size_t newSize)
 {
     struct haiku_area_info info;
     long status = GET_SERVERCALLS()->get_area_info(area, &info);
@@ -936,22 +935,22 @@ int MONIKA_EXPORT _kern_resize_area(int32_t area, size_t newSize)
     return B_OK;
 }
 
-area_id MONIKA_EXPORT _kern_area_for(void *address)
+area_id _moni_area_for(void *address)
 {
     return GET_SERVERCALLS()->area_for(address);
 }
 
-status_t MONIKA_EXPORT _kern_get_area_info(area_id area, void* info)
+status_t _moni_get_area_info(area_id area, void* info)
 {
     return GET_SERVERCALLS()->get_area_info(area, info);
 }
 
-status_t MONIKA_EXPORT _kern_get_next_area_info(team_id team, ssize_t *cookie, void* info)
+status_t _moni_get_next_area_info(team_id team, ssize_t *cookie, void* info)
 {
     return GET_SERVERCALLS()->get_next_area_info(team, cookie, info, NULL);
 }
 
-status_t MONIKA_EXPORT _kern_mlock(const void* address, size_t size)
+status_t _moni_mlock(const void* address, size_t size)
 {
     long status = LINUX_SYSCALL2(__NR_mlock, address, size);
 

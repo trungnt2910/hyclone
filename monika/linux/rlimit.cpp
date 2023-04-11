@@ -3,7 +3,6 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
-#include "export.h"
 #include "haiku_errors.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
@@ -40,7 +39,7 @@ int RlimitBToLinux(int rlimit);
 extern "C"
 {
 
-int MONIKA_EXPORT _kern_getrlimit(int resource, struct haiku_rlimit *rlp)
+int _moni_getrlimit(int resource, struct haiku_rlimit *rlp)
 {
     switch (resource)
     {
@@ -68,7 +67,7 @@ int MONIKA_EXPORT _kern_getrlimit(int resource, struct haiku_rlimit *rlp)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_setrlimit(int resource, const struct haiku_rlimit * rlp)
+int _moni_setrlimit(int resource, const struct haiku_rlimit * rlp)
 {
     switch (resource)
     {

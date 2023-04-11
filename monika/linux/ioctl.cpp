@@ -25,7 +25,6 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "haiku_drivers.h"
 #include "haiku_errors.h"
@@ -35,6 +34,7 @@
 #include "linux_debug.h"
 #include "linux_syscall.h"
 #include "socket_conversion.h"
+#include "stringutils.h"
 
 typedef struct ktermios linux_termios;
 
@@ -45,7 +45,7 @@ static int InterfaceFlagsLinuxToB(int flags);
 extern "C"
 {
 
-status_t MONIKA_EXPORT _kern_ioctl(int fd, uint32 op, void* buffer, size_t length)
+status_t _moni_ioctl(int fd, uint32 op, void* buffer, size_t length)
 {
 #define STUB_IOCTL(name)                     \
     case HAIKU_##name:                       \

@@ -7,7 +7,6 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "haiku_errors.h"
 #include "linux_debug.h"
@@ -25,7 +24,7 @@ haiku_sigaction sHaikuSignalHandlers[HAIKU_NSIG];
 extern "C"
 {
 
-status_t MONIKA_EXPORT _kern_sigaction(int sig, const struct haiku_sigaction *action, struct haiku_sigaction *oldAction)
+status_t _moni_sigaction(int sig, const struct haiku_sigaction *action, struct haiku_sigaction *oldAction)
 {
     CHECK_COMMPAGE();
 
@@ -99,7 +98,7 @@ status_t MONIKA_EXPORT _kern_sigaction(int sig, const struct haiku_sigaction *ac
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_set_signal_mask(int how, const haiku_sigset_t *set, haiku_sigset_t *oldSet)
+status_t _moni_set_signal_mask(int how, const haiku_sigset_t *set, haiku_sigset_t *oldSet)
 {
     linux_sigset_t linuxSetMemory;
     linux_sigset_t oldLinuxSetMemory;
@@ -147,7 +146,7 @@ status_t MONIKA_EXPORT _kern_set_signal_mask(int how, const haiku_sigset_t *set,
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_send_signal(int32 id, uint32 signal, const union haiku_sigval* userValue, uint32 flags)
+status_t _moni_send_signal(int32 id, uint32 signal, const union haiku_sigval* userValue, uint32 flags)
 {
     int linuxSignal = SignalBToLinux(signal);
 
@@ -204,7 +203,7 @@ status_t MONIKA_EXPORT _kern_send_signal(int32 id, uint32 signal, const union ha
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_set_signal_stack(const haiku_stack_t *newStack, haiku_stack_t *oldStack)
+status_t _moni_set_signal_stack(const haiku_stack_t *newStack, haiku_stack_t *oldStack)
 {
     stack_t linuxNewStackStorage;
     stack_t linuxOldStackStorage;

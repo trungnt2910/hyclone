@@ -2,7 +2,6 @@
 #include <fcntl.h>
 
 #include "errno_conversion.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "fcntl_conversion.h"
 #include "haiku_errors.h"
@@ -18,7 +17,7 @@ static short FlockLTypeBToLinux(short type);
 extern "C"
 {
 
-int MONIKA_EXPORT _kern_fcntl(int fd, int op, size_t argument)
+int _moni_fcntl(int fd, int op, size_t argument)
 {
     long status = -EINVAL;
     switch (op)

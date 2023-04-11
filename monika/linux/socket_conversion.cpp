@@ -8,6 +8,7 @@
 #include "haiku_netinet_in.h"
 #include "linux_debug.h"
 #include "socket_conversion.h"
+#include "stringutils.h"
 
 int SocketFamilyBToLinux(int family)
 {

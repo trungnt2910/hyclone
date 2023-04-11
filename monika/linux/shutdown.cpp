@@ -1,5 +1,4 @@
 #include "BeDefs.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "haiku_errors.h"
 #include "linux_syscall.h"
@@ -8,7 +7,7 @@
 extern "C"
 {
 
-status_t MONIKA_EXPORT _kern_shutdown(bool reboot)
+status_t _moni_shutdown(bool reboot)
 {
     if (__gCommPageAddress != NULL)
     {

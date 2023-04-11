@@ -9,7 +9,6 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "haiku_team.h"
 #include "linux_syscall.h"
@@ -34,7 +33,7 @@ enum which_process_info
 extern "C"
 {
 
-void MONIKA_EXPORT _kern_exit_team(status_t returnValue)
+void _moni_exit_team(status_t returnValue)
 {
     if (__gCommPageAddress != NULL)
     {
@@ -46,7 +45,7 @@ void MONIKA_EXPORT _kern_exit_team(status_t returnValue)
     LINUX_SYSCALL1(__NR_exit, returnValue);
 }
 
-thread_id MONIKA_EXPORT _kern_fork()
+thread_id _moni_fork()
 {
     CHECK_COMMPAGE();
     thread_id id = GET_HOSTCALLS()->fork();
@@ -69,7 +68,7 @@ thread_id MONIKA_EXPORT _kern_fork()
     return id;
 }
 
-int MONIKA_EXPORT _kern_exec(const char *path, const char* const* flatArgs,
+int _moni_exec(const char *path, const char* const* flatArgs,
     size_t flatArgsSize, int32 argCount, int32 envCount, haiku_mode_t umask)
 {
     CHECK_COMMPAGE();
@@ -85,7 +84,7 @@ int MONIKA_EXPORT _kern_exec(const char *path, const char* const* flatArgs,
     return status;
 }
 
-thread_id MONIKA_EXPORT _kern_load_image(const char* const* flatArgs,
+thread_id _moni_load_image(const char* const* flatArgs,
     size_t flatArgsSize, int32 argCount, int32 envCount,
     int32 priority, uint32 flags, port_id errorPort,
     uint32 errorToken)
@@ -117,7 +116,7 @@ thread_id MONIKA_EXPORT _kern_load_image(const char* const* flatArgs,
     return pid;
 }
 
-haiku_pid_t MONIKA_EXPORT _kern_wait_for_child(thread_id child, uint32 flags,
+haiku_pid_t _moni_wait_for_child(thread_id child, uint32 flags,
     haiku_siginfo_t* info, team_usage_info* usageInfo)
 {
     int linuxFlags = 0;
@@ -179,7 +178,7 @@ haiku_pid_t MONIKA_EXPORT _kern_wait_for_child(thread_id child, uint32 flags,
     return linuxInfo.si_pid;
 }
 
-status_t MONIKA_EXPORT _kern_get_team_usage_info(team_id team, int32 who, team_usage_info *info, size_t size)
+status_t _moni_get_team_usage_info(team_id team, int32 who, team_usage_info *info, size_t size)
 {
     if (size != sizeof(team_usage_info))
     {
@@ -200,17 +199,17 @@ status_t MONIKA_EXPORT _kern_get_team_usage_info(team_id team, int32 who, team_u
     return GET_HOSTCALLS()->get_process_usage(team, who, info);
 }
 
-status_t MONIKA_EXPORT _kern_get_team_info(team_id id, haiku_team_info* info)
+status_t _moni_get_team_info(team_id id, haiku_team_info* info)
 {
     return GET_SERVERCALLS()->get_team_info(id, info);
 }
 
-status_t MONIKA_EXPORT _kern_get_next_team_info(int32 *cookie, haiku_team_info* info)
+status_t _moni_get_next_team_info(int32 *cookie, haiku_team_info* info)
 {
     return GET_SERVERCALLS()->get_next_team_info(cookie, info);
 }
 
-haiku_pid_t MONIKA_EXPORT _kern_process_info(haiku_pid_t process, int32 which)
+haiku_pid_t _moni_process_info(haiku_pid_t process, int32 which)
 {
     long status;
     switch (which)
@@ -237,7 +236,7 @@ haiku_pid_t MONIKA_EXPORT _kern_process_info(haiku_pid_t process, int32 which)
     return status;
 }
 
-haiku_pid_t MONIKA_EXPORT _kern_setpgid(haiku_pid_t process, haiku_pid_t group)
+haiku_pid_t _moni_setpgid(haiku_pid_t process, haiku_pid_t group)
 {
     long result = LINUX_SYSCALL2(__NR_setpgid, process, group);
     if (result < 0)
@@ -254,7 +253,7 @@ haiku_pid_t MONIKA_EXPORT _kern_setpgid(haiku_pid_t process, haiku_pid_t group)
     return result;
 }
 
-haiku_pid_t MONIKA_EXPORT _kern_setsid()
+haiku_pid_t _moni_setsid()
 {
     long result = LINUX_SYSCALL0(__NR_setsid);
     if (result < 0)

@@ -32,7 +32,7 @@ if [ ! -d "$HAIKU_BUILD_OUTPUT_ROOT" ]; then
     cd $HAIKU_BUILD_TOOLS_DIRECTORY/jam
     make -j$(nproc)
     cd $HAIKU_BUILD_OUTPUT_ROOT
-    $HAIKU_BUILD_TOOLS_DIRECTORY/jam/jam0 -q -j$(nproc) libroot.so runtime_loader "<build>fs_shell.a"
+    $HAIKU_BUILD_TOOLS_DIRECTORY/jam/jam0 -q -j$(nproc) libroot.so runtime_loader kernel_core.o "<build>fs_shell.a"
     popd
 fi
 
@@ -69,3 +69,4 @@ cp -fpv $HAIKU_BUILD_SOURCE_DIRECTORY/src/tools/fs_shell/*.h $SCRIPT_DIR/libhycl
 cp -fpv $HAIKU_BUILD_SOURCE_DIRECTORY/headers/private/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/private/fs_shell
 cp -fpv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/tools/fs_shell/*.o $SCRIPT_DIR/libhyclonefs/fs_shell
 cp -fpv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/build/libroot/*.o $SCRIPT_DIR/libhyclonefs/libroot_host
+cp -fpv $HAIKU_BUILD_OUTPUT_ROOT/objects/haiku/$HAIKU_ARCH/release/system/kernel/syscalls.o $SCRIPT_DIR/monika/dispatcher/syscalls.o

@@ -6,7 +6,6 @@
 #include <sys/socket.h>
 
 #include "errno_conversion.h"
-#include "export.h"
 #include "haiku_errors.h"
 #include "haiku_netinet_in.h"
 #include "haiku_netinet_tcp.h"
@@ -22,7 +21,7 @@ static int TcpOptionBToLinux(int options);
 extern "C"
 {
 
-int MONIKA_EXPORT _kern_socket(int family, int type, int protocol)
+int _moni_socket(int family, int type, int protocol)
 {
     int linuxFamily = SocketFamilyBToLinux(family);
     int linuxType = SocketTypeBToLinux(type);
@@ -43,7 +42,7 @@ int MONIKA_EXPORT _kern_socket(int family, int type, int protocol)
     return status;
 }
 
-status_t MONIKA_EXPORT _kern_socketpair(int family, int type, int protocol, int *socketVector)
+status_t _moni_socketpair(int family, int type, int protocol, int *socketVector)
 {
     int linuxFamily = SocketFamilyBToLinux(family);
     int linuxType = SocketTypeBToLinux(type);
@@ -59,7 +58,7 @@ status_t MONIKA_EXPORT _kern_socketpair(int family, int type, int protocol, int 
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_bind(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
+status_t _moni_bind(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
 {
     struct sockaddr_storage linuxAddress;
     memset(&linuxAddress, 0, sizeof(linuxAddress));
@@ -81,7 +80,7 @@ status_t MONIKA_EXPORT _kern_bind(int socket, const struct haiku_sockaddr *addre
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_connect(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
+status_t _moni_connect(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
 {
     struct sockaddr_storage linuxAddress;
     memset(&linuxAddress, 0, sizeof(linuxAddress));
@@ -103,7 +102,7 @@ status_t MONIKA_EXPORT _kern_connect(int socket, const struct haiku_sockaddr *ad
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_listen(int socket, int backlog)
+status_t _moni_listen(int socket, int backlog)
 {
     long status = LINUX_SYSCALL2(__NR_listen, socket, backlog);
 
@@ -115,7 +114,7 @@ status_t MONIKA_EXPORT _kern_listen(int socket, int backlog)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_accept(int socket, struct haiku_sockaddr *address,
+int _moni_accept(int socket, struct haiku_sockaddr *address,
     haiku_socklen_t *_addressLength)
 {
     struct sockaddr_storage linuxAddressStorage;
@@ -162,7 +161,7 @@ int MONIKA_EXPORT _kern_accept(int socket, struct haiku_sockaddr *address,
     return fd;
 }
 
-ssize_t MONIKA_EXPORT _kern_recvfrom(int socket, void *data, size_t length, int flags,
+ssize_t _moni_recvfrom(int socket, void *data, size_t length, int flags,
     struct haiku_sockaddr *address, haiku_socklen_t *_addressLength)
 {
     struct sockaddr_storage linuxAddressStorage;
@@ -216,12 +215,12 @@ ssize_t MONIKA_EXPORT _kern_recvfrom(int socket, void *data, size_t length, int 
     return bytesReceived;
 }
 
-ssize_t MONIKA_EXPORT _kern_recv(int socket, void *data, size_t length, int flags)
+ssize_t _moni_recv(int socket, void *data, size_t length, int flags)
 {
-    return _kern_recvfrom(socket, data, length, flags, NULL, NULL);
+    return _moni_recvfrom(socket, data, length, flags, NULL, NULL);
 }
 
-ssize_t MONIKA_EXPORT _kern_sendto(int socket, const void *data, size_t length,
+ssize_t _moni_sendto(int socket, const void *data, size_t length,
     int flags, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
 {
     struct sockaddr_storage linuxAddressStorage;
@@ -249,7 +248,7 @@ ssize_t MONIKA_EXPORT _kern_sendto(int socket, const void *data, size_t length,
     return bytesSent;
 }
 
-ssize_t MONIKA_EXPORT _kern_send(int socket, const void *data, size_t length, int flags)
+ssize_t _moni_send(int socket, const void *data, size_t length, int flags)
 {
     int linuxFlags = SendMessageFlagsBToLinux(flags);
 
@@ -268,7 +267,7 @@ ssize_t MONIKA_EXPORT _kern_send(int socket, const void *data, size_t length, in
     return status;
 }
 
-status_t MONIKA_EXPORT _kern_getsockopt(int socket, int level, int option,
+status_t _moni_getsockopt(int socket, int level, int option,
     void *value, haiku_socklen_t *_length)
 {
     // This function could, and SHOULD, be unified with _kern_setsockopt.
@@ -402,7 +401,7 @@ status_t MONIKA_EXPORT _kern_getsockopt(int socket, int level, int option,
     }
 }
 
-status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
+status_t _moni_setsockopt(int socket, int level, int option,
     const void *value, haiku_socklen_t length)
 {
     int linuxLevel;
@@ -515,7 +514,7 @@ status_t MONIKA_EXPORT _kern_setsockopt(int socket, int level, int option,
     }
 }
 
-status_t MONIKA_EXPORT _kern_getpeername(int socket,
+status_t _moni_getpeername(int socket,
     struct haiku_sockaddr *address, haiku_socklen_t *_addressLength)
 {
     struct sockaddr_storage linuxAddressStorage;
@@ -540,7 +539,7 @@ status_t MONIKA_EXPORT _kern_getpeername(int socket,
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_getsockname(int socket,
+status_t _moni_getsockname(int socket,
     struct sockaddr *address, socklen_t *_addressLength)
 {
     struct sockaddr_storage linuxAddressStorage;

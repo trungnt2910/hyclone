@@ -3,7 +3,6 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "haiku_errors.h"
 #include "haiku_time.h"
@@ -14,7 +13,7 @@ extern "C"
 
 // Fills the time zone offset in seconds in the field _timezoneOffset,
 // and the name of the timezone in the buffer by name.
-status_t MONIKA_EXPORT _kern_get_timezone(int32 *_timezoneOffset, char *name, size_t nameLength)
+status_t _moni_get_timezone(int32 *_timezoneOffset, char *name, size_t nameLength)
 {
     if (GET_HOSTCALLS()->system_timezone(_timezoneOffset, name, nameLength) < 0)
     {
@@ -24,7 +23,7 @@ status_t MONIKA_EXPORT _kern_get_timezone(int32 *_timezoneOffset, char *name, si
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_get_clock(clockid_t clockID, bigtime_t* _time)
+status_t _moni_get_clock(clockid_t clockID, bigtime_t* _time)
 {
     long status;
 

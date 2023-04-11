@@ -17,7 +17,6 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "fcntl_conversion.h"
 #include "haiku_dirent.h"
@@ -128,7 +127,7 @@ static bool IsTty(int fd);
 extern "C"
 {
 
-ssize_t MONIKA_EXPORT _kern_write(int fd, haiku_off_t pos, const void* buffer, size_t bufferSize)
+ssize_t _moni_write(int fd, haiku_off_t pos, const void* buffer, size_t bufferSize)
 {
     ssize_t bytesWritten;
 
@@ -149,7 +148,7 @@ ssize_t MONIKA_EXPORT _kern_write(int fd, haiku_off_t pos, const void* buffer, s
     return bytesWritten;
 }
 
-ssize_t MONIKA_EXPORT _kern_writev(int fd, haiku_off_t pos, const struct haiku_iovec *vecs, size_t count)
+ssize_t _moni_writev(int fd, haiku_off_t pos, const struct haiku_iovec *vecs, size_t count)
 {
     size_t memSize = ((count * sizeof(struct iovec)) + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
     struct iovec *linuxVecs =
@@ -189,7 +188,7 @@ ssize_t MONIKA_EXPORT _kern_writev(int fd, haiku_off_t pos, const struct haiku_i
     return bytesWritten;
 }
 
-ssize_t MONIKA_EXPORT _kern_read(int fd, haiku_off_t pos, void* buffer, size_t bufferSize)
+ssize_t _moni_read(int fd, haiku_off_t pos, void* buffer, size_t bufferSize)
 {
     ssize_t bytesRead;
 
@@ -210,7 +209,7 @@ ssize_t MONIKA_EXPORT _kern_read(int fd, haiku_off_t pos, void* buffer, size_t b
     return bytesRead;
 }
 
-ssize_t MONIKA_EXPORT _kern_readv(int fd, off_t pos, const struct haiku_iovec *vecs, size_t count)
+ssize_t _moni_readv(int fd, off_t pos, const struct haiku_iovec *vecs, size_t count)
 {
     size_t memSize = ((count * sizeof(struct iovec)) + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
     struct iovec *linuxVecs =
@@ -250,7 +249,7 @@ ssize_t MONIKA_EXPORT _kern_readv(int fd, off_t pos, const struct haiku_iovec *v
     return bytesRead;
 }
 
-int MONIKA_EXPORT _kern_read_link(int fd, const char* path, char* buffer, size_t *_bufferSize)
+int _moni_read_link(int fd, const char* path, char* buffer, size_t *_bufferSize)
 {
     if (fd == HAIKU_AT_FDCWD)
     {
@@ -289,7 +288,7 @@ int MONIKA_EXPORT _kern_read_link(int fd, const char* path, char* buffer, size_t
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_create_symlink(int fd, const char* path, const char* toPath, int mode)
+status_t _moni_create_symlink(int fd, const char* path, const char* toPath, int mode)
 {
     // Linux does not support permissions on symlinks.
     (void)mode;
@@ -341,7 +340,7 @@ status_t MONIKA_EXPORT _kern_create_symlink(int fd, const char* path, const char
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_create_link(int pathFD, const char* path, int toFD, const char* toPath, bool traverseLeafLink)
+status_t _moni_create_link(int pathFD, const char* path, int toFD, const char* toPath, bool traverseLeafLink)
 {
     if (pathFD == HAIKU_AT_FDCWD)
     {
@@ -388,7 +387,7 @@ status_t MONIKA_EXPORT _kern_create_link(int pathFD, const char* path, int toFD,
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, haiku_stat* st, size_t statSize)
+int _moni_read_stat(int fd, const char* path, bool traverseLink, haiku_stat* st, size_t statSize)
 {
     if (statSize > sizeof(haiku_stat))
     {
@@ -398,7 +397,7 @@ int MONIKA_EXPORT _kern_read_stat(int fd, const char* path, bool traverseLink, h
     return GET_SERVERCALLS()->read_stat(fd, path, path ? strlen(path) : 0, traverseLink, st, statSize);
 }
 
-status_t MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
+status_t _moni_write_stat(int fd, const char* path,
     bool traverseLink, const struct haiku_stat* stat,
     size_t statSize, int statMask)
 {
@@ -427,7 +426,7 @@ status_t MONIKA_EXPORT _kern_write_stat(int fd, const char* path,
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
+int _moni_open(int fd, const char* path, int openMode, int perms)
 {
     if (fd == HAIKU_AT_FDCWD)
     {
@@ -479,7 +478,7 @@ int MONIKA_EXPORT _kern_open(int fd, const char* path, int openMode, int perms)
     return result;
 }
 
-int MONIKA_EXPORT _kern_close(int fd)
+int _moni_close(int fd)
 {
     int result = LINUX_SYSCALL1(__NR_close, fd);
 
@@ -494,7 +493,7 @@ int MONIKA_EXPORT _kern_close(int fd)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_access(int fd, const char* path, int mode, bool effectiveUserGroup)
+int _moni_access(int fd, const char* path, int mode, bool effectiveUserGroup)
 {
     CHECK_FD_AND_PATH(fd, path);
 
@@ -593,7 +592,7 @@ int MONIKA_EXPORT _kern_access(int fd, const char* path, int mode, bool effectiv
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_normalize_path(const char* userPath, bool traverseLink, char* buffer)
+int _moni_normalize_path(const char* userPath, bool traverseLink, char* buffer)
 {
     if (!traverseLink)
     {
@@ -619,7 +618,7 @@ int MONIKA_EXPORT _kern_normalize_path(const char* userPath, bool traverseLink, 
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_create_pipe(int *fds)
+int _moni_create_pipe(int *fds)
 {
     long result = LINUX_SYSCALL1(__NR_pipe, fds);
 
@@ -643,7 +642,7 @@ int MONIKA_EXPORT _kern_create_pipe(int *fds)
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_create_fifo(int fd, const char* path, mode_t perms)
+status_t _moni_create_fifo(int fd, const char* path, mode_t perms)
 {
     CHECK_FD_AND_PATH(fd, path);
 
@@ -667,7 +666,7 @@ status_t MONIKA_EXPORT _kern_create_fifo(int fd, const char* path, mode_t perms)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_rename(int oldDir, const char* oldpath, int newDir, const char* newpath)
+int _moni_rename(int oldDir, const char* oldpath, int newDir, const char* newpath)
 {
     CHECK_FD_AND_PATH(oldDir, oldpath);
     CHECK_FD_AND_PATH(newDir, newpath);
@@ -705,7 +704,7 @@ int MONIKA_EXPORT _kern_rename(int oldDir, const char* oldpath, int newDir, cons
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_unlink(int fd, const char* path)
+int _moni_unlink(int fd, const char* path)
 {
     CHECK_FD_AND_PATH(fd, path);
 
@@ -725,7 +724,7 @@ int MONIKA_EXPORT _kern_unlink(int fd, const char* path)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
+int _moni_open_dir(int fd, const char* path)
 {
     if (fd == HAIKU_AT_FDCWD)
     {
@@ -760,7 +759,7 @@ int MONIKA_EXPORT _kern_open_dir(int fd, const char* path)
     return result;
 }
 
-status_t MONIKA_EXPORT _kern_open_parent_dir(int fd, char* name, size_t nameLength)
+status_t _moni_open_parent_dir(int fd, char* name, size_t nameLength)
 {
     long result = LINUX_SYSCALL3(__NR_openat, fd, "..", O_DIRECTORY);
 
@@ -784,18 +783,18 @@ status_t MONIKA_EXPORT _kern_open_parent_dir(int fd, char* name, size_t nameLeng
     return newFd;
 }
 
-ssize_t MONIKA_EXPORT _kern_read_dir(int fd, struct haiku_dirent* buffer, size_t bufferSize, uint32 maxCount)
+ssize_t _moni_read_dir(int fd, struct haiku_dirent* buffer, size_t bufferSize, uint32 maxCount)
 {
     return GET_HOSTCALLS()->readdir(fd, buffer, bufferSize, maxCount);
 }
 
-status_t MONIKA_EXPORT _kern_rewind_dir(int fd)
+status_t _moni_rewind_dir(int fd)
 {
     GET_HOSTCALLS()->rewinddir(fd);
     return B_OK;
 }
 
-haiku_off_t MONIKA_EXPORT _kern_seek(int fd, off_t pos, int seekType)
+haiku_off_t _moni_seek(int fd, off_t pos, int seekType)
 {
     if (fd == HAIKU_AT_FDCWD)
     {
@@ -813,12 +812,12 @@ haiku_off_t MONIKA_EXPORT _kern_seek(int fd, off_t pos, int seekType)
     return result;
 }
 
-status_t MONIKA_EXPORT _kern_getcwd(char* buffer, size_t size)
+status_t _moni_getcwd(char* buffer, size_t size)
 {
     return GET_SERVERCALLS()->getcwd(buffer, size);
 }
 
-int MONIKA_EXPORT _kern_dup(int fd)
+int _moni_dup(int fd)
 {
     int result = LINUX_SYSCALL1(__NR_dup, fd);
 
@@ -832,7 +831,7 @@ int MONIKA_EXPORT _kern_dup(int fd)
     return result;
 }
 
-int MONIKA_EXPORT _kern_dup2(int ofd, int nfd)
+int _moni_dup2(int ofd, int nfd)
 {
     int result = LINUX_SYSCALL2(__NR_dup2, ofd, nfd);
 
@@ -846,7 +845,7 @@ int MONIKA_EXPORT _kern_dup2(int ofd, int nfd)
     return result;
 }
 
-ssize_t MONIKA_EXPORT _kern_select(int numfds,
+ssize_t _moni_select(int numfds,
     struct haiku_fd_set *readSet, struct haiku_fd_set *writeSet, struct haiku_fd_set *errorSet,
     bigtime_t timeout, const haiku_sigset_t *sigMask)
 {
@@ -943,7 +942,7 @@ ssize_t MONIKA_EXPORT _kern_select(int numfds,
     return result;
 }
 
-ssize_t MONIKA_EXPORT _kern_poll(struct haiku_pollfd *fds, int numFDs,
+ssize_t _moni_poll(struct haiku_pollfd *fds, int numFDs,
     bigtime_t timeout, const haiku_sigset_t *sigMask)
 {
     size_t memSize = ((numFDs * sizeof(struct pollfd)) + (B_PAGE_SIZE - 1)) & ~(B_PAGE_SIZE - 1);
@@ -987,7 +986,7 @@ ssize_t MONIKA_EXPORT _kern_poll(struct haiku_pollfd *fds, int numFDs,
     return status;
 }
 
-status_t MONIKA_EXPORT _kern_setcwd(int fd, const char* path)
+status_t _moni_setcwd(int fd, const char* path)
 {
     // path can be null with a positive fd, this happens
     // in the implementation of fchdir.
@@ -1020,7 +1019,7 @@ status_t MONIKA_EXPORT _kern_setcwd(int fd, const char* path)
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_create_dir(int fd, const char* path, int perms)
+status_t _moni_create_dir(int fd, const char* path, int perms)
 {
     CHECK_FD_AND_PATH(fd, path);
 
@@ -1046,7 +1045,7 @@ status_t MONIKA_EXPORT _kern_create_dir(int fd, const char* path, int perms)
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_remove_dir(int fd, const char* path)
+status_t _moni_remove_dir(int fd, const char* path)
 {
     CHECK_FD_AND_PATH(fd, path);
 
@@ -1072,12 +1071,12 @@ status_t MONIKA_EXPORT _kern_remove_dir(int fd, const char* path)
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_read_fs_info(haiku_dev_t device, struct haiku_fs_info *info)
+status_t _moni_read_fs_info(haiku_dev_t device, struct haiku_fs_info *info)
 {
     return GET_SERVERCALLS()->read_fs_info(device, info);
 }
 
-status_t MONIKA_EXPORT _kern_fsync(int fd)
+status_t _moni_fsync(int fd)
 {
     int status = LINUX_SYSCALL1(__NR_fsync, fd);
     if (status < 0)
@@ -1088,7 +1087,7 @@ status_t MONIKA_EXPORT _kern_fsync(int fd)
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_flock(int fd, int op)
+status_t _moni_flock(int fd, int op)
 {
     int status = LINUX_SYSCALL2(__NR_flock, fd, FlockFlagsBToLinux(op));
     if (status < 0)
@@ -1099,7 +1098,7 @@ status_t MONIKA_EXPORT _kern_flock(int fd, int op)
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char* name)
+status_t _moni_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char* name)
 {
     char hostPath[PATH_MAX];
     long status = GET_SERVERCALLS()->get_entry_ref(device, inode, hostPath, sizeof(hostPath));
@@ -1151,7 +1150,7 @@ status_t MONIKA_EXPORT _kern_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t 
     return status;
 }
 
-status_t MONIKA_EXPORT _kern_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char* name,
+status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char* name,
     int openMode, int perms)
 {
     char hostPath[PATH_MAX];
@@ -1211,7 +1210,7 @@ status_t MONIKA_EXPORT _kern_open_entry_ref(haiku_dev_t device, haiku_ino_t inod
     return status;
 }
 
-status_t MONIKA_EXPORT _kern_entry_ref_to_path(haiku_dev_t device, haiku_ino_t inode,
+status_t _moni_entry_ref_to_path(haiku_dev_t device, haiku_ino_t inode,
     const char *leaf, char *userPath, size_t pathLength)
 {
     char hostPath[PATH_MAX];
@@ -1256,20 +1255,20 @@ status_t MONIKA_EXPORT _kern_entry_ref_to_path(haiku_dev_t device, haiku_ino_t i
     return B_OK;
 }
 
-ssize_t MONIKA_EXPORT _kern_read_attr(int fd, const char* attribute, off_t pos,
+ssize_t _moni_read_attr(int fd, const char* attribute, off_t pos,
     void* buffer, size_t readBytes)
 {
     return GET_SERVERCALLS()->read_attr(fd, attribute, strlen(attribute), pos, buffer, readBytes);
 }
 
-ssize_t MONIKA_EXPORT _kern_write_attr(int fd, const char* attribute, uint32 type,
+ssize_t _moni_write_attr(int fd, const char* attribute, uint32 type,
     off_t pos, const void* buffer, size_t readBytes)
 {
     std::pair<const char*, size_t> attrAndSize(attribute, strlen(attribute));
     return GET_SERVERCALLS()->write_attr(fd, &attrAndSize, type, pos, buffer, readBytes);
 }
 
-int MONIKA_EXPORT _kern_open_attr(int fd, const char* path, const char *name,
+int _moni_open_attr(int fd, const char* path, const char *name,
     uint32 type, int openMode)
 {
     if (name == NULL)
@@ -1312,7 +1311,7 @@ int MONIKA_EXPORT _kern_open_attr(int fd, const char* path, const char *name,
     return status;
 }
 
-int MONIKA_EXPORT _kern_open_attr_dir(int fd, const char* path, bool traverseLeafLink)
+int _moni_open_attr_dir(int fd, const char* path, bool traverseLeafLink)
 {
     char hostPath[PATH_MAX];
 
@@ -1342,12 +1341,12 @@ int MONIKA_EXPORT _kern_open_attr_dir(int fd, const char* path, bool traverseLea
     return status;
 }
 
-int MONIKA_EXPORT _kern_remove_attr(int fd, const char* name)
+int _moni_remove_attr(int fd, const char* name)
 {
     return GET_SERVERCALLS()->remove_attr(fd, name, strlen(name));
 }
 
-int MONIKA_EXPORT _kern_stat_attr(int fd, const char* attribute, struct haiku_attr_info *attrInfo)
+int _moni_stat_attr(int fd, const char* attribute, struct haiku_attr_info *attrInfo)
 {
     return GET_SERVERCALLS()->stat_attr(fd, attribute, strlen(attribute), attrInfo);
 }
@@ -1355,13 +1354,13 @@ int MONIKA_EXPORT _kern_stat_attr(int fd, const char* attribute, struct haiku_at
 // The functions below are clearly impossible
 // to be cleanly implemented in Hyclone, so
 // ENOSYS is directly returned and no logging is provided.
-status_t MONIKA_EXPORT _kern_read_index_stat(haiku_dev_t device, const char* name, struct haiku_stat *stat)
+status_t _moni_read_index_stat(haiku_dev_t device, const char* name, struct haiku_stat *stat)
 {
     // No support for indexing.
     return HAIKU_POSIX_ENOSYS;
 }
 
-status_t MONIKA_EXPORT _kern_create_index(haiku_dev_t device, const char* name, uint32 type, uint32 flags)
+status_t _moni_create_index(haiku_dev_t device, const char* name, uint32 type, uint32 flags)
 {
     // No support for indexing.
     return HAIKU_POSIX_ENOSYS;

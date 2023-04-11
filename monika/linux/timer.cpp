@@ -2,7 +2,6 @@
 #include <time.h>
 
 #include "BeDefs.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "linux_cpu_timers.h"
 #include "linux_subsystemlock.h"
@@ -17,7 +16,7 @@ void InitializeTimerIdMap();
 extern "C"
 {
 
-status_t MONIKA_EXPORT _kern_set_timer(int32 timerID, thread_id threadID,
+status_t _moni_set_timer(int32 timerID, thread_id threadID,
     bigtime_t startTime, bigtime_t interval,
     uint32 flags, struct user_timer_info* oldInfo)
 {

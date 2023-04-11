@@ -1,24 +1,23 @@
 #include "BeDefs.h"
 #include "errno_conversion.h"
 #include "extended_commpage.h"
-#include "export.h"
 #include "haiku_errors.h"
 #include "linux_syscall.h"
 
 extern "C"
 {
 
-haiku_gid_t MONIKA_EXPORT _kern_getgid(bool effective)
+haiku_gid_t _moni_getgid(bool effective)
 {
     return GET_SERVERCALLS()->getgid(effective);
 }
 
-haiku_uid_t MONIKA_EXPORT _kern_getuid(bool effective)
+haiku_uid_t _moni_getuid(bool effective)
 {
     return GET_SERVERCALLS()->getuid(effective);
 }
 
-haiku_ssize_t MONIKA_EXPORT _kern_getgroups(int groupCount, haiku_gid_t* groupList)
+haiku_ssize_t _moni_getgroups(int groupCount, haiku_gid_t* groupList)
 {
     long result = LINUX_SYSCALL2(__NR_getgroups, groupCount, groupList);
     if (result < 0)

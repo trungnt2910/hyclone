@@ -4,11 +4,11 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
-#include "export.h"
 #include "extended_commpage.h"
 #include "haiku_errors.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
+#include "stringutils.h"
 
 typedef struct
 {
@@ -58,7 +58,7 @@ typedef struct
 extern "C"
 {
 
-status_t MONIKA_EXPORT _kern_get_system_info(haiku_system_info *info)
+status_t _moni_get_system_info(haiku_system_info *info)
 {
     struct sysinfo linux_sysinfo;
     long result = LINUX_SYSCALL1(__NR_sysinfo, &linux_sysinfo);
@@ -124,13 +124,13 @@ status_t MONIKA_EXPORT _kern_get_system_info(haiku_system_info *info)
     return B_OK;
 }
 
-int MONIKA_EXPORT _kern_is_computer_on()
+int _moni_is_computer_on()
 {
     // Seriously? Who thought of this syscall?
     return 1;
 }
 
-status_t MONIKA_EXPORT _kern_get_cpu_topology_info(haiku_cpu_topology_node_info *topologyInfos, uint32 *topologyInfoCount)
+status_t _moni_get_cpu_topology_info(haiku_cpu_topology_node_info *topologyInfos, uint32 *topologyInfoCount)
 {
     if (topologyInfos == NULL)
     {
@@ -143,7 +143,7 @@ status_t MONIKA_EXPORT _kern_get_cpu_topology_info(haiku_cpu_topology_node_info 
     }
 }
 
-status_t MONIKA_EXPORT _kern_get_cpu_info(uint32 firstCPU, uint32 cpuCount, haiku_cpu_info *cpuInfos)
+status_t _moni_get_cpu_info(uint32 firstCPU, uint32 cpuCount, haiku_cpu_info *cpuInfos)
 {
     for (uint32 cpuIndex = firstCPU, i = 0; i < cpuCount; ++cpuIndex, ++i)
     {
@@ -153,7 +153,7 @@ status_t MONIKA_EXPORT _kern_get_cpu_info(uint32 firstCPU, uint32 cpuCount, haik
     return B_OK;
 }
 
-status_t MONIKA_EXPORT _kern_cpu_enabled(uint32 cpu)
+status_t _moni_cpu_enabled(uint32 cpu)
 {
     if (cpu < 0 || cpu >= GET_HOSTCALLS()->get_cpu_count())
     {
@@ -164,19 +164,19 @@ status_t MONIKA_EXPORT _kern_cpu_enabled(uint32 cpu)
     return info.enabled;
 }
 
-status_t MONIKA_EXPORT _kern_start_watching_system(int32 object, uint32 flags,
+status_t _moni_start_watching_system(int32 object, uint32 flags,
     port_id port, int32 token)
 {
     return GET_SERVERCALLS()->start_watching_system(object, flags, port, token);
 }
 
-status_t MONIKA_EXPORT _kern_stop_watching_system(int32 object, uint32 flags,
+status_t _moni_stop_watching_system(int32 object, uint32 flags,
     port_id port, int32 token)
 {
     return GET_SERVERCALLS()->stop_watching_system(object, flags, port, token);
 }
 
-status_t MONIKA_EXPORT _kern_get_safemode_option(const char* parameter,
+status_t _moni_get_safemode_option(const char* parameter,
     char* buffer, size_t* _bufferSize)
 {
     return GET_SERVERCALLS()->get_safemode_option(parameter, strlen(parameter), buffer, _bufferSize);
