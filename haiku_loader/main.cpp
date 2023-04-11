@@ -300,15 +300,15 @@ int main(int argc, char** argv, char** envp)
     loader_build_args(user_args_memory, args, argv, envp);
 	loader_init_tls();
 
-	loader_register_process(args.arg_count, args.args);
-	loader_register_thread(-1, NULL, false);
-	loader_register_builtin_areas(commpage, args.args);
-	loader_register_existing_fds();
-
 	std::filesystem::path cwd = std::filesystem::current_path();
 	char emulatedCwd[PATH_MAX];
 	size_t emulatedCwdLength = loader_vchroot_unexpand(cwd.c_str(), emulatedCwd, sizeof(emulatedCwd));
 	loader_hserver_call_setcwd(HAIKU_AT_FDCWD, emulatedCwd, emulatedCwdLength);
+
+	loader_register_existing_fds();
+	loader_register_process(args.arg_count, args.args);
+	loader_register_thread(-1, NULL, false);
+	loader_register_builtin_areas(commpage, args.args);
 
 	((hostcalls*)(((uint8_t*)commpage) + EXTENDED_COMMPAGE_HOSTCALLS_OFFSET))
 		->at_exit = &loader_at_exit;
