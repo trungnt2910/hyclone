@@ -21,18 +21,9 @@ target_link_libraries(root PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libgcc_s.so.1)
 target_link_libraries(root PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/crtendS.o)
 target_link_libraries(root PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/crtn.o)
 
-add_executable(determine_hyclone_revision determine_hyclone_revision.cpp)
-
-add_custom_target(revision.txt ALL
-    DEPENDS root determine_hyclone_revision
-    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}revision.txt
-    COMMENT "Determining HyClone revision"
-    COMMAND determine_hyclone_revision > ${CMAKE_CURRENT_BINARY_DIR}revision.txt)
-
-add_custom_target(SetHycloneRevision ALL
-    DEPENDS root revision.txt
-    COMMAND objcopy ${CMAKE_CURRENT_BINARY_DIR}/libroot.so  
-        --update-section _haiku_revision=${CMAKE_CURRENT_BINARY_DIR}revision.txt)
+add_custom_target(SetHyCloneRevision ALL
+    DEPENDS root
+    COMMAND CMAKE_CURRENT_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/set_hyclone_revision.sh)
 
 install(TARGETS root DESTINATION lib)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/libgcc_s.so.1 DESTINATION lib)
