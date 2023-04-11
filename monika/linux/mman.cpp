@@ -9,6 +9,7 @@
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
+#include "export.h"
 #include "extended_commpage.h"
 #include "haiku_area.h"
 #include "haiku_errors.h"
@@ -157,7 +158,7 @@ int32_t _moni_create_area(const char *name, void **address,
     return area_id;
 }
 
-area_id _moni_clone_area(const char *name, void **address,
+area_id MONIKA_EXPORT _moni_clone_area(const char *name, void **address,
     uint32 addressSpec, uint32 protection, area_id sourceArea)
 {
     void* baseAddr = *address;

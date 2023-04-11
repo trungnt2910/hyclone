@@ -5,6 +5,7 @@ project(syscalls_linux)
 
 include_directories(${CMAKE_SOURCE_DIR}/shared_headers)
 include_directories(${CMAKE_SOURCE_DIR}/shared_headers/${HYCLONE_ARCH})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 set(monika_sources
     errno_conversion.cpp
