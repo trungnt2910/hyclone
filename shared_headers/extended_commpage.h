@@ -80,6 +80,8 @@ struct hostcalls
 
     // Debugger
     bool (*is_debugger_present)();
+    void (*debugger_pre_syscall)(uint32_t callIndex, void* args);
+    void (*debugger_post_syscall)(uint32_t callIndex, void* args, uint64_t result);
 
     // Readdir
     void (*opendir)(int fd);

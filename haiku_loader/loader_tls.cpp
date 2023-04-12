@@ -2,16 +2,10 @@
 #include <cstdint>
 #include <cstdio>
 
-#ifdef __linux__
-#include <unistd.h> // syscall(SYS_gettid)
-#include <sys/syscall.h>
-#else
-#include <thread>   // std::this_thread
-#endif
-
 #include "haiku_errors.h"
 #include "haiku_loader.h"
 #include "haiku_tls.h"
+#include "loader_ids.h"
 #include "user_thread_defs.h"
 
 #include "loader_tls.h"
@@ -58,19 +52,10 @@ void tls_set(int32_t index, void* value)
     get_tls()[index] = value;
 }
 
-static intptr_t loader_get_thread_id()
-{
-#ifdef __linux__
-    return (intptr_t)syscall(SYS_gettid);
-#else
-    return (intptr_t)std::hash<std::thread::id>()(std::this_thread::get_id());
-#endif
-}
-
 void loader_init_tls()
 {
     sProcessTls[TLS_BASE_ADDRESS_SLOT] = &sProcessTls;
-    sProcessTls[TLS_THREAD_ID_SLOT] = (void*)loader_get_thread_id();
+    sProcessTls[TLS_THREAD_ID_SLOT] = (void*)(intptr_t)loader_get_tid();
     sProcessTls[TLS_USER_THREAD_SLOT] = &sUserThread;
     sProcessTls[TLS_DYNAMIC_THREAD_VECTOR] = NULL;
     sUserThread.pthread = NULL;

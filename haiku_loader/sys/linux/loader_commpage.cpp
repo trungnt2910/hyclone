@@ -110,6 +110,8 @@ void* loader_allocate_commpage()
     hostcalls_ptr->get_sigrtmax = loader_get_sigrtmax;
 
     hostcalls_ptr->is_debugger_present = loader_is_debugger_present;
+    hostcalls_ptr->debugger_pre_syscall = loader_debugger_pre_syscall;
+    hostcalls_ptr->debugger_post_syscall = loader_debugger_post_syscall;
 
     hostcalls_ptr->opendir = loader_opendir;
     hostcalls_ptr->closedir = loader_closedir;

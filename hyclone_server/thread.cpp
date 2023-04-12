@@ -34,7 +34,10 @@ Thread::Thread(int pid, int tid) : _tid(tid)
 void Thread::SuspendSelf()
 {
     _suspended = true;
-    _suspended.wait(true);
+    server_worker_run_wait([&]()
+    {
+        _suspended.wait(true);
+    });
 }
 
 void Thread::SetSuspended(bool suspended)
@@ -274,15 +277,20 @@ intptr_t server_hserver_call_suspend_thread(hserver_context& context, int thread
         return B_BAD_THREAD_ID;
     }
 
+    // Currently, this call is used internally in HyClone to force a thread to suspend itself.
+    // After issuing this call, it will have to call wait_for_resume when it is ready to resume.
+    //
+    // When we support suspending other threads, this call should issue a "request" to the target
+    // thread. In the request handler, that target thread should also call wait_for_resume when it
+    // is ready.
     if (thread_id != context.tid)
     {
         std::cerr << "suspend_thread: " << context.pid << " " << context.tid << " " << thread_id << std::endl;
-        std::cerr << "Suspending another thread is currently not supported in Hyclone." << std::endl;
+        std::cerr << "Suspending another thread is currently not supported in HyClone." << std::endl;
         return HAIKU_POSIX_ENOSYS;
     }
 
     thread->GetInfo().state = B_THREAD_SUSPENDED;
-    thread->SuspendSelf();
 
     return B_OK;
 }

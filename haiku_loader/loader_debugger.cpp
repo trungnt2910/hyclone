@@ -5,29 +5,31 @@
 #include <cstring>
 #include <iostream>
 #include <mutex>
-
-#ifdef HYCLONE_HOST_LINUX
-#include <unistd.h>
-#else
-#error Include the header for getpid
-#endif
+#include <unordered_map>
 
 #include "BeDefs.h"
 #include "haiku_debugger.h"
 #include "haiku_errors.h"
 #include "haiku_thread.h"
 #include "loader_debugger.h"
+#include "loader_ids.h"
 #include "loader_servercalls.h"
-#include "loader_sysinfo.h"
 #include "loader_spawn_thread.h"
+#include "loader_sysinfo.h"
+#include "loader_systemtime.h"
 #include "thread_defs.h"
 
+static std::atomic<bool> sDebuggerInstalling = false;
 static std::atomic<bool> sDebuggerInstalled = false;
 static port_id sDebuggerPort = -1;
 static sem_id sDebuggerWriteLock = -1;
 static port_id sNubPort = -1;
 static thread_id sNubThread = -1;
 static void* sNubStack = NULL;
+static std::atomic<int> sTeamFlags = 0;
+std::mutex sThreadFlagsMutex;
+std::unordered_map<int, int> sThreadFlags;
+static thread_local bigtime_t sSyscallStart = -1;
 
 static int loader_debugger_nub_thread_entry(void*, void*);
 
@@ -44,12 +46,18 @@ int loader_dprintf(const char* format, ...)
 int loader_install_team_debugger(int debuggerTeam, int debuggerPort)
 {
     // TODO: Implement Haiku's handover mechanism.
-    if (sDebuggerInstalled.exchange(true))
+    if (sDebuggerInstalling.exchange(true))
     {
         return B_NOT_ALLOWED;
     }
 
-    int pid = getpid();
+    if (sDebuggerInstalled)
+    {
+        sDebuggerInstalling = false;
+        return B_NOT_ALLOWED;
+    }
+
+    int pid = loader_get_pid();
 
     char nameBuffer[B_OS_NAME_LENGTH];
     size_t nameLen;
@@ -116,9 +124,15 @@ int loader_install_team_debugger(int debuggerTeam, int debuggerPort)
 
     loader_hserver_call_register_nub(sNubPort, sNubThread, sDebuggerWriteLock);
 
+    sTeamFlags = 0;
+    sThreadFlags.clear();
+    sDebuggerPort = debuggerPort;
+
     // Everything went fine, resume the nub thread.
     loader_hserver_call_resume_thread(sNubThread);
 
+    sDebuggerInstalled = true;
+    sDebuggerInstalling = false;
     return sNubPort;
 clean_and_die:
     if (error != B_OK)
@@ -138,7 +152,96 @@ clean_and_die:
         sDebuggerInstalled = false;
     }
 
+    sDebuggerInstalled = false;
+    sDebuggerInstalling = false;
     return error;
+}
+
+static void loader_write_debug_message(int code, debug_debugger_message_data& message)
+{
+    int tid = loader_get_tid();
+
+    message.origin.nub_port = sNubPort;
+    message.origin.thread = tid;
+    message.origin.team = loader_get_pid();
+
+    if (loader_hserver_call_acquire_sem(sDebuggerWriteLock) != B_OK)
+    {
+        // Probably the debugger is gone.
+        return;
+    }
+
+    // Does not actually suspend the thread, just set some internal flags.
+    loader_hserver_call_suspend_thread(tid);
+
+    loader_hserver_call_write_port_etc(sDebuggerPort, code, &message, sizeof(message), 0, B_INFINITE_TIMEOUT);
+    loader_hserver_call_release_sem(sDebuggerWriteLock);
+
+    // The thread is actually suspended.
+    loader_hserver_call_wait_for_resume();
+}
+
+void loader_debugger_pre_syscall(uint32_t callIndex, void* args)
+{
+    if (sDebuggerInstalled)
+    {
+        bool debugPreSyscall = (sTeamFlags & B_TEAM_DEBUG_PRE_SYSCALL);
+        bool debugPostSyscall = (sTeamFlags & B_TEAM_DEBUG_POST_SYSCALL);
+
+        if (!debugPreSyscall || !debugPostSyscall)
+        {
+            auto lock = std::unique_lock<std::mutex>(sThreadFlagsMutex);
+            int threadFlags = sThreadFlags[loader_get_tid()];
+            debugPreSyscall = debugPreSyscall || (threadFlags & B_THREAD_DEBUG_PRE_SYSCALL);
+            debugPostSyscall = debugPostSyscall || (threadFlags & B_THREAD_DEBUG_POST_SYSCALL);
+        }
+
+        if (debugPostSyscall)
+        {
+            sSyscallStart = loader_system_time();
+        }
+
+        if (debugPreSyscall)
+        {
+            debug_debugger_message_data message;
+
+            memcpy(message.pre_syscall.args, args, sizeof(message.pre_syscall.args));
+            message.pre_syscall.syscall = callIndex;
+
+            loader_write_debug_message(B_DEBUGGER_MESSAGE_PRE_SYSCALL, message);
+        }
+    }
+}
+
+void loader_debugger_post_syscall(uint32_t callIndex, void* args, uint64_t returnValue)
+{
+    if (sDebuggerInstalled)
+    {
+        int tid = loader_get_tid();
+
+        bool debugPostSyscall = (sTeamFlags & B_TEAM_DEBUG_POST_SYSCALL);
+
+        if (!debugPostSyscall)
+        {
+            auto lock = std::unique_lock<std::mutex>(sThreadFlagsMutex);
+            debugPostSyscall = (sThreadFlags[tid] & B_THREAD_DEBUG_POST_SYSCALL);
+        }
+
+        if (debugPostSyscall && sSyscallStart >= 0)
+        {
+            debug_debugger_message_data message;
+
+            memcpy(message.post_syscall.args, args, sizeof(message.post_syscall.args));
+            message.post_syscall.syscall = callIndex;
+            message.post_syscall.return_value = returnValue;
+            message.post_syscall.start_time = sSyscallStart;
+            message.post_syscall.end_time = loader_system_time();
+
+            sSyscallStart = -1;
+
+            loader_write_debug_message(B_DEBUGGER_MESSAGE_POST_SYSCALL, message);
+        }
+    }
 }
 
 int loader_remove_team_debugger()
@@ -180,6 +283,20 @@ static int loader_debugger_nub_thread_entry(void*, void*)
 
         switch (op)
         {
+            case B_DEBUG_MESSAGE_SET_TEAM_FLAGS:
+                sTeamFlags = data.set_team_flags.flags;
+            break;
+            case B_DEBUG_MESSAGE_SET_THREAD_FLAGS:
+            {
+                auto lock = std::unique_lock<std::mutex>(sThreadFlagsMutex);
+                sThreadFlags[data.set_thread_flags.thread] = data.set_thread_flags.flags;
+            }
+            break;
+            case B_DEBUG_MESSAGE_CONTINUE_THREAD:
+            {
+                loader_hserver_call_resume_thread(data.continue_thread.thread);
+            }
+            break;
             default:
             {
                 std::cerr << "Unimplemented nub thread operation: " << op << std::endl;

@@ -138,19 +138,20 @@ int main(int argc, char** argv)
 
     output << "void syscall_dispatcher(uint32_t callIndex, void* args, uint64_t* _returnValue)\n";
     output << "{\n";
+    output << "    GET_HOSTCALLS()->debugger_pre_syscall(callIndex, args);\n";
     output << "    switch (callIndex)\n";
     output << "    {\n";
     for (int i = 0; i < kSyscallCount; i++)
     {
         auto name = MONIKA_SYSCALL_PREFIX + std::string(kExtendedSyscallInfos[i].name).substr(STRINGSIZE(KENREL_SYSCALL_PREFIX));
-        output << "    case " << i << ":\n";
+        output << "        case " << i << ":\n";
         if (kExtendedSyscallInfos[i].return_type.size == 0)
         {
-            output << "        " << name << "(";
+            output << "            " << name << "(";
         }
         else
         {
-            output << "        *_returnValue = " << name << "(";
+            output << "            *_returnValue = " << name << "(";
         }
         for (int j = 0; j < kExtendedSyscallInfos[i].parameter_count; ++j)
         {
@@ -163,12 +164,13 @@ int main(int argc, char** argv)
             }
         }
         output << ");\n";
-        output << "    break;\n";
+        output << "        break;\n";
     }
-    output << "    default:\n";
-    output << "        *_returnValue = B_BAD_VALUE;\n";
-    output << "    break;\n";
+    output << "        default:\n";
+    output << "            *_returnValue = B_BAD_VALUE;\n";
+    output << "        break;\n";
     output << "    }\n";
+    output << "    GET_HOSTCALLS()->debugger_post_syscall(callIndex, args, *_returnValue);\n";
     output << "}\n";
 
     output << "\n}\n";
