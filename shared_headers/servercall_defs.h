@@ -27,6 +27,7 @@ HYCLONE_SERVERCALL3(register_entry_ref, unsigned long long, unsigned long long, 
 HYCLONE_SERVERCALL6(register_entry_ref_child, unsigned long long, unsigned long long, unsigned long long, unsigned long long, const char*, size_t)
 HYCLONE_SERVERCALL4(get_entry_ref, unsigned long long, unsigned long long, const char *, size_t)
 HYCLONE_SERVERCALL1(fork, int)
+HYCLONE_SERVERCALL1(exec, bool)
 HYCLONE_SERVERCALL0(wait_for_fork_unlock)
 HYCLONE_SERVERCALL3(create_port, int, const char*, size_t)
 HYCLONE_SERVERCALL1(delete_port, int)

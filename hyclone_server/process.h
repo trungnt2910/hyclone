@@ -1,6 +1,7 @@
 #ifndef __HYCLONE_PROCESS_H__
 #define __HYCLONE_PROCESS_H__
 
+#include <atomic>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -24,7 +25,7 @@ private:
     int _uid, _gid, _euid, _egid;
     int _debuggerPid, _debuggerPort, _debuggerWriteLock;
     bool _forkUnlocked;
-    bool _isExecutingExec;
+    std::atomic<bool> _isExecutingExec;
     std::filesystem::path _cwd;
 
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
@@ -88,9 +89,9 @@ public:
     // Checks whether this child process has been unlocked by fork yet.
     bool IsForkUnlocked() const { return _forkUnlocked; }
 
-    void Exec();
-    void FinishExec();
+    void Exec(bool isExec = true);
     bool IsExecutingExec() const { return _isExecutingExec; }
+    void WaitForExec();
 
     const std::unordered_set<int>& GetOwningSemaphores() const { return _owningSemaphores; }
     void AddOwningSemaphore(int id) { _owningSemaphores.insert(id); }

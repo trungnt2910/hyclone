@@ -5,6 +5,8 @@
 #include <cstring>
 #include <iostream>
 #include <mutex>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 
 #include "BeDefs.h"
@@ -171,6 +173,75 @@ void loader_debugger_reset()
     sSyscallStart = -1;
     auto lock = std::unique_lock<std::mutex>(sThreadFlagsMutex);
     sThreadFlags.clear();
+}
+
+std::string loader_debugger_serialize_info()
+{
+    std::stringstream ss;
+    ss << sDebuggerInstalled << ","
+       << sDebuggerPort << ","
+       << sDebuggerWriteLock << ","
+       << sNubPort << ","
+       << sTeamFlags << ","
+       << sThreadFlags[loader_get_tid()] << ","
+       << sSyscallStart;
+
+    return ss.str();
+}
+
+void loader_debugger_restore_info(const std::string& s)
+{
+    if (s.empty())
+    {
+        return;
+    }
+
+    std::stringstream ss(s);
+
+    std::string token;
+    std::getline(ss, token, ',');
+    sDebuggerInstalled = std::stoi(token);
+    std::getline(ss, token, ',');
+    sDebuggerPort = std::stoi(token);
+    std::getline(ss, token, ',');
+    sDebuggerWriteLock = std::stoi(token);
+    std::getline(ss, token, ',');
+    sNubPort = std::stoi(token);
+    std::getline(ss, token, ',');
+    sTeamFlags = std::stoi(token);
+    std::getline(ss, token, ',');
+    sThreadFlags[loader_get_tid()] = std::stoi(token);
+    std::getline(ss, token, ',');
+    sSyscallStart = std::stoull(token);
+
+    if (sDebuggerInstalled)
+    {
+        char nameBuffer[B_OS_NAME_LENGTH];
+        // spawn the nub thread
+        snprintf(nameBuffer, sizeof(nameBuffer), "team %d debug task", loader_get_pid());
+
+        if (sNubStack == NULL)
+        {
+            sNubStack = aligned_alloc(B_PAGE_SIZE, USER_STACK_SIZE + USER_STACK_GUARD_SIZE);
+        }
+
+        thread_creation_attributes threadInfo;
+        memset(&threadInfo, 0, sizeof(threadInfo));
+        threadInfo.entry = loader_debugger_nub_thread_entry;
+        threadInfo.name = nameBuffer;
+        threadInfo.priority = B_NORMAL_PRIORITY;
+        threadInfo.args1 = NULL;
+        threadInfo.args2 = NULL;
+        threadInfo.guard_size = USER_STACK_GUARD_SIZE;
+        threadInfo.stack_size = USER_STACK_SIZE;
+        threadInfo.stack_address = (void*)((uintptr_t)sNubStack + USER_STACK_GUARD_SIZE);
+        // Should be safe as no Haiku code is called in the thread.
+        threadInfo.pthread = NULL;
+        threadInfo.flags = 0;
+
+        sNubThread = loader_spawn_thread(&threadInfo);
+        loader_hserver_call_resume_thread(sNubThread);
+    }
 }
 
 static void loader_write_debug_message(int code, debug_debugger_message_data& message)

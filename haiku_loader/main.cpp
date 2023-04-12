@@ -3,6 +3,7 @@
 #include "haiku_fcntl.h"
 #include "haiku_loader.h"
 #include "loader_commpage.h"
+#include "loader_debugger.h"
 #include "loader_exec.h"
 #include "loader_requests.h"
 #include "loader_runtime.h"
@@ -190,7 +191,7 @@ int main(int argc, char** argv, char** envp)
 	if (argc <= 1)
 	{
 		std::cout << "Usage: " << argv[0]
-			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--] "
+			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--debugger <debugger_info>] [--] "
 			<< "<path to haiku executable> [args]" << std::endl;
 		return 1;
 	}
@@ -244,6 +245,8 @@ int main(int argc, char** argv, char** envp)
 	args.error_port = -1;
 	args.error_token = 0;
 
+	std::string debuggerInfo;
+
 	while (strncmp(argv[0], "--", 2) == 0)
 	{
 		const char* currentArg = argv[0];
@@ -280,6 +283,16 @@ int main(int argc, char** argv, char** envp)
 				args.error_token = std::stoll(argv[0]);
 				++argv; --argc;
 			}
+			else if (strcmp(currentArg, "--debugger") == 0)
+			{
+				if (argc <= 0)
+				{
+					std::cout << "Missing value for --debugger flag.";
+					return 1;
+				}
+				debuggerInfo = argv[0];
+				++argv; --argc;
+			}
 			else if (strcmp(currentArg, "--") == 0)
 			{
 				break;
@@ -304,6 +317,8 @@ int main(int argc, char** argv, char** envp)
 	char emulatedCwd[PATH_MAX];
 	size_t emulatedCwdLength = loader_vchroot_unexpand(cwd.c_str(), emulatedCwd, sizeof(emulatedCwd));
 	loader_hserver_call_setcwd(HAIKU_AT_FDCWD, emulatedCwd, emulatedCwdLength);
+
+	loader_debugger_restore_info(debuggerInfo);
 
 	loader_register_existing_fds();
 	loader_register_process(args.arg_count, args.args);

@@ -2,6 +2,7 @@
 #define __LOADER_DEBUGGER_H__
 
 #include <cstdint>
+#include <string>
 
 #include "BeDefs.h"
 
@@ -11,6 +12,8 @@ int loader_install_team_debugger(int debuggerTeam, int debuggerPort);
 int loader_remove_team_debugger();
 
 void loader_debugger_reset();
+std::string loader_debugger_serialize_info();
+void loader_debugger_restore_info(const std::string& info);
 
 void loader_debugger_pre_syscall(uint32_t callIndex, void* args);
 void loader_debugger_post_syscall(uint32_t callIndex, void* args, uint64_t returnValue);

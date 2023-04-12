@@ -261,14 +261,20 @@ void System::Shutdown()
 intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
     intptr_t uid, intptr_t gid, intptr_t euid, intptr_t egid)
 {
+    std::shared_ptr<Process> process;
+
     auto& system = System::GetInstance();
-    auto lock = system.Lock();
-    system.RegisterConnection(context.conn_id, Connection(pid, tid));
+
+    {
+        auto lock = system.Lock();
+        system.RegisterConnection(context.conn_id, Connection(pid, tid));
+
+        // Might already be registered by fork() or left behind after an exec().
+        process = system.GetProcess(pid).lock();
+    }
 
     std::cerr << "Connection started: " << context.conn_id << " " << pid << " " << tid << std::endl;
 
-    // Might already be registered by fork() or left behind after an exec().
-    auto process = system.GetProcess(pid).lock();
     if (!process)
     {
         {
@@ -282,14 +288,22 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
         process = system.RegisterProcess(pid, uid, gid, euid, egid).lock();
         std::cerr << "Registered process: " << context.conn_id << " " << pid << std::endl;
     }
+    else
+    {
+        std::cerr << "Process " << pid << " already registered" << std::endl;
+        process->WaitForExec();
+    }
 
     if (process)
     {
-        auto procLock = process->Lock();
-        process->FinishExec();
-        auto thread = system.RegisterThread(pid, tid).lock();
+        std::shared_ptr<Thread> thread;
+        {
+            auto lock = system.Lock();
+            thread = system.RegisterThread(pid, tid).lock();
+        }
         if (thread)
         {
+            auto lock = process->Lock();
             process->RegisterThread(thread);
             return B_OK;
         }
@@ -310,6 +324,8 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
 
         const auto& connection = system.GetThreadFromConnection(context.conn_id);
 
+        bool execUnlockNeeded = false;
+
         if (connection.isPrimary)
         {
             auto procLock = context.process->Lock();
@@ -319,6 +335,11 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
                 if (!context.process->IsExecutingExec())
                 {
                     system.UnregisterProcess(context.pid);
+                }
+                else
+                {
+                    std::cerr << "Keeping a reference to process " << context.pid << " because it is executing exec." << std::endl;
+                    execUnlockNeeded = true;
                 }
 
                 for (const auto& s: context.process->GetOwningSemaphores())
@@ -393,6 +414,12 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
                 debuggerPort = system.GetPort(context.process->GetDebuggerPort()).lock();
                 debuggerWriteLock = system.GetSemaphore(context.process->GetDebuggerWriteLock()).lock();
             }
+        }
+
+        if (execUnlockNeeded)
+        {
+            std::cerr << "Unlocking exec for process " << context.pid << std::endl;
+            context.process->Exec(false);
         }
 
         system.UnregisterConnection(context.conn_id);

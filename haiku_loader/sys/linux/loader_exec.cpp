@@ -12,6 +12,7 @@
 
 #include "BeDefs.h"
 #include "haiku_errors.h"
+#include "loader_debugger.h"
 #include "loader_elf.h"
 #include "loader_exec.h"
 #include "loader_servercalls.h"
@@ -70,22 +71,32 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
         }
     }
 
-    loader_hserver_call_disconnect();
-
     int status;
+
+    loader_hserver_call_exec(true);
 
     if (isHaikuExecutable)
     {
-        const char** argv = new const char*[argc + 4];
-        const std::string loaderPath = "/proc/self/exe";
+        const int additionalArgs = 5;
+
+        const char** argv = new const char*[argc + additionalArgs + 1];
+        std::error_code ec;
+        std::string loaderPath = std::filesystem::canonical("/proc/self/exe", ec);
+        if (ec)
+        {
+            loaderPath = "/proc/self/exe";
+        }
         const std::string umaskValue = std::to_string(umask);
+        const std::string debuggerInfo = loader_debugger_serialize_info();
 
         argv[0] = loaderPath.c_str();
         argv[1] = "--umask";
         argv[2] = umaskValue.c_str();
+        argv[3] = "--debugger";
+        argv[4] = debuggerInfo.c_str();
 
-        std::copy(flatArgs, flatArgs + argc, argv + 3);
-        argv[argc + 3] = NULL;
+        std::copy(flatArgs, flatArgs + argc, argv + additionalArgs);
+        argv[argc + additionalArgs] = NULL;
 
         const char* const* envp = flatArgs + argc + 1;
 
@@ -96,6 +107,8 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
         const char* const* envp = flatArgs + argc + 1;
         status = execve(hostPath, (char* const*)flatArgs, (char* const*)envp);
     }
+
+    loader_hserver_call_exec(false);
 
     if (status == -1)
     {

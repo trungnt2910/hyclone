@@ -8,12 +8,13 @@
 #include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
+#include "server_workers.h"
 #include "system.h"
 #include "thread.h"
 
 Process::Process(int pid, int uid, int gid, int euid, int egid)
     : _pid(pid), _uid(uid), _gid(gid), _euid(euid), _egid(egid),
-    _forkUnlocked(false)
+    _forkUnlocked(false), _isExecutingExec(false)
 {
     memset(&_info, 0, sizeof(_info));
     _info.team = pid;
@@ -221,14 +222,18 @@ void Process::Fork(Process& child)
     child._forkUnlocked = true;
 }
 
-void Process::Exec()
+void Process::Exec(bool isExec)
 {
-    _isExecutingExec = true;
+    _isExecutingExec = isExec;
+    _isExecutingExec.notify_all();
 }
 
-void Process::FinishExec()
+void Process::WaitForExec()
 {
-    _isExecutingExec = false;
+    server_worker_run_wait([&]
+    {
+        _isExecutingExec.wait(true);
+    });
 }
 
 size_t Process::ReadMemory(void* address, void* buffer, size_t size)
@@ -296,6 +301,13 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
 
     output = output.lexically_normal();
 
+    return B_OK;
+}
+
+intptr_t server_hserver_call_exec(hserver_context& context, bool isExec)
+{
+    auto lock = context.process->Lock();
+    context.process->Exec(isExec);
     return B_OK;
 }
 

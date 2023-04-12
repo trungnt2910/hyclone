@@ -87,6 +87,9 @@ bool ServerConnection::Connect(bool forceReconnect)
         _socket = maxFd;
     }
 
+    // Somehow SOCK_CLOEXEC doesn't work on WSL1.
+    fcntl(_socket, F_SETFD, FD_CLOEXEC);
+
     intptr_t args[HYCLONE_SERVERCALL_MAX_ARGS + 1] =
         { SERVERCALL_ID_connect, getpid(), syscall(SYS_gettid), getuid(), getgid(), geteuid(), getegid() };
     intptr_t returnCode = -1;
