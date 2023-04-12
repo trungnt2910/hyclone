@@ -8,6 +8,7 @@
 #include "haiku_area.h"
 #include "haiku_errors.h"
 #include "haiku_tls.h"
+#include "loader_debugger.h"
 #include "loader_fork.h"
 #include "loader_servercalls.h"
 #include "loader_tls.h"
@@ -28,6 +29,8 @@ int loader_fork()
     }
     if (status == 0)
     {
+        loader_debugger_reset();
+
         // Set the thread_id slot.
         // libroot's getpid() function depends on it.
         tls_set(TLS_THREAD_ID_SLOT, (void*)(uintptr_t)gettid());
@@ -75,6 +78,10 @@ int loader_fork()
             mmap(areaInfo.address, areaInfo.size, mmap_prot, MAP_FIXED | MAP_SHARED, fd, 0);
             close(fd);
         }
+    }
+    else
+    {
+        loader_debugger_team_created(status);
     }
     return status;
 }

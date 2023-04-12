@@ -13,6 +13,7 @@
 #include "haiku_errors.h"
 #include "haiku_tls.h"
 #include "haiku_thread.h"
+#include "loader_debugger.h"
 #include "loader_servercalls.h"
 #include "loader_spawn_thread.h"
 #include "loader_tls.h"
@@ -101,6 +102,8 @@ int loader_spawn_thread(void* arg)
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
         sHostPthreadObjects[thread_id_nonatomic] = threadInfo;
     }
+
+    loader_debugger_thread_created(thread_id);
 
     return thread_id_nonatomic;
 }
@@ -216,6 +219,7 @@ void* loader_pthread_entry_trampoline(void* arg)
     {
         attributes->name = "user thread";
     }
+    pthread_setname_np(pthread_self(), attributes->name);
 
     loader_register_thread(tid, attributes, true);
 

@@ -159,6 +159,20 @@ clean_and_die:
     return error;
 }
 
+void loader_debugger_reset()
+{
+    sDebuggerInstalled = false;
+    sDebuggerInstalling = false;
+    sDebuggerPort = -1;
+    sDebuggerWriteLock = -1;
+    sNubPort = -1;
+    sNubThread = -1;
+    sTeamFlags = 0;
+    sSyscallStart = -1;
+    auto lock = std::unique_lock<std::mutex>(sThreadFlagsMutex);
+    sThreadFlags.clear();
+}
+
 static void loader_write_debug_message(int code, debug_debugger_message_data& message)
 {
     int tid = loader_get_tid();
@@ -198,11 +212,6 @@ void loader_debugger_pre_syscall(uint32_t callIndex, void* args)
             debugPostSyscall = debugPostSyscall || (threadFlags & B_THREAD_DEBUG_POST_SYSCALL);
         }
 
-        if (debugPostSyscall)
-        {
-            sSyscallStart = loader_system_time();
-        }
-
         if (debugPreSyscall)
         {
             debug_debugger_message_data message;
@@ -211,6 +220,11 @@ void loader_debugger_pre_syscall(uint32_t callIndex, void* args)
             message.pre_syscall.syscall = callIndex;
 
             loader_write_debug_message(B_DEBUGGER_MESSAGE_PRE_SYSCALL, message);
+        }
+
+        if (debugPostSyscall)
+        {
+            sSyscallStart = loader_system_time();
         }
     }
 }
@@ -229,7 +243,7 @@ void loader_debugger_post_syscall(uint32_t callIndex, void* args, uint64_t retur
             debugPostSyscall = (sThreadFlags[tid] & B_THREAD_DEBUG_POST_SYSCALL);
         }
 
-        if (debugPostSyscall && sSyscallStart >= 0)
+        if (debugPostSyscall && sSyscallStart != -1)
         {
             debug_debugger_message_data message;
 
@@ -242,6 +256,39 @@ void loader_debugger_post_syscall(uint32_t callIndex, void* args, uint64_t retur
             sSyscallStart = -1;
 
             loader_write_debug_message(B_DEBUGGER_MESSAGE_POST_SYSCALL, message);
+        }
+    }
+}
+
+void loader_debugger_thread_created(thread_id newThread)
+{
+    if (sDebuggerInstalled)
+    {
+        bool debugNewThreads = (sTeamFlags & B_TEAM_DEBUG_THREADS);
+
+        if (debugNewThreads)
+        {
+            debug_debugger_message_data message;
+
+            message.thread_created.new_thread = newThread;
+
+            loader_write_debug_message(B_DEBUGGER_MESSAGE_THREAD_CREATED, message);
+        }
+    }
+}
+
+void loader_debugger_team_created(team_id newTeam)
+{
+    if (sDebuggerInstalled)
+    {
+        bool debugNewTeams = (sTeamFlags & B_TEAM_DEBUG_TEAM_CREATION);
+
+        if (debugNewTeams)
+        {
+            debug_debugger_message_data message;
+            message.team_created.new_team = newTeam;
+
+            loader_write_debug_message(B_DEBUGGER_MESSAGE_TEAM_CREATED, message);
         }
     }
 }

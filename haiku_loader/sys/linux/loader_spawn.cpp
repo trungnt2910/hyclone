@@ -5,6 +5,7 @@
 #include <spawn.h>
 #include <string>
 #include <unistd.h>
+#include "loader_debugger.h"
 #include "loader_spawn.h"
 
 int loader_spawn(const char* path, const char* const* flatArgs,
@@ -45,6 +46,8 @@ int loader_spawn(const char* path, const char* const* flatArgs,
     {
         return -status;
     }
+
+    loader_debugger_team_created(newpid);
 
     return newpid;
 }
