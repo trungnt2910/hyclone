@@ -34,7 +34,7 @@ private:
     std::unordered_map<int, std::filesystem::path> _fds;
     std::mutex _lock;
     std::unordered_set<int> _owningSemaphores;
-    std::unordered_set<int> _owningPorts;
+    std::set<int> _owningPorts;
 public:
     Process(int pid, int uid, int gid, int euid, int egid);
     ~Process() = default;
@@ -98,7 +98,7 @@ public:
     void RemoveOwningSemaphore(int id) { _owningSemaphores.erase(id); }
     bool IsOwningSemaphore(int id) const { return _owningSemaphores.contains(id); }
 
-    const std::unordered_set<int>& GetOwningPorts() const { return _owningPorts; }
+    const std::set<int>& GetOwningPorts() const { return _owningPorts; }
     void AddOwningPort(int id) { _owningPorts.insert(id); }
     void RemoveOwningPort(int id) { _owningPorts.erase(id); }
     bool IsOwningPort(int id) const { return _owningPorts.contains(id); }

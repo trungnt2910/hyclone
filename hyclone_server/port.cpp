@@ -293,6 +293,94 @@ intptr_t server_hserver_call_get_port_info(hserver_context& context, port_id id,
     }
 }
 
+intptr_t server_hserver_call_get_next_port_info(hserver_context& context, int team, int* userCookie, void* info)
+{
+    std::shared_ptr<Process> targetProcess;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+
+        targetProcess = system.GetProcess(team).lock();
+    }
+
+    if (!targetProcess)
+    {
+        return B_BAD_TEAM_ID;
+    }
+
+    int cookie;
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->ReadMemory(userCookie, &cookie, sizeof(int)) != sizeof(int))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    if (cookie < 0)
+    {
+        return B_BAD_VALUE;
+    }
+
+    std::shared_ptr<Port> port;
+
+    {
+        auto lock = targetProcess->Lock();
+        auto& ports = targetProcess->GetOwningPorts();
+        if (ports.empty() || cookie >= *ports.rbegin())
+        {
+            cookie = -1;
+        }
+
+        while (!port && cookie != -1)
+        {
+            auto it = ports.lower_bound(cookie);
+            if (it == ports.end())
+            {
+                cookie = -1;
+                break;
+            }
+
+            {
+                auto& system = System::GetInstance();
+                auto sysLock = system.Lock();
+
+                port = system.GetPort(*it).lock();
+            }
+
+            cookie = *it + 1;
+        }
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (port)
+        {
+            haiku_port_info portInfo = port->GetInfo();
+            if (context.process->WriteMemory(info, &portInfo, sizeof(haiku_port_info)) != sizeof(haiku_port_info))
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
+
+        if (context.process->WriteMemory(userCookie, &cookie, sizeof(int)) != sizeof(int))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    if (cookie == -1)
+    {
+        return B_BAD_VALUE;
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_port_count(hserver_context& context, port_id id)
 {
     std::shared_ptr<Port> port;

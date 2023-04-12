@@ -71,6 +71,14 @@ status_t _moni_get_port_info(port_id id, struct haiku_port_info *info)
     return result;
 }
 
+status_t _moni_get_next_port_info(team_id team, int32* cookie, struct haiku_port_info *info)
+{
+    DEBUG("get_next_port_info(%d, %p, %p)\n", team, cookie, info);
+    status_t result = GET_SERVERCALLS()->get_next_port_info(team, cookie, info);
+    DEBUG("get_next_port_info(%d, %p, %p) = %d\n", team, cookie, info, result);
+    return result;
+}
+
 ssize_t _moni_port_buffer_size_etc(port_id port, uint32 flags, bigtime_t timeout)
 {
     DEBUG("port_buffer_size_etc(%d, %d, %lld)\n", port, flags, timeout);
