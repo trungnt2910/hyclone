@@ -460,7 +460,7 @@ intptr_t server_hserver_call_read_port_etc(hserver_context& context,
         return B_BAD_ADDRESS;
     }
 
-    return B_OK;
+    return writeSize;
 }
 
 intptr_t server_hserver_call_get_port_message_info_etc(hserver_context& context, int id,

@@ -273,7 +273,7 @@ static int loader_debugger_nub_thread_entry(void*, void*)
         status_t error = loader_hserver_call_read_port_etc(sNubPort, &op, &data, sizeof(data),
             0, B_INFINITE_TIMEOUT);
 
-        if (error != B_OK)
+        if (error < 0)
         {
             // The debugger port is closed.
             // This probably means the debugger is dead.
