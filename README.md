@@ -49,6 +49,7 @@ environment variables to change where `copy_objects.sh` looks for objects:
 
 ```
 cd hyclone
+sudo apt install -y cmake libgmp-dev libmpfr-dev zlib1g-dev libzstd-dev
 mkdir build; cd build
 cmake ..
 # For test builds, do this to install everything to the build directory:
@@ -101,4 +102,4 @@ A screenshot of Hyclone on WSL1:
 ### Notes
 
 - While some basic CLI apps (`bash`, `gcc`,...) may run, most won't work on Hyclone, as this project is still in its early stages.
-- The host's root is mounted on Hyclone as `/SystemRoot`. When translating calls from Haiku to the host system, Hyclone maps the Haiku root to `$HPREFIX`, and when translating the results, Hyclone appends `/SystemRoot` to the host's root. 
+- The host's root is mounted on Hyclone as `/SystemRoot`. When translating calls from Haiku to the host system, Hyclone maps the Haiku root to `$HPREFIX`, and when translating the results, Hyclone appends `/SystemRoot` to the host's root.

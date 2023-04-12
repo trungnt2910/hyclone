@@ -15,7 +15,12 @@ HAIKU_SYSLIBS=$(echo $HAIKU_BUILD_OUTPUT_ROOT/build_packages/gcc_syslibs-*$HAIKU
 HAIKU_SYSLIBS_DEVEL=$(echo $HAIKU_BUILD_OUTPUT_ROOT/build_packages/gcc_syslibs_devel*$HAIKU_ARCH)"/develop/lib"
 HAIKU_GLUE="$HAIKU_BUILD_OUTPUT_ROOT/objects/haiku/$HAIKU_ARCH/release/system/glue"
 HAIKU_GLUE_ARCH="$HAIKU_GLUE/arch/$HAIKU_ARCH"
-HAIKU_GLUE_GCC=$(echo $HAIKU_BUILD_OUTPUT_ROOT/cross-tools-$HAIKU_ARCH/lib/gcc/$HAIKU_ARCH-unknown-haiku/**)
+
+# Some distros store the GCC glue objects in lib64, others in lib.
+HAIKU_GLUE_GCC=$(echo $HAIKU_BUILD_OUTPUT_ROOT/cross-tools-$HAIKU_ARCH/lib64/gcc/$HAIKU_ARCH-unknown-haiku/**)
+if [ ! -f "$HAIKU_GLUE_GCC/crtbeginS.o" ]; then
+    HAIKU_GLUE_GCC=$(echo $HAIKU_BUILD_OUTPUT_ROOT/cross-tools-$HAIKU_ARCH/lib/gcc/$HAIKU_ARCH-unknown-haiku/**)
+fi
 
 # If Haiku is not built, build it!
 if [ ! -d "$HAIKU_BUILD_OUTPUT_ROOT" ]; then
