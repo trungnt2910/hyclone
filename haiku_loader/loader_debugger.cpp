@@ -8,11 +8,13 @@
 #include <unordered_map>
 
 #include "BeDefs.h"
+#include "haiku_area.h"
 #include "haiku_debugger.h"
 #include "haiku_errors.h"
 #include "haiku_thread.h"
 #include "loader_debugger.h"
 #include "loader_ids.h"
+#include "loader_runtime.h"
 #include "loader_servercalls.h"
 #include "loader_spawn_thread.h"
 #include "loader_sysinfo.h"
@@ -283,6 +285,76 @@ static int loader_debugger_nub_thread_entry(void*, void*)
 
         switch (op)
         {
+            case B_DEBUG_MESSAGE_READ_MEMORY:
+            {
+                debug_nub_read_memory_reply reply;
+                reply.error = B_OK;
+                reply.size = 0;
+
+                uintptr_t startAddress = (uintptr_t)data.read_memory.address;
+                uintptr_t endAddress = startAddress + data.read_memory.size;
+
+                uintptr_t startPage = startAddress & ~(B_PAGE_SIZE - 1);
+                uintptr_t endPage = (endAddress + B_PAGE_SIZE - 1) & ~(B_PAGE_SIZE - 1);
+
+                haiku_area_info areaInfo;
+                for (uintptr_t page = startPage; page < endPage;)
+                {
+                    // TODO: Acquire mmanlock?
+                    int areaId = loader_hserver_call_area_for((void*)page);
+
+                    if (areaId < 0)
+                    {
+                        reply.error = B_BAD_ADDRESS;
+                        break;
+                    }
+
+                    reply.error = loader_hserver_call_get_area_info(areaId, &areaInfo);
+                    if (reply.error != B_OK)
+                    {
+                        break;
+                    }
+
+                    uint32 originalProtection = areaInfo.protection;
+                    using kern_set_area_protection_t = status_t (*)(int, uint32);
+                    static kern_set_area_protection_t kern_set_area_protection =
+                        (kern_set_area_protection_t)loader_runtime_symbol("_moni_set_area_protection");
+
+                    if (!(originalProtection & B_READ_AREA))
+                    {
+                        reply.error = kern_set_area_protection(areaId, areaInfo.protection | B_READ_AREA);
+
+                        if (reply.error != B_OK)
+                        {
+                            break;
+                        }
+                    }
+
+                    uintptr_t startCurrentArea = (uintptr_t)areaInfo.address;
+                    uintptr_t endCurrentArea = startCurrentArea + ((areaInfo.size + B_PAGE_SIZE - 1) & ~(B_PAGE_SIZE - 1));
+                    uintptr_t startCopy = std::max(startCurrentArea, startAddress);
+                    uintptr_t endCopy = std::min(endCurrentArea, endAddress);
+
+                    memcpy(reply.data + (startCopy - startAddress), (void*)startCopy, endCopy - startCopy);
+                    reply.size += endCopy - startCopy;
+
+                    if (!(originalProtection & B_READ_AREA))
+                    {
+                        kern_set_area_protection(areaId, originalProtection);
+                    }
+
+                    page = endCurrentArea;
+                }
+
+                if (reply.size > 0)
+                {
+                    reply.error = B_OK;
+                }
+
+                loader_hserver_call_write_port_etc(data.read_memory.reply_port, B_DEBUG_MESSAGE_READ_MEMORY,
+                    &reply, sizeof(reply), 0, B_INFINITE_TIMEOUT);
+            }
+            break;
             case B_DEBUG_MESSAGE_SET_TEAM_FLAGS:
                 sTeamFlags = data.set_team_flags.flags;
             break;

@@ -374,7 +374,7 @@ area_id _moni_transfer_area(area_id area, void **_address,
     return status;
 }
 
-int _moni_set_area_protection(int area, uint32_t newProtection)
+int MONIKA_EXPORT _moni_set_area_protection(int area, uint32_t newProtection)
 {
     CHECK_COMMPAGE();
 
