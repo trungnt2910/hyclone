@@ -95,6 +95,7 @@ private:
             if (_deviceMounts.contains(drivePath))
             {
                 auto device = _deviceMounts[drivePath];
+                isSymlink = traverseLink;
                 T status = work(path, device, isSymlink);
                 if (status != B_OK)
                 {
