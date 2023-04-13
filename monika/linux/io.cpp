@@ -293,44 +293,16 @@ status_t _moni_create_symlink(int fd, const char* path, const char* toPath, int 
     // Linux does not support permissions on symlinks.
     (void)mode;
 
-    if (fd == HAIKU_AT_FDCWD)
-    {
-        fd = AT_FDCWD;
-    }
-
     char hostPath[PATH_MAX];
-    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
+    long status = GET_SERVERCALLS()->vchroot_expandat(fd, path, path ? strlen(path) : 0,
+        false, hostPath, sizeof(hostPath));
 
-    if (status < 0)
+    if (status != B_OK && status != B_ENTRY_NOT_FOUND)
     {
-        return HAIKU_POSIX_ENOENT;
-    }
-    else if (status > sizeof(hostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
+        return status;
     }
 
-    // Absolute path symlink. We want to expand the target path.
-    if (toPath[0] == '/')
-    {
-        char hostToPath[PATH_MAX];
-
-        status = GET_HOSTCALLS()->vchroot_expand(toPath, hostToPath, sizeof(hostToPath));
-        if (status < 0)
-        {
-            return HAIKU_POSIX_ENOENT;
-        }
-        else if (status > sizeof(hostToPath))
-        {
-            return HAIKU_POSIX_ENAMETOOLONG;
-        }
-
-        status = LINUX_SYSCALL2(__NR_symlink, hostToPath, hostPath);
-    }
-    else
-    {
-        status = LINUX_SYSCALL2(__NR_symlink, toPath, hostPath);
-    }
+    status = LINUX_SYSCALL2(__NR_symlink, toPath, hostPath);
 
     if (status < 0)
     {
