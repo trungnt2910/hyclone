@@ -772,13 +772,7 @@ int _moni_map_file(const char *name, void **address,
             return B_BAD_VALUE;
         }
 
-        result = LINUX_SYSCALL2(__NR_munmap, hintAddr, size);
-        if (result < 0)
-        {
-            return LinuxToB(-result);
-        }
-
-        result = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags, fd, offset);
+        result = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, fd, offset);
         if (result < 0)
         {
             return LinuxToB(-result);
