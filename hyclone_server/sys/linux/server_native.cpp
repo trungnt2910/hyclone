@@ -71,9 +71,14 @@ void server_fill_team_info(haiku_team_info* info)
 
     if (info->thread_count == 0)
     {
+        std::error_code ec;
         info->thread_count =
-            std::distance(std::filesystem::directory_iterator("/proc/" + std::to_string(info->team) + "/task"),
+            std::distance(std::filesystem::directory_iterator("/proc/" + std::to_string(info->team) + "/task", ec),
                 std::filesystem::directory_iterator());
+        if (ec)
+        {
+            info->thread_count = 0;
+        }
     }
 
     if (info->image_count == 0)

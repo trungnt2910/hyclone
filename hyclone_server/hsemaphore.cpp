@@ -247,10 +247,14 @@ intptr_t server_hserver_call_acquire_sem_etc(hserver_context& context, int id, u
 
 intptr_t server_hserver_call_release_sem(hserver_context& context, int id)
 {
-    auto& system = System::GetInstance();
-    auto lock = system.Lock();
+    std::shared_ptr<Semaphore> sem;
 
-    auto sem = system.GetSemaphore(id).lock();
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+
+        sem = system.GetSemaphore(id).lock();
+    }
 
     if (!sem)
     {
@@ -265,10 +269,14 @@ intptr_t server_hserver_call_release_sem(hserver_context& context, int id)
 intptr_t server_hserver_call_release_sem_etc(hserver_context& context, int id, unsigned int count,
     unsigned int flags)
 {
-    auto& system = System::GetInstance();
-    auto lock = system.Lock();
+    std::shared_ptr<Semaphore> sem;
 
-    auto sem = system.GetSemaphore(id).lock();
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+
+        sem = system.GetSemaphore(id).lock();
+    }
 
     if (!sem)
     {

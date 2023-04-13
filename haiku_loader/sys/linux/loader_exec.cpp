@@ -84,10 +84,10 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
 
     int status;
 
-    loader_hserver_call_exec(true);
-
     if (isHaikuExecutable)
     {
+        loader_hserver_call_exec(true);
+
         const int additionalArgs = 5;
 
         const char** argv = new const char*[argc + additionalArgs + 1];
@@ -151,13 +151,18 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
         {
             if (strncmp(envp[i], "PATH=", 5) == 0)
             {
-                std::stringstream hPathStream(getenv("HPATH"));
+                const char* hPath = getenv("HPATH");
                 std::unordered_set<std::string> hPaths;
-
                 std::string currentPath;
-                while (std::getline(hPathStream, currentPath, ':'))
+
+                if (hPath != NULL)
                 {
-                    hPaths.insert(currentPath);
+                    std::stringstream hPathStream(hPath);
+
+                    while (std::getline(hPathStream, currentPath, ':'))
+                    {
+                        hPaths.insert(currentPath);
+                    }
                 }
 
                 std::stringstream ss(envp[i] + 5);

@@ -185,6 +185,7 @@ void Process::Fork(Process& child)
     // No, child has its own threads.
     // child._threads = _threads;
     child._info = _info;
+    child._info.team = child._pid;
 
     child._images = _images;
     // Fork is called in a system lock
@@ -596,47 +597,74 @@ intptr_t server_hserver_call_get_team_info(hserver_context& context, int team_id
     return B_OK;
 }
 
-intptr_t server_hserver_call_get_next_team_info(hserver_context& context, int32_t* userCookie, void* userTeamInfo)
+intptr_t server_hserver_call_get_next_team_info(hserver_context& context, int* userCookie, void* userTeamInfo)
 {
-    int32_t cookie;
-    if (server_read_process_memory(context.pid, userCookie, &cookie, sizeof(cookie))
-        != sizeof(cookie))
+    int cookie;
+
     {
-        return B_BAD_ADDRESS;
+        auto lock = context.process->Lock();
+        if (context.process->ReadMemory(userCookie, &cookie, sizeof(cookie)) != sizeof(cookie))
+        {
+            return B_BAD_ADDRESS;
+        }
     }
+
+    if (cookie == -1)
+    {
+        return B_BAD_VALUE;
+    }
+
+    haiku_team_info info;
 
     if (cookie == 0)
     {
-        server_hserver_call_get_team_info(context, B_SYSTEM_TEAM, userTeamInfo);
-        cookie = -1;
+        memset(&info, 0, sizeof(info));
+        info.debugger_nub_thread = -1;
+        info.debugger_nub_port = -1;
+        server_fill_team_info(&info);
+        cookie = -2;
     }
     else
     {
+        std::shared_ptr<Process> process;
+
         {
             auto& system = System::GetInstance();
             auto lock = system.Lock();
             cookie = system.NextProcessId(cookie);
-            if (cookie < 0)
+
+            if (cookie != -1)
             {
-                return B_BAD_VALUE;
+                process = system.GetProcess(cookie).lock();
             }
         }
 
-        status_t status = server_hserver_call_get_team_info(context, cookie, userTeamInfo);
-
-        if (status != B_OK)
+        if (process)
         {
-            return status;
+            auto lock = process->Lock();
+            info = process->GetInfo();
+            server_fill_team_info(&info);
         }
     }
 
-    if (server_write_process_memory(context.pid, userCookie, &cookie, sizeof(cookie))
-        != sizeof(cookie))
     {
-        return B_BAD_ADDRESS;
+        auto lock = context.process->Lock();
+        if (context.process->WriteMemory(userCookie, &cookie, sizeof(cookie)) != sizeof(cookie))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (cookie != -1)
+        {
+            if (context.process->WriteMemory(userTeamInfo, &info, sizeof(haiku_team_info))
+                != sizeof(haiku_team_info))
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
     }
 
-    return B_OK;
+    return (cookie == -1) ? B_BAD_VALUE : B_OK;
 }
 
 intptr_t server_hserver_call_register_team_info(hserver_context& context, void* userTeamInfo)
