@@ -472,9 +472,10 @@ int _moni_access(int fd, const char* path, int mode, bool effectiveUserGroup)
     long status;
 
     char hostPath[PATH_MAX];
-    if (GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path), true, hostPath, sizeof(hostPath)) < 0)
+    status = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path), true, hostPath, sizeof(hostPath));
+    if (status != B_OK)
     {
-        return HAIKU_POSIX_EBADF;
+        return status;
     }
 
     if (effectiveUserGroup)

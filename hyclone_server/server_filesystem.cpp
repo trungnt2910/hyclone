@@ -198,7 +198,7 @@ intptr_t server_hserver_call_write_stat(hserver_context& context, int fd, const 
     {
         auto& vfsService = System::GetInstance().GetVfsService();
         auto lock = vfsService.Lock();
-        status = vfsService.WriteStat(requestPath, fullStat, traverseSymlink);
+        status = vfsService.WriteStat(requestPath, fullStat, statMask, traverseSymlink);
     }
 
     if (status != B_OK)
