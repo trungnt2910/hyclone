@@ -24,7 +24,7 @@ private:
     int _pid;
     int _uid, _gid, _euid, _egid;
     int _debuggerPid, _debuggerPort, _debuggerWriteLock;
-    bool _forkUnlocked;
+    std::atomic<bool> _forkUnlocked;
     std::atomic<bool> _isExecutingExec;
     std::filesystem::path _cwd;
 
@@ -88,6 +88,7 @@ public:
     void Fork(Process& child);
     // Checks whether this child process has been unlocked by fork yet.
     bool IsForkUnlocked() const { return _forkUnlocked; }
+    void WaitForForkUnlock();
 
     void Exec(bool isExec = true);
     bool IsExecutingExec() const { return _isExecutingExec; }

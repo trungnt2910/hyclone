@@ -220,6 +220,15 @@ void Process::Fork(Process& child)
     // child._owningSemaphores = _owningSemaphores;
 
     child._forkUnlocked = true;
+    child._forkUnlocked.notify_all();
+}
+
+void Process::WaitForForkUnlock()
+{
+    server_worker_run_wait([&]
+    {
+        _forkUnlocked.wait(false);
+    });
 }
 
 void Process::Exec(bool isExec)

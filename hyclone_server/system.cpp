@@ -265,37 +265,37 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
 
     auto& system = System::GetInstance();
 
+    std::cerr << "Connection started: " << context.conn_id << " " << pid << " " << tid << std::endl;
+
     {
         auto lock = system.Lock();
         system.RegisterConnection(context.conn_id, Connection(pid, tid));
 
         // Might already be registered by fork() or left behind after an exec().
         process = system.GetProcess(pid).lock();
-    }
 
-    std::cerr << "Connection started: " << context.conn_id << " " << pid << " " << tid << std::endl;
-
-    if (!process)
-    {
+        if (!process)
         {
-            auto& mapService = system.GetUserMapService();
-            auto mapLock = mapService.Lock();
-            uid = mapService.GetUid(uid);
-            gid = mapService.GetGid(gid);
-            euid = mapService.GetUid(euid);
-            egid = mapService.GetGid(egid);
+            {
+                auto& mapService = system.GetUserMapService();
+                auto mapLock = mapService.Lock();
+                uid = mapService.GetUid(uid);
+                gid = mapService.GetGid(gid);
+                euid = mapService.GetUid(euid);
+                egid = mapService.GetGid(egid);
+            }
+            process = system.RegisterProcess(pid, uid, gid, euid, egid).lock();
+            std::cerr << "Registered process: " << context.conn_id << " " << pid << std::endl;
         }
-        process = system.RegisterProcess(pid, uid, gid, euid, egid).lock();
-        std::cerr << "Registered process: " << context.conn_id << " " << pid << std::endl;
-    }
-    else
-    {
-        std::cerr << "Process " << pid << " already registered" << std::endl;
-        process->WaitForExec();
+        else
+        {
+            std::cerr << "Process " << pid << " already registered" << std::endl;
+        }
     }
 
     if (process)
     {
+        process->WaitForExec();
         std::shared_ptr<Thread> thread;
         {
             auto lock = system.Lock();
@@ -481,25 +481,8 @@ intptr_t server_hserver_call_fork(hserver_context& context, int newPid)
 
 intptr_t server_hserver_call_wait_for_fork_unlock(hserver_context& context)
 {
-    while (true)
-    {
-        {
-            auto procLock = context.process->Lock();
-
-            if (context.process->IsForkUnlocked())
-            {
-                return B_OK;
-            }
-        }
-
-        std::cerr << context.process->GetPid() <<  ": Fork not unlocked." << std::endl;
-        // Sleep for a short time as fork happens quite quickly.
-        server_worker_sleep(50);
-    }
-
-    // Should not reach here.
-    std::cerr << "server_hserver_call_wait_for_fork_unlock: Impossible code path reached." << std::endl;
-    return B_BAD_DATA;
+    context.process->WaitForForkUnlock();
+    return B_OK;
 }
 
 intptr_t server_hserver_call_get_safemode_option(hserver_context& context, const char* userParameter, size_t parameterSize,
