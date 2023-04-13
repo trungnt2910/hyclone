@@ -88,7 +88,7 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
     {
         loader_hserver_call_exec(true);
 
-        const int additionalArgs = 5;
+        const int additionalArgs = 8;
 
         const char** argv = new const char*[argc + additionalArgs + 1];
         std::error_code ec;
@@ -105,6 +105,9 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
         argv[2] = umaskValue.c_str();
         argv[3] = "--debugger";
         argv[4] = debuggerInfo.c_str();
+        argv[5] = "--prefix";
+        argv[6] = gHaikuPrefix.c_str();
+        argv[7] = "--no-expand";
 
         std::copy(flatArgs, flatArgs + argc, argv + additionalArgs);
         argv[argc + additionalArgs] = NULL;

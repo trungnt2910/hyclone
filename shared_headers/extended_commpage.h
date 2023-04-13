@@ -103,6 +103,9 @@ struct hostcalls
     size_t (*vchroot_expandlink)(const char* path, char* hostPath, size_t size);
     size_t (*vchroot_expandlinkat)(int fd, const char* path, char* hostPath, size_t size);
 
+    // FDs
+    bool (*is_protected_fd)(int fd);
+
     // Hooks
     void (*at_exit)(int value);
     int (*printf)(const char* format, ...);

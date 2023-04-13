@@ -425,6 +425,11 @@ int _moni_open(int fd, const char* path, int openMode, int perms)
 
 int _moni_close(int fd)
 {
+    if (GET_HOSTCALLS()->is_protected_fd(fd))
+    {
+        return HAIKU_POSIX_EBADF;
+    }
+
     int result = LINUX_SYSCALL1(__NR_close, fd);
 
     if (result < 0)
@@ -779,6 +784,11 @@ int _moni_dup(int fd)
 
 int _moni_dup2(int ofd, int nfd)
 {
+    if (GET_HOSTCALLS()->is_protected_fd(nfd))
+    {
+        return HAIKU_POSIX_EBADF;
+    }
+
     int result = LINUX_SYSCALL2(__NR_dup2, ofd, nfd);
 
     if (result < 0)

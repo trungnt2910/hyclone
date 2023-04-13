@@ -25,13 +25,11 @@
 rld_export **__gRuntimeLoaderPtr;
 const char* hPrefix;
 
-size_t loader_build_path(char* buffer, size_t bufferSize)
+size_t loader_build_path(char* buffer, size_t bufferSize, bool expandPath)
 {
 	std::stringstream result;
 	result << "PATH=";
-	// Probably something that came from an execve.
-	const char* hpath_expanded = getenv("_HPATH_EXPANDED");
-	if (hpath_expanded != NULL && strcmp(hpath_expanded, "1") == 0)
+	if (!expandPath)
 	{
 		result << getenv("PATH");
 	}
@@ -94,7 +92,7 @@ size_t loader_build_home(char* buffer, size_t bufferSize)
 }
 #undef HOME_VALUE
 
-void loader_build_args(uint8*& mem, user_space_program_args &args, char **argv, char **env)
+void loader_build_args(uint8*& mem, user_space_program_args &args, char **argv, char **env, bool expandPath)
 {
 	size_t argCnt = 0;
 	while (argv[argCnt] != NULL) argCnt++;
@@ -105,7 +103,7 @@ void loader_build_args(uint8*& mem, user_space_program_args &args, char **argv, 
     {
 		argSize += strlen(argv[i]) + 1;
 	}
-	size_t pathArgSize = loader_build_path(NULL, 0) + 1;
+	size_t pathArgSize = loader_build_path(NULL, 0, expandPath) + 1;
 	size_t homeArgSize = loader_build_home(NULL, 0) + 1;
 	for (size_t i = 0; i < envCnt; ++i)
     {
@@ -123,9 +121,6 @@ void loader_build_args(uint8*& mem, user_space_program_args &args, char **argv, 
 		}
 	}
 
-	++envCnt; // One for _HPATH_EXPANDED
-	argSize += sizeof("_HPATH_EXPANDED=1") - 1; // Argument of _HPATH_EXPANDED
-
 	mem = new uint8[sizeof(void*)*(argCnt + envCnt + 2) + argSize];
 	char **outArgs = (char**)&mem[0];
 	char *outChars = (char*)&mem[sizeof(void*)*(argCnt + envCnt + 2)];
@@ -142,7 +137,7 @@ void loader_build_args(uint8*& mem, user_space_program_args &args, char **argv, 
 		if (strncmp(env[i], "PATH=", sizeof("PATH=") - 1) == 0)
 		{
 			*outArgs = outChars; outArgs++;
-			outChars += loader_build_path(outChars, pathArgSize);
+			outChars += loader_build_path(outChars, pathArgSize, expandPath);
 			*outChars = '\0';
 			++outChars;
 		}
@@ -161,8 +156,6 @@ void loader_build_args(uint8*& mem, user_space_program_args &args, char **argv, 
 			outChars += len;
 		}
 	}
-	*outArgs = outChars; outArgs++;
-	memcpy(outChars, "_HPATH_EXPANDED=1", sizeof("_HPATH_EXPANDED=1") - 1);
 
 	*outArgs = NULL; outArgs++;
 
@@ -191,52 +184,12 @@ int main(int argc, char** argv, char** envp)
 	if (argc <= 1)
 	{
 		std::cout << "Usage: " << argv[0]
-			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--debugger <debugger_info>] [--] "
+			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--debugger <debugger_info>] [--prefix <hprefix_override>] [--no-expand] [--] "
 			<< "<path to haiku executable> [args]" << std::endl;
 		return 1;
 	}
 
 	++argv; --argc;
-
-	hPrefix = getenv("HPREFIX");
-	if (!loader_init_vchroot(hPrefix))
-	{
-		std::cout << "Failed to initialize vchroot" << std::endl;
-		return 1;
-	}
-
-    void* commpage = loader_allocate_commpage();
-
-	// std::cout << "Connecting to HyClone server" << std::endl;
-	if (!loader_init_servercalls())
-	{
-		std::cout << "Failed to connect to HyClone server" << std::endl;
-		loader_free_commpage(commpage);
-		return 1;
-	}
-
-    // std::cout << "Loading runtime_loader" << std::endl;
-	if (!loader_load_runtime())
-	{
-		std::cout << "Failed to load Haiku runtime_loader" << std::endl;
-		loader_free_commpage(commpage);
-		return 1;
-	}
-
-	if (!loader_init_requests())
-	{
-		std::cout << "Failed to initialize requests" << std::endl;
-		loader_free_commpage(commpage);
-		return 1;
-	}
-
-	auto runtime_loader = gRuntimeLoaderInfo.entry_point;
-	__gRuntimeLoaderPtr = gRuntimeLoaderInfo.gRuntimeLoaderPtr;
-
-	// Hook test_executable as we want to also be able to execve
-	// binaries of the host system.
-	loader_haiku_test_executable = (*__gRuntimeLoaderPtr)->test_executable;
-	(*__gRuntimeLoaderPtr)->test_executable = loader_test_executable;
 
     uint8* user_args_memory = NULL;
 	user_space_program_args args;
@@ -246,6 +199,8 @@ int main(int argc, char** argv, char** envp)
 	args.error_token = 0;
 
 	std::string debuggerInfo;
+	hPrefix = getenv("HPREFIX");
+	bool expandPath = true;
 
 	while (strncmp(argv[0], "--", 2) == 0)
 	{
@@ -293,6 +248,20 @@ int main(int argc, char** argv, char** envp)
 				debuggerInfo = argv[0];
 				++argv; --argc;
 			}
+			else if (strcmp(currentArg, "--prefix") == 0)
+			{
+				if (argc <= 0)
+				{
+					std::cout << "Missing value for --prefix flag.";
+					return 1;
+				}
+				hPrefix = argv[0];
+				++argv; --argc;
+			}
+			else if (strcmp(currentArg, "--no-expand") == 0)
+			{
+				expandPath = false;
+			}
 			else if (strcmp(currentArg, "--") == 0)
 			{
 				break;
@@ -310,7 +279,46 @@ int main(int argc, char** argv, char** envp)
 		}
 	}
 
-    loader_build_args(user_args_memory, args, argv, envp);
+	if (!loader_init_vchroot(hPrefix))
+	{
+		std::cout << "Failed to initialize vchroot" << std::endl;
+		return 1;
+	}
+
+    void* commpage = loader_allocate_commpage();
+
+	// std::cout << "Connecting to HyClone server" << std::endl;
+	if (!loader_init_servercalls())
+	{
+		std::cout << "Failed to connect to HyClone server" << std::endl;
+		loader_free_commpage(commpage);
+		return 1;
+	}
+
+    // std::cout << "Loading runtime_loader" << std::endl;
+	if (!loader_load_runtime())
+	{
+		std::cout << "Failed to load Haiku runtime_loader" << std::endl;
+		loader_free_commpage(commpage);
+		return 1;
+	}
+
+	if (!loader_init_requests())
+	{
+		std::cout << "Failed to initialize requests" << std::endl;
+		loader_free_commpage(commpage);
+		return 1;
+	}
+
+	auto runtime_loader = gRuntimeLoaderInfo.entry_point;
+	__gRuntimeLoaderPtr = gRuntimeLoaderInfo.gRuntimeLoaderPtr;
+
+	// Hook test_executable as we want to also be able to execve
+	// binaries of the host system.
+	loader_haiku_test_executable = (*__gRuntimeLoaderPtr)->test_executable;
+	(*__gRuntimeLoaderPtr)->test_executable = loader_test_executable;
+
+    loader_build_args(user_args_memory, args, argv, envp, expandPath);
 	loader_init_tls();
 
 	std::filesystem::path cwd = std::filesystem::current_path();

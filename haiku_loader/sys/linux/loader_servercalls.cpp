@@ -1,3 +1,4 @@
+#include <atomic>
 #include <cstdlib>
 #include <fcntl.h>
 #include <filesystem>
@@ -12,9 +13,12 @@
 #include <unistd.h>
 
 #include "haiku_errors.h"
+#include "loader_protectedfd.h"
 #include "loader_servercalls.h"
 #include "loader_vchroot.h"
 #include "servercalls.h"
+
+static std::atomic<int> sMinProtectedFd = sysconf(_SC_OPEN_MAX);
 
 class ServerConnection
 {
@@ -54,6 +58,8 @@ bool ServerConnection::Connect(bool forceReconnect)
     {
         if (!forceReconnect)
             return true;
+        int expected = _socket;
+        sMinProtectedFd.compare_exchange_strong(expected, _socket + 1);
         close(_socket);
         _socket = -1;
     }
@@ -82,6 +88,8 @@ bool ServerConnection::Connect(bool forceReconnect)
 
     if (maxFd >= 0)
     {
+        int expected = maxFd + 1;
+        sMinProtectedFd.compare_exchange_strong(expected, maxFd);
         dup2(_socket, maxFd);
         close(_socket);
         _socket = maxFd;
@@ -100,6 +108,8 @@ bool ServerConnection::Connect(bool forceReconnect)
 
     return true;
 fail:
+    int expected = _socket;
+    sMinProtectedFd.compare_exchange_strong(expected, _socket + 1);
     close(_socket);
     _socket = -1;
     return false;
@@ -113,6 +123,8 @@ void ServerConnection::Disconnect()
         intptr_t returnCode = -1;
         Send(args, sizeof(args));
         Receive(&returnCode, sizeof(returnCode));
+        int expected = _socket;
+        sMinProtectedFd.compare_exchange_strong(expected, _socket + 1);
         close(_socket);
         _socket = -1;
     }
@@ -284,4 +296,9 @@ bool loader_init_servercalls()
     }
 
     return true;
+}
+
+bool loader_is_protected_fd(int fd)
+{
+    return fd >= sMinProtectedFd;
 }
