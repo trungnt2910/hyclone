@@ -5,6 +5,7 @@
 #include <sys/un.h>
 
 #include "extended_commpage.h"
+#include "haiku_fcntl.h"
 #include "haiku_netinet_in.h"
 #include "linux_debug.h"
 #include "socket_conversion.h"
@@ -77,7 +78,8 @@ int SocketAddressBToLinux(const struct haiku_sockaddr *addr, haiku_socklen_t add
             }
             memcpy(path, haiku_un->sun_path, pathlen);
             path[pathlen] = '\0';
-            if (GET_HOSTCALLS()->vchroot_expand(path, hostPath, sizeof(hostPath)) >= sizeof(hostPath))
+            if (GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, path, pathlen,
+                false, hostPath, sizeof(hostPath)) != B_OK)
             {
                 return -1;
             }

@@ -108,7 +108,6 @@ typedef struct haiku_fd_set
     if (fd == HAIKU_AT_FDCWD)                                   \
     {                                                           \
         CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(str, B_ENTRY_NOT_FOUND);  \
-        fd = AT_FDCWD;                                          \
     }                                                           \
     else                                                        \
     {                                                           \
@@ -251,26 +250,17 @@ ssize_t _moni_readv(int fd, off_t pos, const struct haiku_iovec *vecs, size_t co
 
 int _moni_read_link(int fd, const char* path, char* buffer, size_t *_bufferSize)
 {
-    if (fd == HAIKU_AT_FDCWD)
-    {
-        fd = AT_FDCWD;
-    }
-
     char hostPath[PATH_MAX];
-    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
+    long status = GET_SERVERCALLS()->vchroot_expandat(fd, path, path ? strlen(path) : 0,
+        false, hostPath, sizeof(hostPath));
 
-    if (status < 0)
+    if (status != B_OK)
     {
-        return HAIKU_POSIX_ENOENT;
-    }
-    else if (status > sizeof(hostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
+        return status;
     }
 
     struct stat linuxStat;
     status = LINUX_SYSCALL2(__NR_lstat, hostPath, &linuxStat);
-
     if (status < 0)
     {
         return LinuxToB(-status);
@@ -314,40 +304,23 @@ status_t _moni_create_symlink(int fd, const char* path, const char* toPath, int 
 
 status_t _moni_create_link(int pathFD, const char* path, int toFD, const char* toPath, bool traverseLeafLink)
 {
-    if (pathFD == HAIKU_AT_FDCWD)
-    {
-        pathFD = AT_FDCWD;
-    }
-
     char hostPath[PATH_MAX];
-    long status = GET_HOSTCALLS()->vchroot_expandat(pathFD, path, hostPath, sizeof(hostPath));
+    long status = GET_SERVERCALLS()->vchroot_expandat(pathFD, path, path ? strlen(path) : 0,
+        false, hostPath, sizeof(hostPath));
 
-    if (status < 0)
+    if (status != B_OK && status != B_ENTRY_NOT_FOUND)
     {
-        return HAIKU_POSIX_ENOENT;
-    }
-    else if (status > sizeof(hostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
-    }
-
-    if (toFD == HAIKU_AT_FDCWD)
-    {
-        toFD = AT_FDCWD;
+        return status;
     }
 
     char hostToPath[PATH_MAX];
-    status = GET_HOSTCALLS()->vchroot_expandat(toFD, toPath, hostToPath, sizeof(hostToPath));
+    status = GET_SERVERCALLS()->vchroot_expandat(toFD, toPath, toPath ? strlen(toPath) : 0,
+        traverseLeafLink, hostToPath, sizeof(hostToPath));
 
-    if (status < 0)
+    if (status != B_OK)
     {
-        return HAIKU_POSIX_ENOENT;
+        return status;
     }
-    else if (status > sizeof(hostToPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
-    }
-
 
     status = LINUX_SYSCALL5(__NR_linkat, AT_FDCWD, hostToPath, AT_FDCWD, hostPath, traverseLeafLink ? AT_SYMLINK_FOLLOW : 0);
 
@@ -494,7 +467,7 @@ int _moni_access(int fd, const char* path, int mode, bool effectiveUserGroup)
     long status;
 
     char hostPath[PATH_MAX];
-    if (GET_HOSTCALLS()->vchroot_expandlinkat(fd, path, hostPath, sizeof(hostPath)) < 0)
+    if (GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path), true, hostPath, sizeof(hostPath)) < 0)
     {
         return HAIKU_POSIX_EBADF;
     }
@@ -571,10 +544,18 @@ int _moni_normalize_path(const char* userPath, bool traverseLink, char* buffer)
         panic("kern_normalize_path without traverseLink not implemented");
     }
 
-    char hostPath[PATH_MAX];
-    if (GET_HOSTCALLS()->vchroot_expand(userPath, hostPath, sizeof(hostPath)) < 0)
+    if (!userPath || !buffer)
     {
-        return HAIKU_POSIX_EBADF;
+        return B_BAD_ADDRESS;
+    }
+
+    char hostPath[PATH_MAX];
+    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, userPath, strlen(userPath),
+        true, hostPath, sizeof(hostPath));
+
+    if (expandStatus != B_OK && expandStatus != B_ENTRY_NOT_FOUND)
+    {
+        return expandStatus;
     }
 
     char resolvedPath[PATH_MAX];
@@ -619,14 +600,11 @@ status_t _moni_create_fifo(int fd, const char* path, mode_t perms)
     CHECK_FD_AND_PATH(fd, path);
 
     char hostPath[PATH_MAX];
-    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
-    if (status < 0)
+    long status = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+        false, hostPath, sizeof(hostPath));
+    if (status != B_OK)
     {
-        return HAIKU_POSIX_EBADF;
-    }
-    else if (status > sizeof(hostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
+        return status;
     }
 
     status = LINUX_SYSCALL3(__NR_mknod, hostPath, perms | S_IFIFO, 0);
@@ -646,24 +624,18 @@ int _moni_rename(int oldDir, const char* oldpath, int newDir, const char* newpat
     char oldHostPath[PATH_MAX];
     char newHostPath[PATH_MAX];
 
-    long status = GET_HOSTCALLS()->vchroot_expandat(oldDir, oldpath, oldHostPath, sizeof(oldHostPath));
-    if (status < 0)
+    long status = GET_SERVERCALLS()->vchroot_expandat(oldDir, oldpath, strlen(oldpath),
+        false, oldHostPath, sizeof(oldHostPath));
+    if (status != B_OK)
     {
-        return HAIKU_POSIX_EBADF;
-    }
-    else if (status > sizeof(oldHostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
+        return status;
     }
 
-    status = GET_HOSTCALLS()->vchroot_expandat(newDir, newpath, newHostPath, sizeof(newHostPath));
-    if (status < 0)
+    status = GET_SERVERCALLS()->vchroot_expandat(newDir, newpath, strlen(newpath),
+        false, newHostPath, sizeof(newHostPath));
+    if (status != B_OK && status != B_ENTRY_NOT_FOUND)
     {
-        return HAIKU_POSIX_EBADF;
-    }
-    else if (status > sizeof(newHostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
+        return status;
     }
 
     status = LINUX_SYSCALL2(__NR_rename, oldHostPath, newHostPath);
@@ -681,9 +653,11 @@ int _moni_unlink(int fd, const char* path)
     CHECK_FD_AND_PATH(fd, path);
 
     char hostPath[PATH_MAX];
-    if (GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath)) < 0)
+    long status = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+        false, hostPath, sizeof(hostPath));
+    if (status != B_OK)
     {
-        return HAIKU_POSIX_EBADF;
+        return status;
     }
 
     int result = LINUX_SYSCALL3(__NR_unlinkat, AT_FDCWD, hostPath, 0);
@@ -996,15 +970,12 @@ status_t _moni_create_dir(int fd, const char* path, int perms)
     CHECK_FD_AND_PATH(fd, path);
 
     char hostPath[PATH_MAX];
-    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
+    long status = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+        false, hostPath, sizeof(hostPath));
 
-    if (status < 0)
+    if (status != B_OK && status != B_ENTRY_NOT_FOUND)
     {
-        return HAIKU_POSIX_ENOENT;
-    }
-    else if (status > sizeof(hostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
+        return status;
     }
 
     status = LINUX_SYSCALL2(__NR_mkdir, hostPath, ModeBToLinux(perms));
@@ -1022,16 +993,8 @@ status_t _moni_remove_dir(int fd, const char* path)
     CHECK_FD_AND_PATH(fd, path);
 
     char hostPath[PATH_MAX];
-    long status = GET_HOSTCALLS()->vchroot_expandat(fd, path, hostPath, sizeof(hostPath));
-
-    if (status < 0)
-    {
-        return HAIKU_POSIX_ENOENT;
-    }
-    else if (status > sizeof(hostPath))
-    {
-        return HAIKU_POSIX_ENAMETOOLONG;
-    }
+    long status = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
+        false, hostPath, sizeof(hostPath));
 
     status = LINUX_SYSCALL1(__NR_rmdir, hostPath);
 
