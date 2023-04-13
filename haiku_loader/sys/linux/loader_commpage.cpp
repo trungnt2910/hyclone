@@ -118,6 +118,7 @@ void* loader_allocate_commpage()
     hostcalls_ptr->closedir = loader_closedir;
     hostcalls_ptr->readdir = loader_readdir;
     hostcalls_ptr->rewinddir = loader_rewinddir;
+    hostcalls_ptr->dupdir = loader_dupdir;
 
     hostcalls_ptr->system_time = loader_system_time;
     hostcalls_ptr->system_time_nsecs = loader_system_time_nsecs;

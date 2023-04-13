@@ -778,6 +778,7 @@ int _moni_dup(int fd)
     }
 
     GET_SERVERCALLS()->register_dup_fd(result, fd);
+    GET_HOSTCALLS()->dupdir(fd, result);
 
     return result;
 }
@@ -797,6 +798,7 @@ int _moni_dup2(int ofd, int nfd)
     }
 
     GET_SERVERCALLS()->register_dup_fd(nfd, ofd);
+    GET_HOSTCALLS()->dupdir(ofd, nfd);
 
     return result;
 }

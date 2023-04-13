@@ -4,6 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <unordered_map>
 
 #include "haiku_dirent.h"
@@ -49,9 +50,8 @@ static std::mutex sFdMapMutex;
 // when we need to emulate more complicated paths.
 static char sDirentBuf[sizeof(struct dirent) + 16];
 
-void loader_opendir(int fd)
+static void loader_opendir_unlocked(int fd)
 {
-    std::unique_lock<std::mutex> lock(sFdMapMutex);
     auto ptr = fdopendir(fd);
     if (ptr != NULL)
     {
@@ -61,10 +61,32 @@ void loader_opendir(int fd)
     }
 }
 
+void loader_opendir(int fd)
+{
+    std::unique_lock<std::mutex> lock(sFdMapMutex);
+    loader_opendir_unlocked(fd);
+}
+
 void loader_closedir(int fd)
 {
     std::unique_lock<std::mutex> lock(sFdMapMutex);
     sFdMap.erase(fd);
+}
+
+void loader_dupdir(int oldFd, int newFd)
+{
+    std::unique_lock<std::mutex> lock(sFdMapMutex);
+    if (sFdMap.contains(newFd))
+    {
+        int newFd2 = dup(newFd);
+        sFdMap.erase(newFd);
+        dup2(newFd2, newFd);
+        close(newFd2);
+    }
+    if (sFdMap.contains(oldFd))
+    {
+        loader_opendir_unlocked(newFd);
+    }
 }
 
 int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
