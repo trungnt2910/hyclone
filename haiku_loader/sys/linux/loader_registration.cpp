@@ -74,7 +74,12 @@ bool loader_register_builtin_areas(void* commpage, char** args)
     if (pthread_getattr_np(pthread_self(), &attr) == -1)
         return false;
     if (pthread_attr_getstack(&attr, &areaInfo.address, &areaInfo.size) == -1)
+    {
+        pthread_attr_destroy(&attr);
         return false;
+    }
+    pthread_attr_destroy(&attr);
+
     areaInfo.protection = B_READ_AREA | B_WRITE_AREA | B_STACK_AREA;
     areaInfo.lock = 0;
     std::string areaName = std::filesystem::path(*args).filename().string() + "_" + std::to_string(getpid()) + "_stack";
@@ -153,8 +158,9 @@ bool loader_register_existing_fds()
     if (dirfd < 0)
         return false;
 
-    DIR* dir = fdopendir(dirfd);
-    if (dir == NULL)
+    std::shared_ptr<DIR> dir(fdopendir(dirfd), [](DIR* dir) { closedir(dir); });
+
+    if (!dir)
         return false;
 
     std::string hycloneSockPath = std::filesystem::path(gHaikuPrefix) / HYCLONE_SOCKET_NAME;
@@ -172,7 +178,7 @@ bool loader_register_existing_fds()
     }
 
     struct dirent* entry;
-    while ((entry = readdir(dir)) != NULL)
+    while ((entry = readdir(dir.get())) != NULL)
     {
         if (entry->d_type != DT_LNK)
             continue;
@@ -201,8 +207,6 @@ bool loader_register_existing_fds()
         if (loader_hserver_call_register_fd(fd, HAIKU_AT_FDCWD, resolvedPath, sizeof(resolvedPath), false) < 0)
             return false;
     }
-
-    closedir(dir);
 
     return true;
 }

@@ -14,7 +14,7 @@ int loader_spawn(const char* path, const char* const* flatArgs,
 {
     const int ADDITIONAL_ARGS = 5;
 
-    const char** argv = new const char*[argc + ADDITIONAL_ARGS];
+    const char** argv = new const char*[argc + ADDITIONAL_ARGS + 1];
     const std::string loaderPath = std::filesystem::canonical("/proc/self/exe").string();
     const std::string errorPortValue = std::to_string(errorPort);
     const std::string errorTokenValue = std::to_string(errorToken);
@@ -40,6 +40,7 @@ int loader_spawn(const char* path, const char* const* flatArgs,
     pid_t newpid;
     int status = posix_spawn(&newpid, loaderPath.c_str(), NULL, NULL, (char**)argv, (char**)envp);
 
+    posix_spawnattr_destroy(&spawnAttributes);
     delete[] argv;
 
     if (status != 0)

@@ -23,4 +23,9 @@ add_executable(haiku_loader
 
 set_property(TARGET haiku_loader PROPERTY CXX_STANDARD 20)
 
+if(HYCLONE_USE_SANITIZERS)
+    target_compile_options(haiku_loader PRIVATE -fsanitize=address)
+    target_link_options(haiku_loader PRIVATE -fsanitize=address)
+endif()
+
 install(TARGETS haiku_loader DESTINATION bin)

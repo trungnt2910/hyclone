@@ -47,6 +47,12 @@ add_executable(hyclone_server
 set_property(TARGET hyclone_server PROPERTY CXX_STANDARD 20)
 target_link_libraries(hyclone_server hpkgvfs)
 target_compile_options(hyclone_server PRIVATE -Wno-multichar)
+
+if(HYCLONE_USE_SANITIZERS)
+    target_compile_options(hyclone_server PRIVATE -fsanitize=address)
+    target_link_options(hyclone_server PRIVATE -fsanitize=address)
+endif()
+
 install(TARGETS hyclone_server DESTINATION bin)
 if(HYCLONE_HOST_LINUX)
     install(CODE "

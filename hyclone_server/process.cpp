@@ -321,13 +321,16 @@ intptr_t server_hserver_call_register_fd(hserver_context& context, int fd, int p
     {
         auto lock = context.process->Lock();
         status = context.process->ReadDirFd(parentFd, userPath, userPathSize, traverseSymlink, requestPath);
+
+        if (status == B_OK)
+        {
+            requestPath = requestPath.lexically_normal();
+            context.process->RegisterFd(fd, requestPath);
+        }
     }
 
     if (status == B_OK)
     {
-        requestPath = requestPath.lexically_normal();
-        context.process->RegisterFd(fd, requestPath);
-
         auto& vfsService = System::GetInstance().GetVfsService();
         auto lock = vfsService.Lock();
 

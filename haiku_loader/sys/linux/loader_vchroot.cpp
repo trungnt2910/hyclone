@@ -108,7 +108,9 @@ size_t loader_vchroot_unexpand(const char* hostPath, char* path, size_t size)
 
     std::string haikuPath = "/";
 
-    if (std::equal(sHaikuPrefixParts.begin(), sHaikuPrefixParts.end(), hostParts.begin()))
+    if (hostParts.size() >= sHaikuPrefixParts.size() &&
+        std::equal(sHaikuPrefixParts.begin(), sHaikuPrefixParts.end(),
+                   hostParts.begin()))
     {
         for (size_t i = sHaikuPrefixParts.size(); i < hostParts.size(); ++i)
         {

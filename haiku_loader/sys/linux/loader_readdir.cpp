@@ -13,12 +13,33 @@
 #include "loader_servercalls.h"
 #include "loader_vchroot.h"
 
-struct LoaderDirectoryInfo
+class LoaderDirectoryInfo
 {
-    DIR* handle;
-    haiku_dev_t dev;
-    haiku_ino_t ino;
-    int extendedEntryIndex;
+private:
+    DIR* _handle = NULL;
+    haiku_dev_t _dev;
+    haiku_ino_t _ino;
+
+public:
+    LoaderDirectoryInfo(DIR* handle, haiku_dev_t dev, haiku_ino_t ino)
+        : _handle(handle), _dev(dev), _ino(ino) { }
+    LoaderDirectoryInfo(const LoaderDirectoryInfo&) = delete;
+    LoaderDirectoryInfo(LoaderDirectoryInfo&& other)
+        : _handle(other._handle), _dev(other._dev), _ino(other._ino)
+    {
+        other._handle = NULL;
+    }
+    DIR* GetHandle() const { return _handle; }
+    haiku_dev_t GetDev() const { return _dev; }
+    haiku_ino_t GetIno() const { return _ino; }
+    ~LoaderDirectoryInfo()
+    {
+        if (_handle)
+        {
+            closedir(_handle);
+            _handle = NULL;
+        }
+    }
 };
 
 static std::unordered_map<int, LoaderDirectoryInfo> sFdMap;
@@ -32,18 +53,17 @@ void loader_opendir(int fd)
 {
     std::unique_lock<std::mutex> lock(sFdMapMutex);
     auto ptr = fdopendir(fd);
-    if (ptr != nullptr)
+    if (ptr != NULL)
     {
         haiku_stat st;
         loader_hserver_call_read_stat(fd, NULL, 0, false, &st, sizeof(st));
-        sFdMap[fd] = LoaderDirectoryInfo{ ptr, st.st_dev, st.st_ino, 0 };
+        sFdMap.emplace(fd, LoaderDirectoryInfo(ptr, st.st_dev, st.st_ino));
     }
 }
 
 void loader_closedir(int fd)
 {
     std::unique_lock<std::mutex> lock(sFdMapMutex);
-    closedir(sFdMap[fd].handle);
     sFdMap.erase(fd);
 }
 
@@ -57,7 +77,7 @@ int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
         return HAIKU_POSIX_ENOTDIR;
     }
 
-    DIR* dir = it->second.handle;
+    DIR* dir = it->second.GetHandle();
 
     char* bufferOffset = (char*)buffer;
     size_t bufferSizeLeft = bufferSize;
@@ -80,8 +100,8 @@ int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount)
             break;
         }
         struct haiku_dirent* haikuEntry = (struct haiku_dirent*)bufferOffset;
-        haikuEntry->d_pdev = it->second.dev;
-        haikuEntry->d_pino = it->second.ino;
+        haikuEntry->d_pdev = it->second.GetDev();
+        haikuEntry->d_pino = it->second.GetIno();
         strcpy(haikuEntry->d_name, entry->d_name);
         haikuEntry->d_reclen = haikuEntrySize;
 
@@ -112,6 +132,5 @@ void loader_rewinddir(int fd)
         return;
     }
 
-    rewinddir(it->second.handle);
-    it->second.extendedEntryIndex = 0;
+    rewinddir(it->second.GetHandle());
 }

@@ -89,6 +89,8 @@ int loader_spawn_thread(void* arg)
 
     int result = pthread_create(&threadInfo.thread, &linux_thread_attributes, loader_pthread_entry_trampoline, &args);
 
+    pthread_attr_destroy(&linux_thread_attributes);
+
     if (result != 0)
     {
         return -result;
@@ -186,6 +188,7 @@ bool loader_register_thread(int tid, const thread_creation_attributes* attribute
         sched_param sched;
         pthread_attr_getschedparam(&attr, &sched);
         thread_info.priority = sched.sched_priority;
+        pthread_attr_destroy(&attr);
     }
 
     if (suspended)
