@@ -6,8 +6,9 @@
 #include "server_native.h"
 #include "system.h"
 
-HostfsDevice::HostfsDevice(const std::filesystem::path& root, const std::filesystem::path& hostRoot)
-    : VfsDevice(root), _hostRoot(hostRoot)
+HostfsDevice::HostfsDevice(const std::filesystem::path& root,
+    const std::filesystem::path& hostRoot, uint32 mountFlags)
+    : VfsDevice(root, mountFlags), _hostRoot(hostRoot)
 {
 
 }

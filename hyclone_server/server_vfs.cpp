@@ -1,13 +1,10 @@
 #include <cstring>
 
 #include "haiku_errors.h"
+#include "haiku_fs_volume.h"
+#include "server_filesystem.h"
 #include "server_native.h"
 #include "server_vfs.h"
-
-VfsDevice::VfsDevice(const std::filesystem::path& root, const haiku_fs_info& info)
-    : _root(root), _info(info)
-{
-}
 
 VfsService::VfsService()
 {
@@ -77,6 +74,101 @@ std::weak_ptr<VfsDevice> VfsService::GetDevice(const std::filesystem::path& path
         return it->second;
     }
     return std::weak_ptr<VfsDevice>();
+}
+
+void VfsService::RegisterBuiltinFilesystem(const std::string& name, mounter_t mounter)
+{
+    _mounters[name] = mounter;
+}
+
+haiku_dev_t VfsService::Mount(const std::filesystem::path& path, const std::filesystem::path& device,
+    const std::string& fsName, uint32 flags, const std::string& args)
+{
+    std::shared_ptr<VfsDevice> volume;
+
+    auto realPath = path.lexically_normal();
+    status_t status = RealPath(realPath);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    struct haiku_stat st;
+    status = ReadStat(realPath, st, false);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    if (!HAIKU_S_ISDIR(st.st_mode))
+    {
+        return B_NOT_A_DIRECTORY;
+    }
+
+    status = B_DEVICE_NOT_FOUND;
+
+    if (_mounters.contains(fsName))
+    {
+        status = _mounters[fsName](realPath, device, flags, args, volume);
+    }
+    else
+    {
+        // TODO: Load from external "drivers".
+        // The VfsDevice class is a header-only class with only virtual
+        // and inline functions. Therefore third-parties can inherit
+        // this class and create ABI-compatible shared objects provided
+        // that they use a compatible compiler.
+    }
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    status = RegisterDevice(volume);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    return volume->GetInfo().dev;
+}
+
+status_t VfsService::Unmount(const std::filesystem::path& path, uint32 flags)
+{
+    auto realPath = path.lexically_normal();
+    status_t status = RealPath(realPath);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    auto it = _deviceMounts.find(realPath);
+    if (it != _deviceMounts.end())
+    {
+        // TODO: Check if the device is still in use.
+        _devices.Remove(it->second->GetInfo().dev);
+        _deviceReferences.erase(it->second->GetInfo().dev);
+        std::vector<decltype(_entryRefs)::iterator> toRemove;
+        for (auto refIt = _entryRefs.begin(); refIt != _entryRefs.end(); ++refIt)
+        {
+            if (refIt->first.GetDevice() == it->second->GetId())
+            {
+                toRemove.push_back(refIt);
+            }
+        }
+        for (auto& refIt : toRemove)
+        {
+            _entryRefs.erase(refIt);
+        }
+        _deviceMounts.erase(it);
+        return B_OK;
+    }
+    return B_DEVICE_NOT_FOUND;
 }
 
 status_t VfsService::GetPath(std::filesystem::path& path, bool traverseLink)

@@ -4,8 +4,8 @@
 #include "rootfs.h"
 #include "server_filesystem.h"
 
-RootfsDevice::RootfsDevice(const std::filesystem::path& hostRoot)
-    : HostfsDevice("/", hostRoot)
+RootfsDevice::RootfsDevice(const std::filesystem::path& hostRoot, uint32 mountFlags)
+    : HostfsDevice("/", hostRoot, mountFlags)
 {
     // same as in Haiku.
     _info.flags = 0;

@@ -5,8 +5,8 @@
 #include "server_filesystem.h"
 #include "server_native.h"
 
-DevfsDevice::DevfsDevice()
-    : HostfsDevice("/dev", "/dev")
+DevfsDevice::DevfsDevice(uint32 mountFlags)
+    : HostfsDevice("/dev", "/dev", mountFlags)
 {
     // same as in Haiku.
     _info.flags = 0;

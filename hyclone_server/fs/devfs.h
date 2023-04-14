@@ -6,7 +6,7 @@
 class DevfsDevice : public HostfsDevice
 {
 public:
-    DevfsDevice();
+    DevfsDevice(uint32 mountFlags = 0);
 };
 
 #endif // __HYCLONE_ROOTFS_H__

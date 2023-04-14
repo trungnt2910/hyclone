@@ -39,6 +39,9 @@ bool server_setup_filesystem()
     vfsService.RegisterDevice(std::make_shared<PackagefsDevice>("/boot", std::filesystem::path(gHaikuPrefix) / "boot"));
     vfsService.RegisterDevice(std::make_shared<SystemfsDevice>());
 
+    vfsService.RegisterBuiltinFilesystem("packagefs", PackagefsDevice::Mount);
+    vfsService.RegisterBuiltinFilesystem("systemfs", SystemfsDevice::Mount);
+
     if (!server_setup_settings())
     {
         std::cerr << "failed to setup system settings." << std::endl;
@@ -130,6 +133,105 @@ intptr_t server_hserver_call_next_device(hserver_context& context, int* userCook
     }
 
     return id;
+}
+
+intptr_t server_hserver_call_mount(hserver_context& context, void* userPathAndSize, void* userDeviceAndSize,
+    void* userFsNameAndSize, unsigned int flags, const char* userArgs, size_t userArgsSize)
+{
+    std::filesystem::path path;
+    std::filesystem::path device;
+    std::string fsName;
+    std::string args;
+
+    {
+        auto lock = context.process->Lock();
+        std::pair<const char*, size_t> pathAndSize;
+        std::pair<const char*, size_t> deviceAndSize;
+        std::pair<const char*, size_t> fsNameAndSize;
+        std::string pathString;
+        std::string deviceString;
+
+        if (context.process->ReadMemory(userPathAndSize, &pathAndSize, sizeof(pathAndSize)) != sizeof(pathAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        pathString.resize(pathAndSize.second);
+        if (context.process->ReadMemory((void*)pathAndSize.first, pathString.data(), pathAndSize.second) != pathAndSize.second)
+        {
+            return B_BAD_ADDRESS;
+        }
+        path = pathString;
+
+        if (context.process->ReadMemory(userDeviceAndSize, &deviceAndSize, sizeof(deviceAndSize)) != sizeof(deviceAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        deviceString.resize(deviceAndSize.second);
+        if (context.process->ReadMemory((void*)deviceAndSize.first, deviceString.data(), deviceAndSize.second) != deviceAndSize.second)
+        {
+            return B_BAD_ADDRESS;
+        }
+        device = deviceString;
+
+        if (context.process->ReadMemory(userFsNameAndSize, &fsNameAndSize, sizeof(fsNameAndSize)) != sizeof(fsNameAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        fsName.resize(fsNameAndSize.second);
+        if (context.process->ReadMemory((void*)fsNameAndSize.first, fsName.data(), fsNameAndSize.second) != fsNameAndSize.second)
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        args.resize(userArgsSize);
+        if (context.process->ReadMemory((void*)userArgs, args.data(), userArgsSize) != userArgsSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (!path.is_absolute())
+        {
+            path = context.process->GetCwd() / path;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+
+        return vfsService.Mount(path, device, fsName, flags, args);
+    }
+}
+
+intptr_t server_hserver_call_unmount(hserver_context& context, const char* userPath, size_t userPathSize, unsigned int flags)
+{
+    std::filesystem::path path;
+
+    {
+        auto lock = context.process->Lock();
+        std::string pathString(userPathSize, '\0');
+
+        if (context.process->ReadMemory((void*)userPath, pathString.data(), userPathSize) != userPathSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+        path = pathString;
+
+        if (!path.is_absolute())
+        {
+            path = context.process->GetCwd() / path;
+        }
+    }
+
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+
+        return vfsService.Unmount(path, flags);
+    }
 }
 
 intptr_t server_hserver_call_read_stat(hserver_context& context, int fd, const char* userPath, size_t userPathSize,

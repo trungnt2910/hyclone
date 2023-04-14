@@ -1,4 +1,6 @@
 #include <cstddef>
+#include <cstring>
+#include <utility>
 
 #include "BeDefs.h"
 #include "extended_commpage.h"
@@ -29,9 +31,40 @@ status_t _moni_stop_watching(haiku_dev_t device, haiku_ino_t node, port_id port,
     return HAIKU_POSIX_ENOSYS;
 }
 
-haiku_dev_t _moni_next_device(int32 *_cookie)
+haiku_dev_t _moni_next_device(int32* _cookie)
 {
     return GET_SERVERCALLS()->next_device(_cookie);
+}
+
+haiku_dev_t _moni_mount(const char* path, const char* device,
+    const char* fs_name, uint32 flags, const char* args,
+    size_t argsLength)
+{
+    if (path == NULL)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    if (*path == '\0')
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
+
+    std::pair<const char*, size_t> pathAndSize(path, strlen(path));
+    std::pair<const char*, size_t> deviceAndSize(device, device ? strlen(device) : 0);
+    std::pair<const char*, size_t> fsNameAndSize(fs_name, fs_name ? strlen(fs_name) : 0);
+
+    return GET_SERVERCALLS()->mount(&pathAndSize, &deviceAndSize, &fsNameAndSize, flags, args, argsLength);
+}
+
+status_t _moni_unmount(const char* path, uint32 flags)
+{
+    if (path == NULL)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return GET_SERVERCALLS()->unmount(path, strlen(path), flags);
 }
 
 }

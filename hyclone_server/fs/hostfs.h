@@ -13,7 +13,8 @@ protected:
     virtual bool _IsBlacklisted(const std::filesystem::directory_entry& entry) const { return false; }
     static haiku_ino_t _Hash(uint64_t hostDev, uint64_t hostIno);
 public:
-    HostfsDevice(const std::filesystem::path& root, const std::filesystem::path& hostRoot);
+    HostfsDevice(const std::filesystem::path& root, const std::filesystem::path& hostRoot,
+        uint32 mountFlags = 0);
     virtual ~HostfsDevice() override = default;
 
     virtual status_t GetPath(std::filesystem::path& path, bool& isSymlink) override;

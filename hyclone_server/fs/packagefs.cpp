@@ -38,8 +38,8 @@ public:
 };
 
 PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
-    const std::filesystem::path& hostRoot)
-    : HostfsDevice(root, hostRoot)
+    const std::filesystem::path& hostRoot, PackageFSMountType mountType, uint32 mountFlags)
+    : HostfsDevice(root, hostRoot, mountFlags), _mountType(mountType)
 {
     std::filesystem::create_directories(hostRoot / _relativeAttributesPath);
 
@@ -78,6 +78,11 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     }
 
     std::vector<std::pair<std::filesystem::path, std::string>> toRename;
+
+    if (!std::filesystem::exists(packagesPath))
+    {
+        std::filesystem::create_directories(packagesPath);
+    }
 
     for (const auto& file : std::filesystem::directory_iterator(packagesPath))
     {
@@ -726,5 +731,57 @@ haiku_ssize_t PackagefsDevice::RemoveAttr(const std::filesystem::path& path, con
     }
 
     std::filesystem::remove(attrTypeHostPath, ec);
+    return B_OK;
+}
+
+status_t PackagefsDevice::Mount(const std::filesystem::path& path,
+    const std::filesystem::path& device, uint32 flags, const std::string& args,
+    std::shared_ptr<VfsDevice>& output)
+{
+    PackageFSMountType mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM;
+
+    if (!args.empty())
+    {
+        std::stringstream ss(args);
+        std::string arg;
+
+        ss >> arg;
+
+        if (arg != "type")
+        {
+            return B_BAD_VALUE;
+        }
+
+        ss >> arg;
+
+        if (arg == "system")
+        {
+            mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM;
+        }
+        else if (arg == "home")
+        {
+            mountType = PACKAGE_FS_MOUNT_TYPE_HOME;
+        }
+        else if (arg == "custom")
+        {
+            mountType = PACKAGE_FS_MOUNT_TYPE_CUSTOM;
+        }
+        else
+        {
+            return B_BAD_VALUE;
+        }
+    }
+
+    auto& vfsService = System::GetInstance().GetVfsService();
+    auto hostPath = path;
+    status_t status = vfsService.GetPath(hostPath, false);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    output = std::make_shared<PackagefsDevice>(path, hostPath, mountType, flags);
+
     return B_OK;
 }

@@ -126,7 +126,8 @@ protected:
     bool _IsBlacklisted(const std::filesystem::directory_entry& entry) const override;
 public:
     PackagefsDevice(const std::filesystem::path& root,
-        const std::filesystem::path& hostRoot);
+        const std::filesystem::path& hostRoot, PackageFSMountType mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM,
+        uint32 mountFlags = 0);
     virtual status_t GetAttrPath(std::filesystem::path& path, const std::string& name,
         uint32 type, bool createNew, bool& isSymlink) override;
     virtual status_t StatAttr(const std::filesystem::path& path, const std::string& name,
@@ -140,6 +141,9 @@ public:
         override;
     virtual status_t Ioctl(const std::filesystem::path& path, unsigned int cmd,
         void* addr, void* buffer, size_t size) override;
+
+    static status_t Mount(const std::filesystem::path& path, const std::filesystem::path& device, uint32 flags,
+        const std::string& args, std::shared_ptr<VfsDevice>& output);
 };
 
 #endif // __HYCLONE_ROOTFS_H__

@@ -23,9 +23,12 @@ class VfsDevice
 protected:
     haiku_fs_info _info;
     std::filesystem::path _root;
-    VfsDevice(const std::filesystem::path& root) : _root(root) {}
+    uint32 _mountFlags;
+    VfsDevice(const std::filesystem::path& root, uint32 mountFlags)
+        : _root(root), _mountFlags(mountFlags) { }
 public:
-    VfsDevice(const std::filesystem::path& root, const haiku_fs_info& info);
+    VfsDevice(const std::filesystem::path& root, const haiku_fs_info& info, uint32 mountFlags)
+        : _root(root), _info(info), _mountFlags(mountFlags) { }
     virtual ~VfsDevice() = default;
 
     // If the initial value if isSymlink is true, the function will traverse the symlinks.
@@ -70,6 +73,10 @@ private:
     std::unordered_map<EntryRef, std::string> _entryRefs;
     IdMap<std::shared_ptr<VfsDevice>, haiku_dev_t> _devices;
     std::unordered_map<std::filesystem::path, std::shared_ptr<VfsDevice>, PathHash> _deviceMounts;
+    std::unordered_map<int, int> _deviceReferences;
+    using mounter_t = status_t(*)(const std::filesystem::path& path, const std::filesystem::path& device,
+        uint32 mountFlags, const std::string& args, std::shared_ptr<VfsDevice>& output);
+    std::unordered_map<std::string, mounter_t> _mounters;
 
     template <typename T = status_t>
     struct Callback
@@ -81,6 +88,11 @@ private:
     T _DoWork(std::filesystem::path& path, bool traverseLink, const Callback<T>::Type& work)
     {
         path = path.lexically_normal();
+        if (path.filename().empty())
+        {
+            path = path.parent_path();
+        }
+
         bool isSymlink = traverseLink;
 
         do
@@ -139,6 +151,11 @@ public:
     std::weak_ptr<VfsDevice> GetDevice(int id);
     std::weak_ptr<VfsDevice> GetDevice(const std::filesystem::path& path);
     haiku_dev_t NextDeviceId(haiku_dev_t id) const { return _devices.NextId(id); }
+
+    void RegisterBuiltinFilesystem(const std::string& name, mounter_t mounter);
+    haiku_dev_t Mount(const std::filesystem::path& path, const std::filesystem::path& device,
+        const std::string& fsName, uint32 flags, const std::string& args);
+    status_t Unmount(const std::filesystem::path& path, uint32 flags);
 
     // Gets the host path for the given VFS path.
     // The VFS path MUST be absolute.
