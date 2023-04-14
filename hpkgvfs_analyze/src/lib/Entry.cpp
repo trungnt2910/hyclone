@@ -100,13 +100,15 @@ namespace HpkgVfs
     Entry::Entry(const std::string& name,
             std::filesystem::file_type type,
             std::filesystem::perms permissions,
+            bool shineThrough,
             const std::string& user,
             const std::string& group,
             const std::filesystem::file_time_type& access,
             const std::filesystem::file_time_type& modified,
             const std::filesystem::file_time_type& create,
             const std::string& packageName)
-        : _name(name), _type(type), _permissions(permissions), _user(user), _group(group), _access(access), _modified(modified), _create(create)
+        : _name(name), _type(type), _permissions(permissions), _shineThrough(shineThrough),
+        _user(user), _group(group), _access(access), _modified(modified), _create(create)
     {
         switch (_type)
         {
@@ -206,6 +208,7 @@ namespace HpkgVfs
         _name = std::move(other._name);
         _type = std::move(other._type);
         _permissions = std::move(other._permissions);
+        _shineThrough = std::move(other._shineThrough);
         _user = std::move(other._user);
         _group = std::move(other._group);
         _access = std::move(other._access);
@@ -268,6 +271,7 @@ namespace HpkgVfs
             throw std::invalid_argument("Child already has a parent.");
         }
         child->_parent = shared_from_this();
+        child->_shineThrough = child->_shineThrough || _shineThrough;
         auto& vec = _children[child->_name];
         if (child->_type == std::filesystem::file_type::directory)
         {
@@ -601,6 +605,11 @@ namespace HpkgVfs
             throw std::invalid_argument("Cannot merge entries with different names.");
         }
 
+        if (!_shineThrough && other->_shineThrough)
+        {
+            throw std::invalid_argument("Cannot merge a shine-through entry to a read-only entry.");
+        }
+
         if (_type == std::filesystem::file_type::directory &&
             other->_type == std::filesystem::file_type::directory)
         {
@@ -663,6 +672,15 @@ namespace HpkgVfs
             return;
         }
 
+        if (!_shineThrough)
+        {
+            auto parent = _parent.lock();
+            if (parent)
+            {
+                _shineThrough = _shineThrough || parent->_shineThrough;
+            }
+        }
+
         std::filesystem::path path = rootPath / _name;
 
         bool exists = std::filesystem::exists(std::filesystem::symlink_status(path));
@@ -705,13 +723,14 @@ namespace HpkgVfs
                 auto oldPerms = oldStatus.permissions();
                 auto oldType = oldStatus.type();
 
-                // Ignore writable files. This is the same behavior
-                // as on Haiku.
+                // Ignore writable files on shine-through directories.
+                // This is the same behavior as on Haiku.
                 // It also ensures that user setting files are not removed
                 // during package upgrades.
                 // Symlinks are always removed as many systems don't support
                 // permissions for symlinks.
                 if ((oldType == std::filesystem::file_type::symlink)
+                    || !_shineThrough
                     || (oldPerms == std::filesystem::perms::unknown)
                     || (oldPerms & std::filesystem::perms::owner_write) == std::filesystem::perms::none)
                 {
@@ -748,6 +767,11 @@ namespace HpkgVfs
                 // If the file is read only, temporarily allow us to write on it.
                 if (exists)
                 {
+                    std::error_code _;
+                    std::filesystem::permissions(path,
+                        std::filesystem::perms::owner_write,
+                        std::filesystem::perm_options::add |
+                        std::filesystem::perm_options::nofollow, _);
                     std::filesystem::remove(path);
                 }
                 std::ofstream fout(path, std::ios::binary);
@@ -761,6 +785,10 @@ namespace HpkgVfs
             std::error_code _;
             if (exists)
             {
+                std::filesystem::permissions(path,
+                    std::filesystem::perms::owner_write,
+                    std::filesystem::perm_options::add |
+                    std::filesystem::perm_options::nofollow, _);
                 std::filesystem::remove(path);
             }
             if (std::filesystem::is_directory(targetPath, _))
@@ -780,8 +808,15 @@ namespace HpkgVfs
             {
                 options |= std::filesystem::perm_options::nofollow;
             }
+            auto effectivePermissions = _permissions;
+            if (!_shineThrough)
+            {
+                effectivePermissions &= ~std::filesystem::perms::owner_write;
+                effectivePermissions &= ~std::filesystem::perms::group_write;
+                effectivePermissions &= ~std::filesystem::perms::others_write;
+            }
             std::error_code e;
-            std::filesystem::permissions(path, _permissions, options, e);
+            std::filesystem::permissions(path, effectivePermissions, options, e);
             if (e.value() == (int)std::errc::operation_not_supported && _type == std::filesystem::file_type::symlink)
             {
             }
@@ -1030,23 +1065,28 @@ namespace HpkgVfs
 
         std::shared_ptr<Entry> non_packagedDir = std::make_shared<Entry>("non-packaged",
             std::filesystem::file_type::directory,
-            defaultWritableDirectoryPerms);
+            defaultWritableDirectoryPerms,
+            true);
 
         std::shared_ptr<Entry> settingsDir = std::make_shared<Entry>("settings",
             std::filesystem::file_type::directory,
-            defaultWritableDirectoryPerms);
+            defaultWritableDirectoryPerms,
+            true);
 
         std::shared_ptr<Entry> cacheDir = std::make_shared<Entry>("cache",
             std::filesystem::file_type::directory,
-            defaultWritableDirectoryPerms);
+            defaultWritableDirectoryPerms,
+            true);
 
         std::shared_ptr<Entry> packagesDir = std::make_shared<Entry>("packages",
             std::filesystem::file_type::directory,
-            defaultWritableDirectoryPerms);
+            defaultWritableDirectoryPerms,
+            true);
 
         std::shared_ptr<Entry> varDir = std::make_shared<Entry>("var",
             std::filesystem::file_type::directory,
-            defaultWritableDirectoryPerms);
+            defaultWritableDirectoryPerms,
+            true);
 
         std::shared_ptr<Entry> hpkgvfsPackagesDir = std::make_shared<Entry>(".hpkgvfsPackages",
             std::filesystem::file_type::directory,

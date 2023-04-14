@@ -57,6 +57,7 @@ namespace HpkgVfs
 
         int _writablePackages = 0;
         bool _updated = false;
+        bool _shineThrough = false;
 
         // This is intentionally made private.
         // See the comments at FromAttribute.
@@ -70,6 +71,7 @@ namespace HpkgVfs
         Entry(const std::string& name,
             std::filesystem::file_type type = std::filesystem::file_type::regular,
             std::filesystem::perms permissions = std::filesystem::perms::none,
+            bool shineThrough = false,
             const std::string& user = "",
             const std::string& group = "",
             const std::filesystem::file_time_type& access = std::filesystem::file_time_type::min(),
