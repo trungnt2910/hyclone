@@ -88,7 +88,7 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
     {
         loader_hserver_call_exec(true);
 
-        const int additionalArgs = 8;
+        const int additionalArgs = 10;
 
         const char** argv = new const char*[argc + additionalArgs + 1];
         std::error_code ec;
@@ -100,6 +100,9 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
         const std::string umaskValue = std::to_string(umask);
         const std::string debuggerInfo = loader_debugger_serialize_info();
 
+        char cwd[PATH_MAX];
+        loader_hserver_call_getcwd(cwd, sizeof(cwd));
+
         argv[0] = loaderPath.c_str();
         argv[1] = "--umask";
         argv[2] = umaskValue.c_str();
@@ -107,7 +110,9 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
         argv[4] = debuggerInfo.c_str();
         argv[5] = "--prefix";
         argv[6] = gHaikuPrefix.c_str();
-        argv[7] = "--no-expand";
+        argv[7] = "--cwd";
+        argv[8] = cwd;
+        argv[9] = "--no-expand";
 
         std::copy(flatArgs, flatArgs + argc, argv + additionalArgs);
         argv[argc + additionalArgs] = NULL;

@@ -184,7 +184,7 @@ int main(int argc, char** argv, char** envp)
 	if (argc <= 1)
 	{
 		std::cout << "Usage: " << argv[0]
-			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--debugger <debugger_info>] [--prefix <hprefix_override>] [--no-expand] [--] "
+			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--debugger <debugger_info>] [--prefix <hprefix_override>] [--cwd <cwd_override>] [--no-expand] [--] "
 			<< "<path to haiku executable> [args]" << std::endl;
 		return 1;
 	}
@@ -200,6 +200,7 @@ int main(int argc, char** argv, char** envp)
 
 	std::string debuggerInfo;
 	hPrefix = getenv("HPREFIX");
+	std::string cwd;
 	bool expandPath = true;
 
 	while (strncmp(argv[0], "--", 2) == 0)
@@ -256,6 +257,16 @@ int main(int argc, char** argv, char** envp)
 					return 1;
 				}
 				hPrefix = argv[0];
+				++argv; --argc;
+			}
+			else if (strcmp(currentArg, "--cwd") == 0)
+			{
+				if (argc <= 0)
+				{
+					std::cout << "Missing value for --cwd flag.";
+					return 1;
+				}
+				cwd = argv[0];
 				++argv; --argc;
 			}
 			else if (strcmp(currentArg, "--no-expand") == 0)
@@ -321,10 +332,15 @@ int main(int argc, char** argv, char** envp)
     loader_build_args(user_args_memory, args, argv, envp, expandPath);
 	loader_init_tls();
 
-	std::filesystem::path cwd = std::filesystem::current_path();
-	char emulatedCwd[PATH_MAX];
-	size_t emulatedCwdLength = loader_vchroot_unexpand(cwd.c_str(), emulatedCwd, sizeof(emulatedCwd));
-	loader_hserver_call_setcwd(HAIKU_AT_FDCWD, emulatedCwd, emulatedCwdLength);
+	if (cwd.empty())
+	{
+		std::filesystem::path hostCwd = std::filesystem::current_path();
+		char emulatedCwd[PATH_MAX];
+		size_t emulatedCwdLength = loader_vchroot_unexpand(hostCwd.c_str(), emulatedCwd, sizeof(emulatedCwd));
+		cwd = emulatedCwd;
+	}
+
+	loader_hserver_call_setcwd(HAIKU_AT_FDCWD, cwd.c_str(), cwd.size());
 
 	loader_debugger_restore_info(debuggerInfo);
 
