@@ -377,7 +377,7 @@ int _moni_open(int fd, const char* path, int openMode, int perms)
     {
         CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, HAIKU_POSIX_ENOENT);
     }
-    bool noTraverse = (openMode & HAIKU_O_NOTRAVERSE);
+    bool noTraverse = (openMode & (HAIKU_O_NOTRAVERSE | HAIKU_O_NOFOLLOW));
 
     openMode &= ~HAIKU_O_NOTRAVERSE;
     int linuxFlags = OFlagsBToLinux(openMode);
@@ -1135,7 +1135,7 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
         memcpy(hostPath + hostPathLen, name, nameLen + 1);
     }
 
-    bool noTraverse = (openMode & HAIKU_O_NOTRAVERSE);
+    bool noTraverse = (openMode & (HAIKU_O_NOTRAVERSE | HAIKU_O_NOFOLLOW));
 
     openMode &= ~HAIKU_O_NOTRAVERSE;
     int linuxFlags = OFlagsBToLinux(openMode);
