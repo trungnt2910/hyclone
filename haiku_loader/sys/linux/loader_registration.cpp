@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "BeDefs.h"
 #include "commpage_defs.h"
 #include "haiku_area.h"
 #include "haiku_fcntl.h"
@@ -56,7 +57,7 @@ bool loader_register_process(int argc, char** args)
     return loader_hserver_call_register_team_info(&teamInfo) >= 0;
 }
 
-bool loader_register_builtin_areas(void* commpage, char** args)
+bool loader_register_builtin_areas(user_space_program_args* args, void* commpage)
 {
     haiku_area_info areaInfo;
     memset(&areaInfo, 0, sizeof(areaInfo));
@@ -82,7 +83,7 @@ bool loader_register_builtin_areas(void* commpage, char** args)
 
     areaInfo.protection = B_READ_AREA | B_WRITE_AREA | B_STACK_AREA;
     areaInfo.lock = 0;
-    std::string areaName = std::filesystem::path(*args).filename().string() + "_" + std::to_string(getpid()) + "_stack";
+    std::string areaName = std::filesystem::path(*args->args).filename().string() + "_" + std::to_string(getpid()) + "_stack";
     strncpy(areaInfo.name, areaName.c_str(), sizeof(areaInfo.name));
     if (loader_hserver_call_register_area(&areaInfo, REGION_PRIVATE_MAP) < 0)
         return false;
@@ -142,6 +143,23 @@ bool loader_register_builtin_areas(void* commpage, char** args)
         if (loader_hserver_call_register_area(&areaInfo, REGION_PRIVATE_MAP) < 0)
             return false;
     }
+
+    // TODO: On real Haiku systems, the arguments are stored on the stack instead
+    // of a separate area.
+    const char* lastEnv = args->env[args->env_count - 1];
+    uintptr_t argsEnd = (uintptr_t)lastEnv + strlen(lastEnv) + 1;
+    uintptr_t argsStart = (uintptr_t)args->args;
+    uintptr_t argsSize = argsEnd - argsStart;
+    argsSize = (argsSize + B_PAGE_SIZE - 1) & ~(B_PAGE_SIZE - 1);
+
+    areaInfo.address = (void*)argsStart;
+    areaInfo.size = argsSize;
+    areaInfo.protection = B_READ_AREA | B_WRITE_AREA;
+    areaInfo.lock = 0;
+    strncpy(areaInfo.name, "program args", sizeof(areaInfo.name));
+
+    if (loader_hserver_call_register_area(&areaInfo, REGION_PRIVATE_MAP) < 0)
+        return false;
 
     // Still missing a certain "user area" area of size 16384.
     // Haiku uses it to store internal kernel stuff.

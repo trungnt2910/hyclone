@@ -51,6 +51,7 @@ public:
     int NextImageId(int image_id);
     bool IsValidImageId(int image_id);
     size_t UnregisterImage(int image_id);
+    void ClearImages() { _images.Clear(); }
 
     std::weak_ptr<Area> RegisterArea(const std::shared_ptr<Area>& area);
     std::weak_ptr<Area> GetArea(int area_id);
@@ -59,6 +60,7 @@ public:
     int NextAreaId(int area_id);
     bool IsValidAreaId(int area_id);
     size_t UnregisterArea(int area_id);
+    void ClearAreas() { _areas.clear(); }
 
     size_t RegisterFd(int fd, const std::filesystem::path& path);
     const std::filesystem::path& GetFd(int fd);
@@ -98,11 +100,13 @@ public:
     void AddOwningSemaphore(int id) { _owningSemaphores.insert(id); }
     void RemoveOwningSemaphore(int id) { _owningSemaphores.erase(id); }
     bool IsOwningSemaphore(int id) const { return _owningSemaphores.contains(id); }
+    void ClearOwningSemaphores() { _owningSemaphores.clear(); }
 
     const std::set<int>& GetOwningPorts() const { return _owningPorts; }
     void AddOwningPort(int id) { _owningPorts.insert(id); }
     void RemoveOwningPort(int id) { _owningPorts.erase(id); }
     bool IsOwningPort(int id) const { return _owningPorts.contains(id); }
+    void ClearOwningPorts() { _owningPorts.clear(); }
 
     size_t ReadMemory(void* address, void* buffer, size_t size);
     size_t WriteMemory(void* address, const void* buffer, size_t size);

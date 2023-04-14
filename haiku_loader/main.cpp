@@ -121,7 +121,9 @@ void loader_build_args(uint8*& mem, user_space_program_args &args, char **argv, 
 		}
 	}
 
-	mem = new uint8[sizeof(void*)*(argCnt + envCnt + 2) + argSize];
+	size_t memSize = sizeof(void*)*(argCnt + envCnt + 2) + argSize;
+	memSize = (memSize + B_PAGE_SIZE - 1) & ~(B_PAGE_SIZE - 1);
+	mem = (uint8_t*)aligned_alloc(B_PAGE_SIZE, memSize);
 	char **outArgs = (char**)&mem[0];
 	char *outChars = (char*)&mem[sizeof(void*)*(argCnt + envCnt + 2)];
 	for (size_t i = 0; i < argCnt; ++i)
@@ -347,7 +349,7 @@ int main(int argc, char** argv, char** envp)
 	loader_register_existing_fds();
 	loader_register_process(args.arg_count, args.args);
 	loader_register_thread(-1, NULL, false);
-	loader_register_builtin_areas(commpage, args.args);
+	loader_register_builtin_areas(&args, commpage);
 
 	((hostcalls*)(((uint8_t*)commpage) + EXTENDED_COMMPAGE_HOSTCALLS_OFFSET))
 		->at_exit = &loader_at_exit;
@@ -359,6 +361,6 @@ int main(int argc, char** argv, char** envp)
 	loader_unload_runtime();
 	loader_free_commpage(commpage);
 
-	delete[] user_args_memory;
+	free(user_args_memory);
     return retVal;
 }

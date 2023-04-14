@@ -76,6 +76,12 @@ public:
         return _items.size() - _freeIds.size();
     }
 
+    void Clear()
+    {
+        _items.clear();
+        _freeIds.clear();
+    }
+
     size_t size() const { return Size(); }
     IdMapIter<T, id_t> begin();
     IdMapIter<T, id_t> end();

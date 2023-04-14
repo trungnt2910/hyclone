@@ -346,17 +346,22 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
                 {
                     system.UnregisterSemaphore(s);
                 }
+                context.process->ClearOwningSemaphores();
 
                 for (const auto& s: context.process->GetOwningPorts())
                 {
                     system.UnregisterPort(s);
                 }
+                context.process->ClearOwningPorts();
 
                 area_id area = -1;
                 while ((area = context.process->NextAreaId(area)) != -1)
                 {
                     system.UnregisterArea(area);
                 }
+                context.process->ClearAreas();
+
+                context.process->ClearImages();
 
                 {
                     auto& msgService = system.GetMessagingService();
