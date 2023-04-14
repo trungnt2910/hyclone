@@ -13,8 +13,7 @@ bool server_setup_filesystem();
 
 struct haiku_fs_info;
 
-// Sets up Haiku settings files.
-// (The /boot/system/settings/network directory)
-bool server_setup_settings();
+// Sets up Haiku prefix.
+bool server_setup_prefix();
 
 #endif // __SERVER_FILESYSTEM_H__

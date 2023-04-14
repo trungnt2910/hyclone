@@ -122,17 +122,11 @@ $SCRIPT_DIR/build/hyclone_server/hyclone_server
 killall -9 hyclone_server
 
 echo "Copy additional required files"
-# Hyclone requires a modified libroot to work.
-cp -fv $SCRIPT_DIR/build/libroot/libroot.so $HPREFIX/boot/system/lib/libroot.so
 # Required for bash prompt to work like Haiku.
 cp -rfv $HAIKU_BUILD_SOURCE_DIRECTORY/data/etc $HPREFIX/boot/system
 # Some apps require this link to work properly.
 if [ ! -L "$HPREFIX/system" ]; then
     ln -s boot/system $HPREFIX/system
 fi
-# The default SetupEnvironment overwrites the PATH variable, which is not what we want.
-chmod u+w $HPREFIX/boot/system/boot/SetupEnvironment
-echo $(cat $HPREFIX/boot/system/boot/SetupEnvironment | sed '/$PATH/! s/\(export PATH=.*\)/\1:$PATH/g') > $HPREFIX/boot/system/boot/SetupEnvironment
-chmod u-w $HPREFIX/boot/system/boot/SetupEnvironment
 
 echo "Done"

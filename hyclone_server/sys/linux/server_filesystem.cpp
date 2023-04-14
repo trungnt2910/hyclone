@@ -1,9 +1,10 @@
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 
 #include "server_prefix.h"
 
-bool server_setup_settings()
+bool server_setup_prefix()
 {
     std::filesystem::path systemPath = std::filesystem::path(gHaikuPrefix) / "boot" / "system";
     std::filesystem::path settingsPath = systemPath / "settings";
@@ -29,6 +30,36 @@ bool server_setup_settings()
     std::filesystem::copy_file("/etc/group", etcPath / "group",
         std::filesystem::copy_options::overwrite_existing);
     std::fstream shadow((etcPath / "shadow").c_str(), std::ios::out | std::ios::app);
+
+    std::filesystem::path hostServerPath = std::filesystem::canonical("/proc/self/exe");
+    std::filesystem::path hostInstallPrefix = hostServerPath.parent_path().parent_path();
+    std::filesystem::path hostLibrootPath = hostInstallPrefix / "lib" / "libroot.so";
+    std::filesystem::path libPath = systemPath / "lib";
+    std::filesystem::path librootPath = libPath / "libroot.so";
+
+    // TODO: Check libroot.so hcrev.
+    if (!std::filesystem::exists(hostLibrootPath))
+    {
+        std::cerr << "Could not find libroot.so at " << hostLibrootPath << std::endl;
+        std::cerr << "HyClone may not work correctly without the correct custom libroot.so" << std::endl;
+    }
+
+    std::filesystem::permissions(libPath, std::filesystem::perms::owner_write,
+        std::filesystem::perm_options::add);
+
+    if (std::filesystem::exists(librootPath))
+    {
+        std::filesystem::permissions(librootPath, std::filesystem::perms::owner_write,
+            std::filesystem::perm_options::add);
+    }
+
+    std::filesystem::copy_file(hostLibrootPath, librootPath,
+        std::filesystem::copy_options::overwrite_existing);
+
+    std::filesystem::permissions(librootPath, std::filesystem::perms::owner_write,
+        std::filesystem::perm_options::remove);
+    std::filesystem::permissions(libPath, std::filesystem::perms::owner_write,
+        std::filesystem::perm_options::remove);
 
     return true;
 }

@@ -44,9 +44,9 @@ bool server_setup_filesystem()
     vfsService.RegisterBuiltinFilesystem("systemfs", SystemfsDevice::Mount);
     vfsService.RegisterBuiltinFilesystem("bindfs", BindfsDevice::Mount);
 
-    if (!server_setup_settings())
+    if (!server_setup_prefix())
     {
-        std::cerr << "failed to setup system settings." << std::endl;
+        std::cerr << "failed to setup system files." << std::endl;
     }
 
     return true;
