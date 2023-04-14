@@ -731,6 +731,11 @@ int _moni_map_file(const char *name, void **address,
         return result;
     }
 
+    if (addressSpec != B_EXACT_ADDRESS)
+    {
+        unmapAddressRange = false;
+    }
+
     MmanLock mmanLock;
 
     // These two variables are only valid when they are needed:
@@ -738,7 +743,7 @@ int _moni_map_file(const char *name, void **address,
     bool collidesWithReservedRange = false;
     bool isInReservedRange = false;
 
-    if ((unmapAddressRange || addressSpec == B_EXACT_ADDRESS))
+    if (addressSpec == B_EXACT_ADDRESS)
     {
         collidesWithReservedRange = GET_HOSTCALLS()->collides_with_reserved_range(hintAddr, size);
         isInReservedRange = GET_HOSTCALLS()->is_in_reserved_range(hintAddr, size);
