@@ -3,6 +3,7 @@
 
 #include <filesystem>
 
+#include "fs/bindfs.h"
 #include "fs/devfs.h"
 #include "fs/packagefs.h"
 #include "fs/rootfs.h"
