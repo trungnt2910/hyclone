@@ -36,7 +36,8 @@ bool server_setup_filesystem()
 
     vfsService.RegisterDevice(std::make_shared<RootfsDevice>(gHaikuPrefix));
     vfsService.RegisterDevice(std::make_shared<DevfsDevice>());
-    vfsService.RegisterDevice(std::make_shared<PackagefsDevice>("/boot", std::filesystem::path(gHaikuPrefix) / "boot"));
+    vfsService.RegisterDevice(std::make_shared<SystemfsDevice>("/boot", std::filesystem::path(gHaikuPrefix) / "boot"));
+    vfsService.RegisterDevice(std::make_shared<PackagefsDevice>("/boot/system", std::filesystem::path(gHaikuPrefix) / "boot/system"));
     vfsService.RegisterDevice(std::make_shared<SystemfsDevice>());
 
     vfsService.RegisterBuiltinFilesystem("packagefs", PackagefsDevice::Mount);

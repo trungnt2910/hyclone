@@ -131,6 +131,7 @@ namespace HpkgVfs
             bool dropData = false);
 
         static std::shared_ptr<Entry> CreateHaikuBootEntry(std::shared_ptr<Entry>* system = nullptr);
+        static std::shared_ptr<Entry> CreatePackageFsRootEntry(const std::string& name);
     };
 }
 

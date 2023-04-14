@@ -998,17 +998,33 @@ namespace HpkgVfs
 
     std::shared_ptr<Entry> Entry::CreateHaikuBootEntry(std::shared_ptr<Entry>* system)
     {
+        std::shared_ptr<Entry> bootDir = std::make_shared<Entry>("boot",
+            std::filesystem::file_type::directory,
+            std::filesystem::perms::owner_all   |
+            std::filesystem::perms::group_read  |
+            std::filesystem::perms::group_exec  |
+            std::filesystem::perms::others_exec);
+
+        std::shared_ptr<Entry> systemDir = CreatePackageFsRootEntry("system");
+        bootDir->AddChild(systemDir);
+
+        if (system)
+        {
+            *system = systemDir;
+        }
+
+        return bootDir;
+    }
+
+    std::shared_ptr<Entry> Entry::CreatePackageFsRootEntry(const std::string& name)
+    {
         const auto defaultWritableDirectoryPerms =
             std::filesystem::perms::owner_all   |
             std::filesystem::perms::group_read  |
             std::filesystem::perms::group_exec  |
             std::filesystem::perms::others_exec;
 
-        std::shared_ptr<Entry> bootDir = std::make_shared<Entry>("boot",
-            std::filesystem::file_type::directory,
-            defaultWritableDirectoryPerms);
-
-        std::shared_ptr<Entry> systemDir = std::make_shared<Entry>("system",
+        std::shared_ptr<Entry> systemDir = std::make_shared<Entry>(name,
             std::filesystem::file_type::directory,
             defaultWritableDirectoryPerms & ~std::filesystem::perms::owner_write);
 
@@ -1042,13 +1058,7 @@ namespace HpkgVfs
         systemDir->AddChild(packagesDir);
         systemDir->AddChild(varDir);
         systemDir->AddChild(hpkgvfsPackagesDir);
-        bootDir->AddChild(systemDir);
 
-        if (system)
-        {
-            *system = systemDir;
-        }
-
-        return bootDir;
+        return systemDir;
     }
 }

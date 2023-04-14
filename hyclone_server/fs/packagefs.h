@@ -113,6 +113,7 @@ private:
 
     static std::filesystem::path _relativeInstalledPackagesPath;
     static std::filesystem::path _relativeAttributesPath;
+    static std::filesystem::path _relativePackagesPath;
     static std::filesystem::path _GetAttrPathInternal(
         const std::filesystem::path& path, const std::string& name);
     static std::string _UnescapeAttrName(const std::string& name);

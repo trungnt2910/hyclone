@@ -13,7 +13,8 @@
 #include "system.h"
 
 std::filesystem::path PackagefsDevice::_relativeAttributesPath = std::filesystem::path(".hyclone.pkgfsattrs");
-std::filesystem::path PackagefsDevice::_relativeInstalledPackagesPath = std::filesystem::path("system/.hpkgvfsPackages");
+std::filesystem::path PackagefsDevice::_relativeInstalledPackagesPath = std::filesystem::path(".hpkgvfsPackages");
+std::filesystem::path PackagefsDevice::_relativePackagesPath = std::filesystem::path("packages");
 
 class PackagefsEntryWriter : public HpkgVfs::EntryWriter
 {
@@ -41,15 +42,19 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     const std::filesystem::path& hostRoot, PackageFSMountType mountType, uint32 mountFlags)
     : HostfsDevice(root, hostRoot, mountFlags), _mountType(mountType)
 {
+    auto permissions = std::filesystem::status(hostRoot).permissions();
+    std::filesystem::permissions(hostRoot, permissions | std::filesystem::perms::owner_write);
     std::filesystem::create_directories(hostRoot / _relativeAttributesPath);
+    std::filesystem::create_directories(hostRoot / _relativeInstalledPackagesPath);
+    std::filesystem::create_directories(hostRoot / _relativePackagesPath);
+    std::filesystem::permissions(hostRoot, permissions);
 
     using namespace HpkgVfs;
 
-    std::filesystem::path packagesPath = hostRoot / "system" / "packages";
+    std::filesystem::path packagesPath = hostRoot / _relativePackagesPath;
     std::filesystem::path installedPackagesPath = hostRoot / _relativeInstalledPackagesPath;
 
-    std::shared_ptr<Entry> system;
-    std::shared_ptr<Entry> boot = Entry::CreateHaikuBootEntry(&system);
+    std::shared_ptr<Entry> system = Entry::CreatePackageFsRootEntry(_root.filename().string());
 
     std::unordered_map<std::string, std::filesystem::file_time_type> installedPackages;
     std::unordered_map<std::string, std::filesystem::file_time_type> enabledPackages;
@@ -78,11 +83,6 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     }
 
     std::vector<std::pair<std::filesystem::path, std::string>> toRename;
-
-    if (!std::filesystem::exists(packagesPath))
-    {
-        std::filesystem::create_directories(packagesPath);
-    }
 
     for (const auto& file : std::filesystem::directory_iterator(packagesPath))
     {
@@ -132,18 +132,18 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         if (it == enabledPackages.end())
         {
             std::cerr << "Uninstalling package: " << kvp.first << std::endl;
-            boot->RemovePackage(kvp.first);
-            boot->WriteToDisk(hostRoot.parent_path(), writer);
+            system->RemovePackage(kvp.first);
+            system->WriteToDisk(hostRoot.parent_path(), writer);
         }
         else if (it->second > kvp.second)
         {
             std::cerr << "Updating package: " << kvp.first << " (later timestamp detected)" << std::endl;
-            boot->RemovePackage(kvp.first);
+            system->RemovePackage(kvp.first);
             Package package((packagesPath / (it->first + ".hpkg")).string());
             std::shared_ptr<Entry> entry = package.GetRootEntry();
             system->Merge(entry);
-            boot->WriteToDisk(hostRoot.parent_path(), writer);
-            boot->Drop();
+            system->WriteToDisk(hostRoot.parent_path(), writer);
+            system->Drop();
         }
         else
         {
@@ -162,8 +162,8 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         Package package((packagesPath / (pkg.first + ".hpkg")).string());
         std::shared_ptr<Entry> entry = package.GetRootEntry();
         system->Merge(entry);
-        boot->WriteToDisk(hostRoot.parent_path(), writer);
-        boot->Drop();
+        system->WriteToDisk(hostRoot.parent_path(), writer);
+        system->Drop();
     }
 
     std::cerr << "Done extracting packagefs." << std::endl;
@@ -177,7 +177,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     _info.free_blocks = 0;
     _info.total_nodes = 0;
     _info.free_nodes = 0;
-    strncpy(_info.volume_name, "system", sizeof(_info.volume_name));
+    strncpy(_info.volume_name, hostRoot.filename().c_str(), sizeof(_info.volume_name));
     strncpy(_info.fsh_name, "packagefs", sizeof(_info.fsh_name));
 
     server_fill_fs_info(hostRoot, &_info);
@@ -426,23 +426,37 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
 
             auto volumeInfo = (PackageFSVolumeInfo*)buffer;
             volumeInfo->mountType = _mountType;
-            volumeInfo->rootDeviceID = _info.dev;
-            volumeInfo->rootDirectoryID = _info.root;
-            volumeInfo->packagesDirectoryCount = 1;
 
             auto& vfsService = System::GetInstance().GetVfsService();
 
             haiku_stat st;
-            status_t status = vfsService.ReadStat(_root / "system" / "packages", st, false);
+            status_t status = vfsService.ReadStat(_root.parent_path(), st, false);
             if (status != B_OK)
             {
                 return status;
             }
 
+            volumeInfo->rootDeviceID = st.st_dev;
+
+            auto device = vfsService.GetDevice(st.st_dev).lock();
+            if (!device)
+            {
+                return B_BAD_VALUE;
+            }
+
+            volumeInfo->rootDirectoryID = device->GetInfo().root;
+
+            status = vfsService.ReadStat(_root / _relativePackagesPath, st, false);
+            if (status != B_OK)
+            {
+                return status;
+            }
+
+            volumeInfo->packagesDirectoryCount = 1;
             volumeInfo->packagesDirectoryInfos[0].deviceID = st.st_dev;
             volumeInfo->packagesDirectoryInfos[0].nodeID = st.st_ino;
 
-            vfsService.RegisterEntryRef(EntryRef(st.st_dev, st.st_ino), _root / "system" / "packages");
+            vfsService.RegisterEntryRef(EntryRef(st.st_dev, st.st_ino), _root / _relativePackagesPath);
 
             return B_OK;
         }
@@ -466,7 +480,7 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
             auto& vfsService = System::GetInstance().GetVfsService();
 
             haiku_stat dirst;
-            status_t status = vfsService.ReadStat(_root / "system" / "packages", dirst, false);
+            status_t status = vfsService.ReadStat(_root / _relativePackagesPath, dirst, false);
             if (status != B_OK)
             {
                 return status;
@@ -483,7 +497,7 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                     info->directoryDeviceID = dirst.st_dev;
                     info->directoryNodeID = dirst.st_ino;
 
-                    auto installedPackagePath = _root / "system" / "packages" / package.path().filename();
+                    auto installedPackagePath = _root / _relativePackagesPath / package.path().filename();
 
                     haiku_stat st;
                     status = vfsService.ReadStat(installedPackagePath, st, false);
@@ -553,11 +567,10 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
 
             using namespace HpkgVfs;
 
-            std::filesystem::path packagesPath = _hostRoot / "system" / "packages";
+            std::filesystem::path packagesPath = _hostRoot / _relativePackagesPath;
             std::filesystem::path installedPackagesPath = _hostRoot / _relativeInstalledPackagesPath;
 
-            std::shared_ptr<Entry> system;
-            std::shared_ptr<Entry> boot = Entry::CreateHaikuBootEntry(&system);
+            std::shared_ptr<Entry> system = Entry::CreatePackageFsRootEntry(_root.filename().string());
 
             std::unordered_set<std::string> installedPackages;
 
@@ -601,26 +614,26 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                     Package package((packagesPath / (name.string() + ".hpkg")).string());
                     std::shared_ptr<Entry> entry = package.GetRootEntry();
                     system->Merge(entry);
-                    boot->WriteToDisk(_hostRoot.parent_path(), writer);
-                    boot->Drop();
+                    system->WriteToDisk(_hostRoot.parent_path(), writer);
+                    system->Drop();
                 }
                 else
                 {
                     if (item.type == PACKAGE_FS_DEACTIVATE_PACKAGE)
                     {
                         std::cerr << "Uninstalling package: " << *it << std::endl;
-                        boot->RemovePackage(*it);
-                        boot->WriteToDisk(_hostRoot.parent_path(), writer);
+                        system->RemovePackage(*it);
+                        system->WriteToDisk(_hostRoot.parent_path(), writer);
                     }
                     else if (item.type == PACKAGE_FS_REACTIVATE_PACKAGE)
                     {
                         std::cerr << "Reinstalling package: " << *it << std::endl;
-                        boot->RemovePackage(*it);
+                        system->RemovePackage(*it);
                         Package package((packagesPath / (*it + ".hpkg")).string());
                         std::shared_ptr<Entry> entry = package.GetRootEntry();
                         system->Merge(entry);
-                        boot->WriteToDisk(_hostRoot.parent_path(), writer);
-                        boot->Drop();
+                        system->WriteToDisk(_hostRoot.parent_path(), writer);
+                        system->Drop();
                     }
                     else if (item.type == PACKAGE_FS_ACTIVATE_PACKAGE)
                     {
