@@ -198,6 +198,12 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         system->Drop();
     }
 
+    auto librootPath = _hostRoot / "lib" / "libroot.so";
+    if (std::filesystem::exists(librootPath))
+    {
+        server_replace_libroot(librootPath);
+    }
+
     std::cerr << "Done extracting packagefs." << std::endl;
 
     _CleanupAttributes();
@@ -705,6 +711,12 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                         std::cerr << "Unknown activation change type: " << item.type << std::endl;
                     }
                 }
+            }
+
+            auto librootPath = _hostRoot / "lib" / "libroot.so";
+            if (std::filesystem::exists(librootPath))
+            {
+                server_replace_libroot(librootPath);
             }
 
             std::cerr << "Done updating packagefs." << std::endl;

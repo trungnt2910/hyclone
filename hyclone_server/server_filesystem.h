@@ -16,4 +16,6 @@ struct haiku_fs_info;
 // Sets up Haiku prefix.
 bool server_setup_prefix();
 
+void server_replace_libroot(const std::filesystem::path& target);
+
 #endif // __SERVER_FILESYSTEM_H__
