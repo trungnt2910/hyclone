@@ -80,6 +80,32 @@ status_t _moni_bind(int socket, const struct haiku_sockaddr *address, haiku_sock
     return B_OK;
 }
 
+status_t _moni_shutdown_socket(int socket, int how)
+{
+    int linuxHow = 0;
+    switch (how)
+    {
+        case HAIKU_SHUT_RD:
+            linuxHow = SHUT_RD;
+            break;
+        case HAIKU_SHUT_WR:
+            linuxHow = SHUT_WR;
+            break;
+        case HAIKU_SHUT_RDWR:
+            linuxHow = SHUT_RDWR;
+            break;
+        default:
+            return HAIKU_POSIX_EINVAL;
+    }
+
+    long status = LINUX_SYSCALL2(__NR_shutdown, socket, linuxHow);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+}
+
 status_t _moni_connect(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
 {
     struct sockaddr_storage linuxAddress;
