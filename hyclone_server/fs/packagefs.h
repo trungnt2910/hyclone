@@ -4,6 +4,11 @@
 #include "fs/hostfs.h"
 #include "haiku_drivers.h"
 
+namespace HpkgVfs
+{
+    class Package;
+}
+
 enum PackageFSMountType
 {
     PACKAGE_FS_MOUNT_TYPE_SYSTEM,
@@ -117,11 +122,13 @@ private:
     static std::filesystem::path _GetAttrPathInternal(
         const std::filesystem::path& path, const std::string& name);
     static std::string _UnescapeAttrName(const std::string& name);
+    static status_t _ResolvePackagePath(std::filesystem::path& path);
 
     std::mutex _updateMutex;
     PackageFSMountType _mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM;
 
     void _CleanupAttributes();
+    std::shared_ptr<HpkgVfs::Package> _GetPackageInPackagesDirectory(const std::string& name);
 protected:
     bool _IsBlacklisted(const std::filesystem::path& path) const override;
     bool _IsBlacklisted(const std::filesystem::directory_entry& entry) const override;

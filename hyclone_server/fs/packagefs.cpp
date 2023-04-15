@@ -56,8 +56,8 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
 
     std::shared_ptr<Entry> system = Entry::CreatePackageFsRootEntry(_root.filename().string());
 
-    std::unordered_map<std::string, std::filesystem::file_time_type> installedPackages;
-    std::unordered_map<std::string, std::filesystem::file_time_type> enabledPackages;
+    std::unordered_map<std::string, haiku_timespec> installedPackages;
+    std::unordered_map<std::string, haiku_timespec> enabledPackages;
 
     if (std::filesystem::exists(installedPackagesPath))
     {
@@ -75,7 +75,12 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
             }
 
             Package package(file.path().string());
-            installedPackages.emplace(file.path().stem(), file.last_write_time());
+            struct haiku_stat st;
+            if (server_read_stat(file.path(), st) != B_OK)
+            {
+                continue;
+            }
+            installedPackages.emplace(file.path().stem(), st.st_mtim);
             std::cerr << "Preinstalled package: " << file.path().stem() << std::endl;
             std::shared_ptr<Entry> entry = package.GetRootEntry(/*dropData*/ true);
             system->Merge(entry);
@@ -86,14 +91,25 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
 
     for (const auto& file : std::filesystem::directory_iterator(packagesPath))
     {
-        if (file.path().extension() != ".hpkg")
+        auto currentPath = root / _relativePackagesPath / file.path().filename();
+        auto originalPath = file.path();
+
+        if (currentPath.extension() != ".hpkg")
         {
             continue;
         }
 
-        // file may be a symlink which we have to resolve.
-        if (!std::filesystem::is_regular_file(std::filesystem::status(file.path())))
+        if (file.symlink_status().type() == std::filesystem::file_type::directory)
         {
+            continue;
+        }
+
+        status_t status = _ResolvePackagePath(currentPath);
+
+        if (status != B_OK)
+        {
+            std::cerr << "Failed to resolve symlink: " << originalPath << std::endl;
+            std::cerr << "Skipping package: " << file.path().filename() << std::endl;
             continue;
         }
 
@@ -101,19 +117,24 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         std::string fileName;
 
         {
-            Package package(file.path().string());
+            Package package(currentPath.string());
             name = package.GetId();
             fileName = name + ".hpkg";
         }
 
-        if (file.path().filename() != fileName)
+        if (originalPath.filename() != fileName)
         {
-            toRename.emplace_back(file.path(), fileName);
+            toRename.emplace_back(originalPath, fileName);
         }
 
         // Package names might not match the ID.
         // We must read the data from the package.
-        enabledPackages.emplace(name, file.last_write_time());
+        struct haiku_stat st;
+        if (server_read_stat(currentPath, st) != B_OK)
+        {
+            continue;
+        }
+        enabledPackages.emplace(name, st.st_mtim);
     }
 
     for (const auto& pair : toRename)
@@ -135,12 +156,18 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
             system->RemovePackage(kvp.first);
             system->WriteToDisk(hostRoot.parent_path(), writer);
         }
-        else if (it->second > kvp.second)
+        else if (std::make_pair(it->second.tv_sec, it->second.tv_nsec) >
+            std::make_pair(kvp.second.tv_sec, kvp.second.tv_nsec))
         {
             std::cerr << "Updating package: " << kvp.first << " (later timestamp detected)" << std::endl;
             system->RemovePackage(kvp.first);
-            Package package((packagesPath / (it->first + ".hpkg")).string());
-            std::shared_ptr<Entry> entry = package.GetRootEntry();
+            auto package = _GetPackageInPackagesDirectory(it->first);
+            if (!package)
+            {
+                std::cerr << "Failed to update package: " << kvp.first << std::endl;
+                continue;
+            }
+            std::shared_ptr<Entry> entry = package->GetRootEntry();
             system->Merge(entry);
             system->WriteToDisk(hostRoot.parent_path(), writer);
             system->Drop();
@@ -159,8 +186,13 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     for (const auto& pkg: enabledPackages)
     {
         std::cerr << "Installing package: " << pkg.first << std::endl;
-        Package package((packagesPath / (pkg.first + ".hpkg")).string());
-        std::shared_ptr<Entry> entry = package.GetRootEntry();
+        auto package = _GetPackageInPackagesDirectory(pkg.first);
+        if (!package)
+        {
+            std::cerr << "Failed to install package: " << pkg.first << std::endl;
+            continue;
+        }
+        std::shared_ptr<Entry> entry = package->GetRootEntry();
         system->Merge(entry);
         system->WriteToDisk(hostRoot.parent_path(), writer);
         system->Drop();
@@ -264,6 +296,14 @@ std::string PackagefsDevice::_UnescapeAttrName(const std::string& name)
     return result;
 }
 
+status_t PackagefsDevice::_ResolvePackagePath(std::filesystem::path& path)
+{
+    auto& vfsService = System::GetInstance().GetVfsService();
+    auto lock = vfsService.Lock();
+
+    return vfsService.GetPath(path);
+}
+
 void PackagefsDevice::_CleanupAttributes()
 {
     for (auto it = std::filesystem::recursive_directory_iterator(_hostRoot / _relativeAttributesPath);
@@ -303,6 +343,18 @@ void PackagefsDevice::_CleanupAttributes()
             ++it;
         }
     }
+}
+
+std::shared_ptr<HpkgVfs::Package> PackagefsDevice::_GetPackageInPackagesDirectory(const std::string& name)
+{
+    auto packagePath = _root / _relativePackagesPath / (name + ".hpkg");
+    status_t status = _ResolvePackagePath(packagePath);
+    if (status != B_OK)
+    {
+        std::cerr << "Failed to resolve package path: " << name << " " << status << std::endl;
+        return std::shared_ptr<HpkgVfs::Package>();
+    }
+    return std::make_shared<HpkgVfs::Package>(packagePath);
 }
 
 bool PackagefsDevice::_IsBlacklisted(const std::filesystem::path& hostPath) const
@@ -500,7 +552,7 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                     auto installedPackagePath = _root / _relativePackagesPath / package.path().filename();
 
                     haiku_stat st;
-                    status = vfsService.ReadStat(installedPackagePath, st, false);
+                    status = vfsService.ReadStat(installedPackagePath, st, true);
 
                     if (status != B_OK)
                     {
@@ -567,7 +619,7 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
 
             using namespace HpkgVfs;
 
-            std::filesystem::path packagesPath = _hostRoot / _relativePackagesPath;
+            std::filesystem::path emulatedPackagesPath = _root / _relativePackagesPath;
             std::filesystem::path installedPackagesPath = _hostRoot / _relativeInstalledPackagesPath;
 
             std::shared_ptr<Entry> system = Entry::CreatePackageFsRootEntry(_root.filename().string());
@@ -611,8 +663,13 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                         continue;
                     }
                     std::cerr << "Installing package: " << name << std::endl;
-                    Package package((packagesPath / (name.string() + ".hpkg")).string());
-                    std::shared_ptr<Entry> entry = package.GetRootEntry();
+                    auto package = _GetPackageInPackagesDirectory(name.string());
+                    if (!package)
+                    {
+                        std::cerr << "Package not found: " << name << std::endl;
+                        continue;
+                    }
+                    std::shared_ptr<Entry> entry = package->GetRootEntry();
                     system->Merge(entry);
                     system->WriteToDisk(_hostRoot.parent_path(), writer);
                     system->Drop();
@@ -627,10 +684,14 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                     }
                     else if (item.type == PACKAGE_FS_REACTIVATE_PACKAGE)
                     {
-                        std::cerr << "Reinstalling package: " << *it << std::endl;
+                        auto package = _GetPackageInPackagesDirectory(name.string());
+                        if (!package)
+                        {
+                            std::cerr << "Package not found: " << name << std::endl;
+                            continue;
+                        }
                         system->RemovePackage(*it);
-                        Package package((packagesPath / (*it + ".hpkg")).string());
-                        std::shared_ptr<Entry> entry = package.GetRootEntry();
+                        std::shared_ptr<Entry> entry = package->GetRootEntry();
                         system->Merge(entry);
                         system->WriteToDisk(_hostRoot.parent_path(), writer);
                         system->Drop();
