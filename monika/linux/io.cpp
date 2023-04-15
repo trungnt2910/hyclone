@@ -402,7 +402,7 @@ int _moni_open(int fd, const char* path, int openMode, int perms)
 
     if (noTraverse)
     {
-        linuxFlags |= O_PATH | O_NOFOLLOW;
+        linuxFlags |= O_NOFOLLOW;
     }
 
     int result = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags, linuxMode);
@@ -1170,7 +1170,7 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
 
     if (noTraverse)
     {
-        linuxFlags |= O_PATH | O_NOFOLLOW;
+        linuxFlags |= O_NOFOLLOW;
     }
 
     status = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags, linuxMode);
