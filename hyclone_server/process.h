@@ -26,7 +26,10 @@ private:
     int _debuggerPid, _debuggerPort, _debuggerWriteLock;
     std::atomic<bool> _forkUnlocked;
     std::atomic<bool> _isExecutingExec;
+
+    // Both of these are relative to $HPREFIX.
     std::filesystem::path _cwd;
+    std::filesystem::path _root;
 
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     IdMap<haiku_extended_image_info, int> _images;
@@ -73,11 +76,14 @@ public:
     int GetEuid() const { return _euid; }
     int GetEgid() const { return _egid; }
     const std::filesystem::path& GetCwd() const { return _cwd; }
+    const std::filesystem::path& GetRoot() const { return _root; }
     haiku_team_info& GetInfo() { return _info; }
     const haiku_team_info& GetInfo() const { return _info; }
 
     void SetCwd(const std::filesystem::path& cwd) { _cwd = cwd; }
     void SetCwd(std::filesystem::path&& cwd) { _cwd = std::move(cwd); }
+    void SetRoot(const std::filesystem::path& root) { _root = root; }
+    void SetRoot(std::filesystem::path&& root) { _root = std::move(root); }
 
     int GetDebuggerPid() const { return _debuggerPid; }
     int GetDebuggerPort() const { return _debuggerPort; }

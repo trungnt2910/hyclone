@@ -15,7 +15,7 @@ int loader_spawn(const char* path, const char* const* flatArgs,
     size_t flatArgsSize, int argc, int envc,
     int priority, int flags, int errorPort, int errorToken)
 {
-    const int ADDITIONAL_ARGS = 10;
+    const int ADDITIONAL_ARGS = 12;
 
     const char** argv = new const char*[argc + ADDITIONAL_ARGS + 1];
     const std::string loaderPath = std::filesystem::canonical("/proc/self/exe").string();
@@ -23,7 +23,10 @@ int loader_spawn(const char* path, const char* const* flatArgs,
     const std::string errorTokenValue = std::to_string(errorToken);
 
     char cwd[PATH_MAX];
-    loader_hserver_call_getcwd(cwd, sizeof(cwd));
+    loader_hserver_call_getcwd(cwd, sizeof(cwd), false);
+
+    char root[PATH_MAX];
+    loader_hserver_call_get_root(root, sizeof(root));
 
     argv[0] = loaderPath.c_str();
     argv[1] = "--error-port";
@@ -34,7 +37,9 @@ int loader_spawn(const char* path, const char* const* flatArgs,
     argv[6] = gHaikuPrefix.c_str();
     argv[7] = "--cwd";
     argv[8] = cwd;
-    argv[9] = "--no-expand";
+    argv[9] = "--root";
+    argv[10] = root;
+    argv[11] = "--no-expand";
 
     std::copy(flatArgs, flatArgs + argc, argv + ADDITIONAL_ARGS);
     argv[argc + ADDITIONAL_ARGS] = NULL;

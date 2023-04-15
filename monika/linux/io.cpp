@@ -766,7 +766,7 @@ haiku_off_t _moni_seek(int fd, off_t pos, int seekType)
 
 status_t _moni_getcwd(char* buffer, size_t size)
 {
-    return GET_SERVERCALLS()->getcwd(buffer, size);
+    return GET_SERVERCALLS()->getcwd(buffer, size, true);
 }
 
 int _moni_dup(int fd)
@@ -973,7 +973,34 @@ status_t _moni_setcwd(int fd, const char* path)
         return LinuxToB(-result);
     }
 
-    GET_SERVERCALLS()->setcwd(fd, path, pathLength);
+    GET_SERVERCALLS()->setcwd(fd, path, pathLength, true);
+
+    return B_OK;
+}
+
+status_t _moni_change_root(const char* path)
+{
+    if (path == NULL)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    status_t status = GET_SERVERCALLS()->change_root(path, strlen(path), true);
+
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    // Haiku does a "chdir("/")" after a chroot.
+    // hyclone_server automatically handles this
+    // on the server side, but we still need
+    // to deal with it on the Linux side.
+    char hostPath[PATH_MAX];
+    GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD,
+        "/", 1, false, hostPath, sizeof(hostPath));
+
+    LINUX_SYSCALL1(__NR_chdir, hostPath);
 
     return B_OK;
 }

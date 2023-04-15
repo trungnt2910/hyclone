@@ -150,7 +150,6 @@ intptr_t server_hserver_call_mount(hserver_context& context, void* userPathAndSi
         std::pair<const char*, size_t> pathAndSize;
         std::pair<const char*, size_t> deviceAndSize;
         std::pair<const char*, size_t> fsNameAndSize;
-        std::string pathString;
         std::string deviceString;
 
         if (context.process->ReadMemory(userPathAndSize, &pathAndSize, sizeof(pathAndSize)) != sizeof(pathAndSize))
@@ -158,12 +157,11 @@ intptr_t server_hserver_call_mount(hserver_context& context, void* userPathAndSi
             return B_BAD_ADDRESS;
         }
 
-        pathString.resize(pathAndSize.second);
-        if (context.process->ReadMemory((void*)pathAndSize.first, pathString.data(), pathAndSize.second) != pathAndSize.second)
+        status_t status = context.process->ReadDirFd(HAIKU_AT_FDCWD, pathAndSize.first, pathAndSize.second, true, path);
+        if (status != B_OK)
         {
-            return B_BAD_ADDRESS;
+            return status;
         }
-        path = pathString;
 
         if (context.process->ReadMemory(userDeviceAndSize, &deviceAndSize, sizeof(deviceAndSize)) != sizeof(deviceAndSize))
         {
@@ -193,11 +191,6 @@ intptr_t server_hserver_call_mount(hserver_context& context, void* userPathAndSi
         {
             return B_BAD_ADDRESS;
         }
-
-        if (!path.is_absolute())
-        {
-            path = context.process->GetCwd() / path;
-        }
     }
 
     {
@@ -214,17 +207,11 @@ intptr_t server_hserver_call_unmount(hserver_context& context, const char* userP
 
     {
         auto lock = context.process->Lock();
-        std::string pathString(userPathSize, '\0');
 
-        if (context.process->ReadMemory((void*)userPath, pathString.data(), userPathSize) != userPathSize)
+        status_t status = context.process->ReadDirFd(HAIKU_AT_FDCWD, userPath, userPathSize, true, path);
+        if (status != B_OK)
         {
-            return B_BAD_ADDRESS;
-        }
-        path = pathString;
-
-        if (!path.is_absolute())
-        {
-            path = context.process->GetCwd() / path;
+            return status;
         }
     }
 

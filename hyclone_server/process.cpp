@@ -14,7 +14,7 @@
 
 Process::Process(int pid, int uid, int gid, int euid, int egid)
     : _pid(pid), _uid(uid), _gid(gid), _euid(euid), _egid(egid),
-    _forkUnlocked(false), _isExecutingExec(false)
+    _forkUnlocked(false), _isExecutingExec(false), _root("/")
 {
     memset(&_info, 0, sizeof(_info));
     _info.team = pid;
@@ -216,6 +216,7 @@ void Process::Fork(Process& child)
 
     child._fds = _fds;
     child._cwd = _cwd;
+    child._root = _root;
 
     // No, semaphores don't seem to be inherited.
     // child._owningSemaphores = _owningSemaphores;
@@ -264,6 +265,8 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
         return B_BAD_ADDRESS;
     }
 
+    bool jailBroken = false;
+
     if (path[0] != '/')
     {
         if (fd != HAIKU_AT_FDCWD)
@@ -285,6 +288,11 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
             output = GetCwd();
         }
 
+        if (std::mismatch(output.begin(), output.end(), _root.begin(), _root.end()).second != _root.end())
+        {
+            jailBroken = true;
+        }
+
         if (!path.empty())
         {
             if (!output.has_filename())
@@ -299,7 +307,8 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
     }
     else
     {
-        output = path;
+        // Be careful: operator / does not work with absolute paths.
+        output = _root / std::filesystem::path(path).relative_path();
     }
 
     if (traverseLink)
@@ -309,7 +318,38 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
         vfsService.RealPath(output);
     }
 
+    if (!jailBroken)
+    {
+        int rootLevel = std::distance(_root.begin(), _root.end());
+        std::vector<std::filesystem::path> parts;
+
+        for (const auto& part : output)
+        {
+            if (part == "..")
+            {
+                if (parts.size() > rootLevel)
+                {
+                    parts.pop_back();
+                }
+            }
+            else if (part != "" && part != ".")
+            {
+                parts.push_back(part);
+            }
+        }
+
+        for (const auto& part : parts)
+        {
+            output /= part;
+        }
+    }
+
     output = output.lexically_normal();
+
+    if (!output.has_filename())
+    {
+        output = output.parent_path();
+    }
 
     return B_OK;
 }
@@ -512,7 +552,7 @@ intptr_t server_hserver_call_unregister_fd(hserver_context& context, int fd)
     return B_OK;
 }
 
-intptr_t server_hserver_call_setcwd(hserver_context& context, int fd, const char* userPath, size_t userPathSize)
+intptr_t server_hserver_call_setcwd(hserver_context& context, int fd, const char* userPath, size_t userPathSize, bool respectChroot)
 {
     std::filesystem::path requestPath;
 
@@ -520,22 +560,69 @@ intptr_t server_hserver_call_setcwd(hserver_context& context, int fd, const char
 
     {
         auto lock = context.process->Lock();
-        status = context.process->ReadDirFd(fd, userPath, userPathSize, true, requestPath);
 
-        if (status == B_OK)
+        if (respectChroot)
         {
-            // This is a hook called after the real setcwd syscall, so no check needs to be done.
-            context.process->SetCwd(requestPath.lexically_normal());
+            status = context.process->ReadDirFd(fd, userPath, userPathSize, true, requestPath);
+
+            if (status == B_OK)
+            {
+                // This is a hook called after the real setcwd syscall, so no check needs to be done.
+                context.process->SetCwd(requestPath.lexically_normal());
+            }
+        }
+        else
+        {
+            // respectChroot = false is only internally used by `haiku_loader`
+            // on startup.
+            if (fd != HAIKU_AT_FDCWD)
+            {
+                return B_BAD_VALUE;
+            }
+
+            std::string path;
+            path.resize(userPathSize);
+
+            if (context.process->ReadMemory((void*)userPath, path.data(), path.size()) != path.size())
+            {
+                return B_BAD_ADDRESS;
+            }
+
+            context.process->SetCwd(std::filesystem::path(path));
         }
     }
 
     return status;
 }
 
-intptr_t server_hserver_call_getcwd(hserver_context& context, char* userBuffer, size_t userSize)
+intptr_t server_hserver_call_getcwd(hserver_context& context, char* userBuffer, size_t userSize, bool respectChroot)
 {
     auto lock = context.process->Lock();
-    auto cwdString = context.process->GetCwd().string();
+    const auto& cwd = context.process->GetCwd();
+    std::string cwdString;
+
+    if (respectChroot)
+    {
+        // This reflects the weird behavior on Haiku when you do a fchdir after a chroot.
+        cwdString = cwd.lexically_relative(context.process->GetRoot()).string();
+        if (cwdString.starts_with(".."))
+        {
+            cwdString = cwd.string();
+        }
+        else if (cwdString == ".")
+        {
+            cwdString = "/";
+        }
+        else
+        {
+            cwdString = "/" + cwdString;
+        }
+    }
+    else
+    {
+        cwdString = cwd.string();
+    }
+
     if (cwdString.size() >= userSize)
     {
         return B_BUFFER_OVERFLOW;
@@ -543,6 +630,62 @@ intptr_t server_hserver_call_getcwd(hserver_context& context, char* userBuffer, 
 
     size_t writeBytes = cwdString.size() + 1;
     if (context.process->WriteMemory(userBuffer, cwdString.c_str(), writeBytes) != writeBytes)
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_change_root(hserver_context& context, const char* userPath, size_t userPathSize, bool respectChroot)
+{
+    std::filesystem::path requestPath;
+
+    status_t status = B_OK;
+
+    {
+        auto lock = context.process->Lock();
+
+        if (respectChroot)
+        {
+            status = context.process->ReadDirFd(HAIKU_AT_FDCWD, userPath, userPathSize, true, requestPath);
+
+            if (status == B_OK)
+            {
+                context.process->SetRoot(requestPath);
+                context.process->SetCwd(requestPath);
+            }
+        }
+        else
+        {
+            std::string path;
+            path.resize(userPathSize);
+
+            if (context.process->ReadMemory((void*)userPath, path.data(), path.size()) != path.size())
+            {
+                return B_BAD_ADDRESS;
+            }
+
+            context.process->SetRoot(std::filesystem::path(path));
+        }
+    }
+
+    return status;
+}
+
+intptr_t server_hserver_call_get_root(hserver_context& context, char* userPath, size_t userPathSize)
+{
+    auto lock = context.process->Lock();
+    const auto& root = context.process->GetRoot();
+    std::string rootString = root.string();
+
+    if (rootString.size() >= userPathSize)
+    {
+        return B_BUFFER_OVERFLOW;
+    }
+
+    size_t writeBytes = rootString.size() + 1;
+    if (context.process->WriteMemory(userPath, rootString.c_str(), writeBytes) != writeBytes)
     {
         return B_BAD_ADDRESS;
     }

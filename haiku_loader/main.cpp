@@ -186,7 +186,7 @@ int main(int argc, char** argv, char** envp)
 	if (argc <= 1)
 	{
 		std::cout << "Usage: " << argv[0]
-			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--debugger <debugger_info>] [--prefix <hprefix_override>] [--cwd <cwd_override>] [--no-expand] [--] "
+			<< " [--umask <umask>] [--error-port <error_port>] [--error-token <error_token>] [--debugger <debugger_info>] [--prefix <hprefix_override>] [--cwd <cwd_override>] [--root <chroot_override>] [--no-expand] [--] "
 			<< "<path to haiku executable> [args]" << std::endl;
 		return 1;
 	}
@@ -202,7 +202,7 @@ int main(int argc, char** argv, char** envp)
 
 	std::string debuggerInfo;
 	hPrefix = getenv("HPREFIX");
-	std::string cwd;
+	std::string cwd, root;
 	bool expandPath = true;
 
 	while (strncmp(argv[0], "--", 2) == 0)
@@ -271,6 +271,16 @@ int main(int argc, char** argv, char** envp)
 				cwd = argv[0];
 				++argv; --argc;
 			}
+			else if (strcmp(currentArg, "--root") == 0)
+			{
+				if (argc <= 0)
+				{
+					std::cout << "Missing value for --root flag.";
+					return 1;
+				}
+				root = argv[0];
+				++argv; --argc;
+			}
 			else if (strcmp(currentArg, "--no-expand") == 0)
 			{
 				expandPath = false;
@@ -334,6 +344,11 @@ int main(int argc, char** argv, char** envp)
     loader_build_args(user_args_memory, args, argv, envp, expandPath);
 	loader_init_tls();
 
+	if (!root.empty())
+	{
+		loader_hserver_call_change_root(root.c_str(), root.size(), false);
+	}
+
 	if (cwd.empty())
 	{
 		std::filesystem::path hostCwd = std::filesystem::current_path();
@@ -342,7 +357,7 @@ int main(int argc, char** argv, char** envp)
 		cwd = emulatedCwd;
 	}
 
-	loader_hserver_call_setcwd(HAIKU_AT_FDCWD, cwd.c_str(), cwd.size());
+	loader_hserver_call_setcwd(HAIKU_AT_FDCWD, cwd.c_str(), cwd.size(), false);
 
 	loader_debugger_restore_info(debuggerInfo);
 
