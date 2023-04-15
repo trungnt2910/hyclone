@@ -202,7 +202,7 @@ area_id MONIKA_EXPORT _moni_clone_area(const char *name, void **address,
         }
 
         // Safe to call MAP_FIXED in this case.
-        status = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, -1, 0);
+        status = LINUX_SYSCALL6(__NR_mmap, hintAddr, size, mmap_prot, mmap_flags | MAP_FIXED, fd, 0);
         if (status < 0)
         {
             LINUX_SYSCALL1(__NR_close, fd);
