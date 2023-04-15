@@ -44,8 +44,19 @@ status_t BindfsDevice::_TransformPath(std::filesystem::path& path)
     {
         return B_ENTRY_NOT_FOUND;
     }
+    if (relativePath.begin()->string() == "..")
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
 
-    path = _boundRoot / relativePath;
+    if (relativePath.begin()->string() != ".")
+    {
+        path = _boundRoot / relativePath;
+    }
+    else
+    {
+        path = _boundRoot;
+    }
 
     return B_OK;
 }
@@ -73,6 +84,32 @@ status_t BindfsDevice::GetAttrPath(std::filesystem::path& path, const std::strin
 
     auto& vfsService = System::GetInstance().GetVfsService();
     return vfsService.GetAttrPath(path, name, type, createNew, isSymlink);
+}
+
+status_t BindfsDevice::RealPath(std::filesystem::path& path, bool& isSymlink)
+{
+    auto status = _TransformPath(path);
+    if (status != B_OK)
+    {
+        return status;
+    }
+
+    auto& vfsService = System::GetInstance().GetVfsService();
+    status = vfsService.RealPath(path);
+
+    auto relativePath = path.lexically_relative(_boundRoot);
+    if (relativePath.empty() || relativePath == ".")
+    {
+        path = _root;
+    }
+    else
+    {
+        path = _root / relativePath;
+    }
+
+    isSymlink = false;
+
+    return status;
 }
 
 status_t BindfsDevice::ReadStat(std::filesystem::path& path, haiku_stat& stat, bool& isSymlink)

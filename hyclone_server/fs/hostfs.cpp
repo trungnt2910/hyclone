@@ -122,6 +122,26 @@ status_t HostfsDevice::GetPath(std::filesystem::path& path, bool& isSymlink)
     return ec ? B_ENTRY_NOT_FOUND : B_OK;
 }
 
+status_t HostfsDevice::RealPath(std::filesystem::path& path, bool& isSymlink)
+{
+    std::filesystem::path originalPath = path;
+    status_t status = GetPath(path, isSymlink);
+    if (!isSymlink)
+    {
+        auto relativePath = path.lexically_relative(_hostRoot);
+        if (relativePath.empty() || relativePath == ".")
+        {
+            path = _root;
+        }
+        else
+        {
+            path = _root / relativePath;
+        }
+    }
+
+    return status;
+}
+
 status_t HostfsDevice::ReadStat(std::filesystem::path& path, haiku_stat& stat, bool& isSymlink)
 {
     assert(path.is_absolute());

@@ -18,6 +18,7 @@ public:
     virtual ~HostfsDevice() override = default;
 
     virtual status_t GetPath(std::filesystem::path& path, bool& isSymlink) override;
+    virtual status_t RealPath(std::filesystem::path& path, bool& isSymlink) override;
     virtual status_t ReadStat(std::filesystem::path& path, haiku_stat& stat, bool& isSymlink) override;
     virtual status_t WriteStat(std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool& isSymlink) override;

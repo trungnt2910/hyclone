@@ -192,16 +192,10 @@ status_t VfsService::GetAttrPath(std::filesystem::path& path, const std::string&
 
 status_t VfsService::RealPath(std::filesystem::path& path)
 {
-    auto tempPath = path;
-    return _DoWork(tempPath, true, [&](std::filesystem::path& currentPath,
+    return _DoWork(path, true, [&](std::filesystem::path& currentPath,
         const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
     {
-        status_t status = device->GetPath(currentPath, isSymlink);
-        if (isSymlink)
-        {
-            path = currentPath;
-        }
-        return status;
+        return device->RealPath(currentPath, isSymlink);
     });
 }
 

@@ -35,6 +35,7 @@ public:
     virtual status_t GetPath(std::filesystem::path& path, bool& isSymlink) = 0;
     virtual status_t GetAttrPath(std::filesystem::path& path, const std::string& name,
         uint32 type, bool createNew, bool& isSymlink) { return B_UNSUPPORTED; }
+    virtual status_t RealPath(std::filesystem::path& path, bool& isSymlink) = 0;
     virtual status_t ReadStat(std::filesystem::path& path, haiku_stat& stat, bool& isSymlink) = 0;
     virtual status_t WriteStat(std::filesystem::path& path, const haiku_stat& stat,
         int statMask, bool& isSymlink) = 0;
