@@ -203,6 +203,43 @@ status_t _moni_send_signal(int32 id, uint32 signal, const union haiku_sigval* us
     return B_OK;
 }
 
+status_t _moni_sigwait(const haiku_sigset_t* set, haiku_siginfo_t* info, uint32 flags,
+    bigtime_t timeout)
+{
+    linux_sigset_t linuxSet = SigSetBToLinux(*set);
+    siginfo_t linuxInfoMemory;
+
+    siginfo_t* linuxInfo = NULL;
+    if (info != NULL)
+    {
+        linuxInfo = &linuxInfoMemory;
+    }
+
+    struct timespec linuxTimeoutMemory;
+    struct timespec* linuxTimeout = NULL;
+
+    if (timeout != B_INFINITE_TIMEOUT)
+    {
+        linuxTimeout = &linuxTimeoutMemory;
+        linuxTimeout->tv_sec = timeout / 1000000;
+        linuxTimeout->tv_nsec = (timeout % 1000000) * 1000;
+    }
+
+    long status = LINUX_SYSCALL4(__NR_rt_sigtimedwait, &linuxSet, linuxInfo, linuxTimeout, sizeof(linux_sigset_t));
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    if (info != NULL)
+    {
+        SiginfoLinuxToB(*linuxInfo, *info);
+    }
+
+    return B_OK;
+}
+
 status_t _moni_set_signal_stack(const haiku_stack_t *newStack, haiku_stack_t *oldStack)
 {
     stack_t linuxNewStackStorage;
@@ -214,7 +251,7 @@ status_t _moni_set_signal_stack(const haiku_stack_t *newStack, haiku_stack_t *ol
     if (newStack != NULL)
     {
         linuxNewStack = &linuxNewStackStorage;
-        StackBToLinux(*newStack, *linuxNewStack);        
+        StackBToLinux(*newStack, *linuxNewStack);
     }
 
     if (oldStack != NULL)
