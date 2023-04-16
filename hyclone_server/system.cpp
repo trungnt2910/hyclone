@@ -8,6 +8,7 @@
 #include "haiku_debugger.h"
 #include "haiku_errors.h"
 #include "haiku_fs_info.h"
+#include "haiku_scheduler.h"
 #include "hsemaphore.h"
 #include "port.h"
 #include "process.h"
@@ -542,4 +543,28 @@ intptr_t server_hserver_call_get_safemode_option(hserver_context& context, const
     }
 
     return B_OK;
+}
+
+intptr_t server_hserver_call_set_scheduler_mode(hserver_context& context, int mode)
+{
+    auto& system = System::GetInstance();
+
+    if (mode != SCHEDULER_MODE_LOW_LATENCY && mode != SCHEDULER_MODE_POWER_SAVING)
+    {
+        return B_BAD_VALUE;
+    }
+
+    {
+        auto lock = system.Lock();
+        system.SetSchedulerMode(mode);
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_get_scheduler_mode(hserver_context& context)
+{
+    auto& system = System::GetInstance();
+    auto lock = system.Lock();
+    return system.GetSchedulerMode();
 }

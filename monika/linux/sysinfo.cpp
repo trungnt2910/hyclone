@@ -182,4 +182,14 @@ status_t _moni_get_safemode_option(const char* parameter,
     return GET_SERVERCALLS()->get_safemode_option(parameter, strlen(parameter), buffer, _bufferSize);
 }
 
+status_t _moni_set_scheduler_mode(int32 mode)
+{
+    return GET_SERVERCALLS()->set_scheduler_mode(mode);
+}
+
+int32 _moni_get_scheduler_mode()
+{
+    return GET_SERVERCALLS()->get_scheduler_mode();
+}
+
 }

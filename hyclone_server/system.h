@@ -40,6 +40,7 @@ class System
 private:
     bool _isShuttingDown = false;
     int _nextAreaId = 1;
+    int _schedulerMode = 0;
     std::map<int, std::shared_ptr<Process>> _processes;
     std::unordered_map<int, std::shared_ptr<Thread>> _threads;
     std::unordered_map<intptr_t, Connection> _connections;
@@ -89,6 +90,9 @@ public:
     std::weak_ptr<Area> GetArea(int id);
     bool IsValidAreaId(int id) const;
     size_t UnregisterArea(int id);
+
+    int GetSchedulerMode() const { return _schedulerMode; }
+    void SetSchedulerMode(int mode) { _schedulerMode = mode; }
 
     void Shutdown();
     bool IsShuttingDown() const { return _isShuttingDown; }
