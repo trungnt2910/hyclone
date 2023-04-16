@@ -51,6 +51,14 @@ std::weak_ptr<Thread> Process::GetThread(int tid)
     return it->second;
 }
 
+int Process::NextThreadId(int tid)
+{
+    auto it = _threads.upper_bound(tid);
+    if (it == _threads.end())
+        return -1;
+    return it->first;
+}
+
 size_t Process::UnregisterThread(int tid)
 {
     _threads.erase(tid);

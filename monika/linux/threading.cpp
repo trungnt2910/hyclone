@@ -67,7 +67,7 @@ void _moni_thread_yield(void)
     LINUX_SYSCALL0(__NR_sched_yield);
 }
 
-status_t _moni_wait_for_thread(thread_id thread, status_t *_returnCode)
+status_t _moni_wait_for_thread(thread_id thread, status_t* _returnCode)
 {
     long status = GET_HOSTCALLS()->wait_for_thread(thread, _returnCode);
     if (status < 0)
@@ -82,9 +82,15 @@ void _moni_find_thread()
     panic("_kern_find_thread not implemented");
 }
 
-status_t _moni_get_thread_info(thread_id id, haiku_thread_info *info)
+status_t _moni_get_thread_info(thread_id id, haiku_thread_info* info)
 {
     return GET_SERVERCALLS()->get_thread_info(id, info);
+}
+
+status_t _moni_get_next_thread_info(team_id team, int32* cookie,
+    haiku_thread_info* info)
+{
+    return GET_SERVERCALLS()->get_next_thread_info(team, cookie, info);
 }
 
 status_t _moni_rename_thread(thread_id thread, const char* newName)

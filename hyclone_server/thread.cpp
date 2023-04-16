@@ -251,34 +251,6 @@ status_t Thread::RequestReply(intptr_t result)
     return B_OK;
 }
 
-intptr_t server_hserver_call_get_thread_info(hserver_context& context, int thread_id, void* userThreadInfo)
-{
-    auto& system = System::GetInstance();
-
-    std::shared_ptr<Thread> thread;
-
-    {
-        auto lock = system.Lock();
-        thread = system.GetThread(thread_id).lock();
-    }
-
-    if (!thread)
-    {
-        return B_BAD_THREAD_ID;
-    }
-
-    haiku_thread_info info = thread->GetInfo();
-    server_fill_thread_info(&info);
-
-    if (server_write_process_memory(context.pid, userThreadInfo, &info, sizeof(haiku_thread_info))
-        != sizeof(haiku_thread_info))
-    {
-        return B_BAD_ADDRESS;
-    }
-
-    return B_OK;
-}
-
 intptr_t server_hserver_call_register_thread_info(hserver_context& context, void* userThreadInfo)
 {
     auto& system = System::GetInstance();
@@ -327,6 +299,112 @@ intptr_t server_hserver_call_register_thread_info(hserver_context& context, void
     }
 
     return B_OK;
+}
+
+intptr_t server_hserver_call_get_thread_info(hserver_context& context, int thread_id, void* userThreadInfo)
+{
+    auto& system = System::GetInstance();
+
+    std::shared_ptr<Thread> thread;
+
+    {
+        auto lock = system.Lock();
+        thread = system.GetThread(thread_id).lock();
+    }
+
+    if (!thread)
+    {
+        return B_BAD_THREAD_ID;
+    }
+
+    haiku_thread_info info = thread->GetInfo();
+    server_fill_thread_info(&info);
+
+    if (server_write_process_memory(context.pid, userThreadInfo, &info, sizeof(haiku_thread_info))
+        != sizeof(haiku_thread_info))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_get_next_thread_info(hserver_context& context, int team, int* userCookie,
+    void* userThreadInfo)
+{
+    auto& system = System::GetInstance();
+
+    std::shared_ptr<Process> process;
+
+    {
+        auto lock = system.Lock();
+        process = system.GetProcess(team).lock();
+    }
+
+    if (!process)
+    {
+        return B_BAD_TEAM_ID;
+    }
+
+    int cookie = 0;
+
+    {
+        auto lock = context.process->Lock();
+        if (context.process->ReadMemory(userCookie, &cookie, sizeof(int)) != sizeof(int))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    if (cookie == -1)
+    {
+        return B_BAD_VALUE;
+    }
+
+    std::shared_ptr<Thread> thread;
+
+    {
+        auto lock = process->Lock();
+        cookie = process->NextThreadId(cookie);
+
+        if (cookie != -1)
+        {
+            thread = process->GetThread(cookie).lock();
+
+            if (!thread)
+            {
+                return B_BAD_THREAD_ID;
+            }
+        }
+    }
+
+    haiku_thread_info info;
+
+    if (thread)
+    {
+        auto lock = thread->Lock();
+        info = thread->GetInfo();
+        server_fill_thread_info(&info);
+    }
+
+    {
+        auto lock = context.process->Lock();
+        if (thread)
+        {
+            if (context.process->WriteMemory(userThreadInfo, &info, sizeof(haiku_thread_info))
+                != sizeof(haiku_thread_info))
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
+
+        if (context.process->WriteMemory(userCookie, &cookie, sizeof(int)) != sizeof(int))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return thread ? B_OK : B_BAD_VALUE;
 }
 
 intptr_t server_hserver_call_rename_thread(hserver_context& context, int thread_id, const char* userNewName, size_t len)

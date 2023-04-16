@@ -31,7 +31,7 @@ private:
     std::filesystem::path _cwd;
     std::filesystem::path _root;
 
-    std::unordered_map<int, std::shared_ptr<Thread>> _threads;
+    std::map<int, std::shared_ptr<Thread>> _threads;
     IdMap<haiku_extended_image_info, int> _images;
     std::map<int, std::shared_ptr<Area>> _areas;
     std::unordered_map<int, std::filesystem::path> _fds;
@@ -47,6 +47,7 @@ public:
     std::weak_ptr<Thread> RegisterThread(int tid);
     std::weak_ptr<Thread> RegisterThread(const std::shared_ptr<Thread>& thread);
     std::weak_ptr<Thread> GetThread(int tid);
+    int NextThreadId(int tid);
     size_t UnregisterThread(int tid);
 
     int RegisterImage(const haiku_extended_image_info& image);
