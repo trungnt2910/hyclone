@@ -56,6 +56,7 @@ std::weak_ptr<Thread> System::RegisterThread(int pid, int tid)
 {
     auto ptr = std::make_shared<Thread>(pid, tid);
     _threads[tid] = ptr;
+    ptr->_registered = true;
     return ptr;
 }
 
@@ -69,7 +70,15 @@ std::weak_ptr<Thread> System::GetThread(int tid)
 
 size_t System::UnregisterThread(int tid)
 {
-    _threads.erase(tid);
+    auto it = _threads.find(tid);
+    if (it != _threads.end())
+    {
+        it->second->_registered = false;
+        it->second->_blockCondition.notify_all();
+        it->second->_sendDataCondition.notify_all();
+        it->second->_receiveDataCondition.notify_all();
+        _threads.erase(it);
+    }
     return _threads.size();
 }
 

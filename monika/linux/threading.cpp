@@ -46,6 +46,16 @@ status_t _moni_unblock_thread(thread_id thread, status_t status)
     return GET_SERVERCALLS()->unblock_thread(thread, status);
 }
 
+status_t _moni_send_data(thread_id thread, int32 code, const void* buffer, size_t size)
+{
+    return GET_SERVERCALLS()->send_data(thread, code, buffer, size);
+}
+
+int32 _moni_receive_data(thread_id* _sender, void* buffer, size_t size)
+{
+    return GET_SERVERCALLS()->receive_data(_sender, buffer, size);
+}
+
 status_t _moni_exit_thread(status_t returnValue)
 {
     GET_HOSTCALLS()->exit_thread(returnValue);

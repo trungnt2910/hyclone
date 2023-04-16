@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 #include "haiku_thread.h"
 
@@ -15,6 +16,7 @@ class Request;
 
 class Thread
 {
+    friend class System;
 private:
     haiku_thread_info _info;
     std::mutex _lock;
@@ -22,10 +24,16 @@ private:
     std::shared_ptr<Request> _request;
     std::atomic<bool> _suspended = false;
     std::condition_variable _blockCondition;
+    std::condition_variable _sendDataCondition;
+    std::condition_variable _receiveDataCondition;
+    std::vector<uint8_t> _receiveData;
     user_thread* _userThreadAddress = NULL;
     int _tid;
     status_t _blockStatus;
+    int _sender = -1;
+    int _receiveCode = -1;
     bool _blocked = false;
+    bool _registered = false;
 public:
     Thread(int pid, int tid);
     ~Thread() = default;
@@ -44,6 +52,9 @@ public:
     status_t Block(std::unique_lock<std::mutex>& lock, uint32 flags, bigtime_t timeout);
     status_t Unblock(status_t status);
 
+    status_t SendData(std::unique_lock<std::mutex>& lock, thread_id sender, int code, std::vector<uint8_t>&& data);
+    status_t ReceiveData(std::unique_lock<std::mutex>& lock, thread_id& sender, int& code, std::vector<uint8_t>& data);
+
     user_thread* GetUserThreadAddress() const { return _userThreadAddress; }
     void SetUserThreadAddress(user_thread* address) { _userThreadAddress = address; }
 
@@ -52,6 +63,8 @@ public:
     size_t RequestAck();
     status_t RequestRead(void* address);
     status_t RequestReply(intptr_t result);
+
+    bool IsRegistered() const { return _registered; }
 };
 
 #endif // __HYCLONE_PROCESS_H__

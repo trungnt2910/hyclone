@@ -151,6 +151,63 @@ status_t Thread::Unblock(status_t status)
     return B_OK;
 }
 
+status_t Thread::SendData(std::unique_lock<std::mutex>& lock, thread_id sender, int code, std::vector<uint8_t>&& data)
+{
+    if (_sender != -1)
+    {
+        server_worker_run_wait([&]()
+        {
+            _sendDataCondition.wait(lock, [&]()
+            {
+                return !_registered || _sender == -1;
+            });
+        });
+    }
+
+    if (!_registered)
+    {
+        return B_BAD_THREAD_ID;
+    }
+
+    _sender = sender;
+    _receiveCode = code;
+    _receiveData = std::move(data);
+
+    _receiveDataCondition.notify_all();
+
+    return B_OK;
+}
+
+status_t Thread::ReceiveData(std::unique_lock<std::mutex>& lock, thread_id& sender, int& code, std::vector<uint8_t>& data)
+{
+    if (_sender == -1)
+    {
+        server_worker_run_wait([&]()
+        {
+            _receiveDataCondition.wait(lock, [&]()
+            {
+                return !_registered || _sender != -1;
+            });
+        });
+    }
+
+    if (!_registered)
+    {
+        return B_BAD_THREAD_ID;
+    }
+
+    sender = _sender;
+    code = _receiveCode;
+    data = std::move(_receiveData);
+
+
+    _sender = -1;
+
+    _sendDataCondition.notify_all();
+
+    return B_OK;
+}
+
 std::shared_future<intptr_t> Thread::SendRequest(std::shared_ptr<Request> request)
 {
     assert(!IsRequesting());
@@ -446,6 +503,73 @@ intptr_t server_hserver_call_unblock_thread(hserver_context& context, int thread
         auto lock = thread->Lock();
         return thread->Unblock(status);
     }
+}
+
+intptr_t server_hserver_call_send_data(hserver_context& context, int thread_id, int code, const void* data, size_t len)
+{
+    std::shared_ptr<Thread> thread;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        thread = system.GetThread(thread_id).lock();
+    }
+
+    if (!thread)
+    {
+        return B_BAD_THREAD_ID;
+    }
+
+    std::vector<uint8_t> buffer(len);
+
+    {
+        auto lock = context.process->Lock();
+        if (context.process->ReadMemory((void*)data, buffer.data(), len) != len)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    {
+        auto lock = thread->Lock();
+        return thread->SendData(lock, context.tid, code, std::move(buffer));
+    }
+}
+
+intptr_t server_hserver_call_receive_data(hserver_context& context, int* userSender, void* userData, size_t len)
+{
+    thread_id sender;
+    int code;
+
+    std::vector<uint8_t> data;
+
+    {
+        auto lock = context.thread->Lock();
+
+        status_t status = context.thread->ReceiveData(lock, sender, code, data);
+
+        if (status != B_OK)
+        {
+            return status;
+        }
+    }
+
+    len = std::min(len, data.size());
+
+    {
+        auto lock = context.process->Lock();
+        if (context.process->WriteMemory(userData, data.data(), len) != len)
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (context.process->WriteMemory(userSender, &sender, sizeof(sender)) != sizeof(sender))
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return code;
 }
 
 intptr_t server_hserver_call_request_ack(hserver_context& context, int pid, int tid)
