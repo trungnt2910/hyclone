@@ -104,6 +104,8 @@ status_t _moni_shutdown_socket(int socket, int how)
     {
         return LinuxToB(-status);
     }
+
+    return B_OK;
 }
 
 status_t _moni_connect(int socket, const struct haiku_sockaddr *address, haiku_socklen_t addressLength)
