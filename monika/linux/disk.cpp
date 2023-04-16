@@ -31,6 +31,12 @@ status_t _moni_stop_watching(haiku_dev_t device, haiku_ino_t node, port_id port,
     return HAIKU_POSIX_ENOSYS;
 }
 
+status_t _moni_stop_notifying(port_id port, uint32 token)
+{
+    _moni_debug_output("stub: _kern_stop_notifying");
+    return HAIKU_POSIX_ENOSYS;
+}
+
 haiku_dev_t _moni_next_device(int32* _cookie)
 {
     return GET_SERVERCALLS()->next_device(_cookie);
