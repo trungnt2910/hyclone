@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <pthread.h>
 #include <string>
 #include <sys/stat.h>
 #include <sys/statfs.h>
@@ -375,4 +376,9 @@ status_t server_write_stat(const std::filesystem::path& path, const haiku_stat& 
     }
 
     return B_OK;
+}
+
+void server_exit_thread()
+{
+    pthread_exit(NULL);
 }

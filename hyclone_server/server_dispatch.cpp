@@ -51,27 +51,29 @@ intptr_t server_dispatch(intptr_t conn_id, intptr_t call_id,
         }
     }
 
+    intptr_t result = HAIKU_POSIX_ENOSYS;
+
 #define HYCLONE_SERVERCALL0(name) \
     case SERVERCALL_ID_##name: \
-        return server_hserver_call_##name(context);
+        result = server_hserver_call_##name(context); break;
 #define HYCLONE_SERVERCALL1(name, arg1) \
     case SERVERCALL_ID_##name: \
-        return server_hserver_call_##name(context, (arg1)a1);
+        result = server_hserver_call_##name(context, (arg1)a1); break;
 #define HYCLONE_SERVERCALL2(name, arg1, arg2) \
     case SERVERCALL_ID_##name: \
-        return server_hserver_call_##name(context, (arg1)a1, (arg2)a2);
+        result = server_hserver_call_##name(context, (arg1)a1, (arg2)a2); break;
 #define HYCLONE_SERVERCALL3(name, arg1, arg2, arg3) \
     case SERVERCALL_ID_##name: \
-        return server_hserver_call_##name(context, (arg1)a1, (arg2)a2, (arg3)a3);
+        result = server_hserver_call_##name(context, (arg1)a1, (arg2)a2, (arg3)a3); break;
 #define HYCLONE_SERVERCALL4(name, arg1, arg2, arg3, arg4) \
     case SERVERCALL_ID_##name: \
-        return server_hserver_call_##name(context, (arg1)a1, (arg2)a2, (arg3)a3, (arg4)a4);
+        result = server_hserver_call_##name(context, (arg1)a1, (arg2)a2, (arg3)a3, (arg4)a4); break;
 #define HYCLONE_SERVERCALL5(name, arg1, arg2, arg3, arg4, arg5) \
     case SERVERCALL_ID_##name: \
-        return server_hserver_call_##name(context, (arg1)a1, (arg2)a2, (arg3)a3, (arg4)a4, (arg5)a5);
+        result = server_hserver_call_##name(context, (arg1)a1, (arg2)a2, (arg3)a3, (arg4)a4, (arg5)a5); break;
 #define HYCLONE_SERVERCALL6(name, arg1, arg2, arg3, arg4, arg5, arg6) \
     case SERVERCALL_ID_##name: \
-        return server_hserver_call_##name(context, (arg1)a1, (arg2)a2, (arg3)a3, (arg4)a4, (arg5)a5, (arg6)a6);
+        result = server_hserver_call_##name(context, (arg1)a1, (arg2)a2, (arg3)a3, (arg4)a4, (arg5)a5, (arg6)a6); break;
 
     switch (call_id)
     {
@@ -86,5 +88,5 @@ intptr_t server_dispatch(intptr_t conn_id, intptr_t call_id,
 #undef HYCLONE_SERVERCALL5
 #undef HYCLONE_SERVERCALL6
 
-    return HAIKU_POSIX_ENOSYS;
+    return result;
 }

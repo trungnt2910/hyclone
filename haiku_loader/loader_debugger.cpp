@@ -183,8 +183,7 @@ std::string loader_debugger_serialize_info()
        << sDebuggerWriteLock << ","
        << sNubPort << ","
        << sTeamFlags << ","
-       << sThreadFlags[loader_get_tid()] << ","
-       << sSyscallStart;
+       << sThreadFlags[loader_get_tid()];
 
     return ss.str();
 }
@@ -211,8 +210,6 @@ void loader_debugger_restore_info(const std::string& s)
     sTeamFlags = std::stoi(token);
     std::getline(ss, token, ',');
     sThreadFlags[loader_get_tid()] = std::stoi(token);
-    std::getline(ss, token, ',');
-    sSyscallStart = std::stoull(token);
 
     if (sDebuggerInstalled)
     {

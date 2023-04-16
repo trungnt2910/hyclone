@@ -39,12 +39,28 @@ intptr_t server_hserver_call_install_team_debugger(hserver_context& context, int
         auto lock = system.Lock();
 
         targetProcess = system.GetProcess(team).lock();
+        for (int i = 0; i < 10 && !targetProcess; ++i)
+        {
+            lock.unlock();
+            server_worker_sleep(100 * 1000);
+            lock.lock();
+            targetProcess = system.GetProcess(team).lock();
+        }
+
         if (!targetProcess)
         {
             return B_BAD_TEAM_ID;
         }
 
         targetThread = system.GetThread(team).lock();
+        for (int i = 0; i < 10 && !targetThread; ++i)
+        {
+            lock.unlock();
+            server_worker_sleep(100 * 1000);
+            lock.lock();
+            targetThread = system.GetThread(team).lock();
+        }
+
         if (!targetThread)
         {
             return B_BAD_TEAM_ID;

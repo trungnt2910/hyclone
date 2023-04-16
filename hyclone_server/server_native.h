@@ -26,4 +26,6 @@ void server_fill_fs_info(const std::filesystem::path& path, haiku_fs_info* info)
 status_t server_read_stat(const std::filesystem::path& path, haiku_stat& st);
 status_t server_write_stat(const std::filesystem::path& path, const haiku_stat& stat, int statMask);
 
+void server_exit_thread();
+
 #endif // __SERVER_NATIVE_H__

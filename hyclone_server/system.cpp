@@ -335,7 +335,7 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
 
         bool execUnlockNeeded = false;
 
-        if (connection.isPrimary)
+        if (context.process && connection.isPrimary)
         {
             auto procLock = context.process->Lock();
             // No more threads => Process dead.

@@ -165,7 +165,7 @@ int server_main(int argc, char **argv)
                 }
                 // std::cerr << "received servercall: " + std::to_string(buffer[0]) << std::endl;
 
-                const auto dispatch = [&](int fd, std::unique_ptr<intptr_t[]> buffer)
+                const auto dispatch = [](int fd, std::unique_ptr<intptr_t[]> buffer)
                 {
                     intptr_t returnValue =
                         server_dispatch(fd,
@@ -173,14 +173,6 @@ int server_main(int argc, char **argv)
 
                     write(fd, &returnValue, sizeof(returnValue));
                 };
-
-                if (buffer[0] == SERVERCALL_ID_disconnect)
-                {
-                    // Synchronously dispatch this call to
-                    // quickly free the invalid fd.
-                    dispatch(fd, std::move(buffer));
-                    goto connection_close;
-                }
 
                 server_worker_run(dispatch, fd, std::move(buffer));
             }
