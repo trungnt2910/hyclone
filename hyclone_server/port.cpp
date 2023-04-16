@@ -43,7 +43,7 @@ status_t Port::Write(Message&& message, bigtime_t timeout)
         {
             const auto writableOrDead = [&]()
             {
-                return !_registered || _info.queue_count < _info.capacity;
+                return !_registered || _closed || _info.queue_count < _info.capacity;
             };
 
             if (timeout != B_INFINITE_TIMEOUT)
@@ -58,7 +58,7 @@ status_t Port::Write(Message&& message, bigtime_t timeout)
         });
     }
 
-    if (!_registered)
+    if (!_registered || _closed)
     {
         return B_BAD_PORT_ID;
     }
@@ -175,6 +175,18 @@ status_t Port::GetMessageInfo(haiku_port_message_info& info, bigtime_t timeout)
     return B_OK;
 }
 
+status_t Port::Close()
+{
+    if (_closed)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    _closed = true;
+    _writeCondVar.notify_all();
+    return B_OK;
+}
+
 intptr_t server_hserver_call_create_port(hserver_context& context, int32 queue_length, const char *name, size_t portNameLength)
 {
     if (queue_length < 1 || queue_length > HAIKU_PORT_MAX_QUEUE_LENGTH)
@@ -204,6 +216,28 @@ intptr_t server_hserver_call_create_port(hserver_context& context, int32 queue_l
     }
 
     return id;
+}
+
+intptr_t server_hserver_call_close_port(hserver_context& context, int portId)
+{
+    auto& system = System::GetInstance();
+
+    std::shared_ptr<Port> port;
+
+    {
+        auto lock = system.Lock();
+
+        port = system.GetPort(portId).lock();
+        if (!port)
+        {
+            return B_BAD_PORT_ID;
+        }
+    }
+
+    {
+        auto lock = port->Lock();
+        return port->Close();
+    }
 }
 
 intptr_t server_hserver_call_delete_port(hserver_context& context, int portId)
@@ -487,6 +521,12 @@ intptr_t server_hserver_call_write_port_etc(hserver_context& context, port_id id
     }
 
     if (!port)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    // Don't need to acquire a lock, a race here is harmless.
+    if (port->IsClosed())
     {
         return B_BAD_PORT_ID;
     }

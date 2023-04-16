@@ -30,6 +30,7 @@ private:
     std::condition_variable _readCondVar;
     std::mutex _lock;
     std::atomic<bool> _registered = false;
+    bool _closed = false;
 public:
     Port(int pid, int capacity, const char* name);
     ~Port() = default;
@@ -37,12 +38,15 @@ public:
     status_t Write(Message&& message, bigtime_t timeout);
     status_t Read(Message& message, bigtime_t timeout);
     status_t GetMessageInfo(haiku_port_message_info& info, bigtime_t timeout);
+    status_t Close();
 
     std::string GetName() const { return _info.name; }
     const haiku_port_info& GetInfo() const { return _info; }
     size_t GetBufferSize() const { return _messages.front().data.size(); }
     int GetOwner() const { return _info.team; }
     int GetId() const { return _info.port; }
+
+    bool IsClosed() const { return _closed; }
 
     std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(_lock); }
 

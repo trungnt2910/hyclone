@@ -9,12 +9,6 @@
 #include "haiku_port.h"
 #include "linux_debug.h"
 
-#ifdef HYCLONE_DEBUG_PORT
-#define DEBUG(...) GET_HOSTCALLS()->printf(__VA_ARGS__)
-#else
-#define DEBUG(...)
-#endif
-
 extern "C"
 {
 
@@ -22,95 +16,67 @@ port_id _moni_create_port(int32 queue_length, const char *name)
 {
     // No +1, the server will add the null byte when it reads the memory.
     // name can't be null for ports, we won't check anything here.
-    DEBUG("create_port(%d, %s)\n", queue_length, name);
-    size_t result = GET_SERVERCALLS()->create_port(queue_length, name, strlen(name));
-    DEBUG("create_port(%d, %s) = %d)\n", queue_length, name, result);
-    return result;
+    return GET_SERVERCALLS()->create_port(queue_length, name, strlen(name));
 }
 
 size_t _moni_read_port_etc(port_id port, int32 *msgCode,
     void *msgBuffer, size_t bufferSize, uint32 flags,
     bigtime_t timeout)
 {
-    DEBUG("read_port_etc(%d, %p, %p, %d, %d, %lld)\n", port, msgCode, msgBuffer, bufferSize, flags, timeout);
-    size_t result = GET_SERVERCALLS()->read_port_etc(port, msgCode, msgBuffer, bufferSize, flags, timeout);
-    DEBUG("read_port_etc(%d, %p, %p, %d, %d, %lld) = %d\n", port, msgCode, msgBuffer, bufferSize, flags, timeout, result);
-    return result;
+    return GET_SERVERCALLS()->read_port_etc(port, msgCode, msgBuffer, bufferSize, flags, timeout);
 }
 
 status_t _moni_write_port_etc(port_id port, int32 messageCode, const void *msgBuffer,
     size_t bufferSize, uint32 flags, bigtime_t timeout)
 {
-    DEBUG("write_port_etc(%d, %d, %p, %d, %d, %lld)\n", port, messageCode, msgBuffer, bufferSize, flags, timeout);
-    status_t result = GET_SERVERCALLS()->write_port_etc(port, messageCode, msgBuffer, bufferSize, flags, timeout);
-    DEBUG("write_port_etc(%d, %d, %p, %d, %d, %lld) = %d\n", port, messageCode, msgBuffer, bufferSize, flags, timeout, result);
-    return result;
+    return GET_SERVERCALLS()->write_port_etc(port, messageCode, msgBuffer, bufferSize, flags, timeout);
 }
 
 int32 _moni_port_count(port_id port)
 {
-    DEBUG("port_count(%d)\n", port);
-    int32 result = GET_SERVERCALLS()->port_count(port);
-    DEBUG("port_count(%d) = %d\n", port, result);
-    return result;
+    return GET_SERVERCALLS()->port_count(port);
 }
 
 port_id _moni_find_port(const char *port_name)
 {
-    DEBUG("find_port(%s)\n", port_name);
-    port_id result = GET_SERVERCALLS()->find_port(port_name, strlen(port_name));
-    DEBUG("find_port(%s) = %d\n", port_name, result);
-    return result;
+    return GET_SERVERCALLS()->find_port(port_name, strlen(port_name));
 }
 
 status_t _moni_get_port_info(port_id id, struct haiku_port_info *info)
 {
-    DEBUG("get_port_info(%d, %p)\n", id, info);
-    status_t result = GET_SERVERCALLS()->get_port_info(id, info);
-    DEBUG("get_port_info(%d, %p) = %d\n", id, info, result);
-    return result;
+    return GET_SERVERCALLS()->get_port_info(id, info);
 }
 
 status_t _moni_get_next_port_info(team_id team, int32* cookie, struct haiku_port_info *info)
 {
-    DEBUG("get_next_port_info(%d, %p, %p)\n", team, cookie, info);
-    status_t result = GET_SERVERCALLS()->get_next_port_info(team, cookie, info);
-    DEBUG("get_next_port_info(%d, %p, %p) = %d\n", team, cookie, info, result);
-    return result;
+    return GET_SERVERCALLS()->get_next_port_info(team, cookie, info);
 }
 
 ssize_t _moni_port_buffer_size_etc(port_id port, uint32 flags, bigtime_t timeout)
 {
-    DEBUG("port_buffer_size_etc(%d, %d, %lld)\n", port, flags, timeout);
-    ssize_t result = GET_SERVERCALLS()->port_buffer_size_etc(port, flags, timeout);
-    DEBUG("port_buffer_size_etc(%d, %d, %lld) = %d\n", port, flags, timeout, result);
-    return result;
+    return GET_SERVERCALLS()->port_buffer_size_etc(port, flags, timeout);
 }
 
 status_t _moni_set_port_owner(port_id port, team_id team)
 {
-    DEBUG("set_port_owner(%d, %d)\n", port, team);
-    status_t result = GET_SERVERCALLS()->set_port_owner(port, team);
-    DEBUG("set_port_owner(%d, %d) = %d\n", port, team, result);
-    return result;
+    return GET_SERVERCALLS()->set_port_owner(port, team);
+}
+
+status_t _moni_close_port(port_id id)
+{
+    return GET_SERVERCALLS()->close_port(id);
 }
 
 status_t _moni_delete_port(port_id id)
 {
-    DEBUG("delete_port(%d)\n", id);
-    status_t result = GET_SERVERCALLS()->delete_port(id);
-    DEBUG("delete_port(%d) = %d\n", id, result);
-    return result;
+    return GET_SERVERCALLS()->delete_port(id);
 }
 
 status_t _moni_get_port_message_info_etc(port_id port,
     haiku_port_message_info* info, size_t infoSize, uint32 flags,
     bigtime_t timeout)
 {
-    DEBUG("get_port_message_info_etc(%d, %p, %d, %d, %lld)\n", port, info, infoSize, flags, timeout);
-    status_t result = GET_SERVERCALLS()->get_port_message_info_etc(port, info, infoSize, flags, timeout);
-    DEBUG("get_port_message_info_etc(%d, %p, %d, %d, %lld) = %d\n", port, info, infoSize, flags, timeout, result);
-    return result;
+    return GET_SERVERCALLS()->get_port_message_info_etc(port, info, infoSize, flags, timeout);
 }
 
 status_t _moni_register_messaging_service(sem_id lockingSem,
