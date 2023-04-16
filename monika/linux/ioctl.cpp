@@ -36,6 +36,9 @@
 #include "socket_conversion.h"
 #include "stringutils.h"
 
+#define B_IOCTL_GET_TTY_INDEX (HAIKU_TCGETA + 32) /* param is int32* */
+#define B_IOCTL_GRANT_TTY     (HAIKU_TCGETA + 33) /* no param (cf. grantpt()) */
+
 typedef struct ktermios linux_termios;
 
 static void TermiosLinuxToB(const linux_termios& linuxTermios, haiku_termios& haikuTermios);
@@ -304,6 +307,21 @@ status_t _moni_ioctl(int fd, uint32 op, void* buffer, size_t length)
 
             LINUX_SYSCALL2(__NR_munmap, (void*)linux_ifconf.ifc_ifcu.ifcu_buf, bufferSize);
             return B_OK;
+        }
+        case B_IOCTL_GET_TTY_INDEX:
+        {
+            long result = LINUX_SYSCALL3(__NR_ioctl, fd, TIOCGPTN, buffer);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+            return B_OK;
+        }
+        case B_IOCTL_GRANT_TTY:
+        {
+            // This is what musl's grantpt() does.
+            // https://elixir.bootlin.com/musl/latest/source/src/misc/pty.c#L15
+            return 0;
         }
         case B_GET_PATH_FOR_DEVICE:
         {

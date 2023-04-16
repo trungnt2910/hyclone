@@ -16,6 +16,7 @@
 #include "loader_lock.h"
 #include "loader_mutex.h"
 #include "loader_protectedfd.h"
+#include "loader_pty.h"
 #include "loader_readdir.h"
 #include "loader_reservedrange.h"
 #include "loader_semaphore.h"
@@ -133,6 +134,11 @@ void* loader_allocate_commpage()
     hostcalls_ptr->vchroot_expandlinkat = loader_vchroot_expandlinkat;
 
     hostcalls_ptr->is_protected_fd = loader_is_protected_fd;
+
+    hostcalls_ptr->posix_openpt = loader_openpt;
+    hostcalls_ptr->grantpt = loader_grantpt;
+    hostcalls_ptr->ptsname = loader_ptsname;
+    hostcalls_ptr->unlockpt = loader_unlockpt;
 
     hostcalls_ptr->at_exit = NULL;
     hostcalls_ptr->printf = loader_dprintf;

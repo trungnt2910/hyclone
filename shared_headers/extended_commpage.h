@@ -107,6 +107,12 @@ struct hostcalls
     // FDs
     bool (*is_protected_fd)(int fd);
 
+    // Pty
+    int (*posix_openpt)(int flags);
+    int (*grantpt)(int fd);
+    int (*ptsname)(int fd, char* buffer, size_t bufferSize);
+    int (*unlockpt)(int fd);
+
     // Hooks
     void (*at_exit)(int value);
     int (*printf)(const char* format, ...);
