@@ -6,6 +6,7 @@
 #include "haiku_loader.h"
 #include "haiku_tls.h"
 #include "loader_ids.h"
+#include "loader_servercalls.h"
 #include "user_thread_defs.h"
 
 #include "loader_tls.h"
@@ -63,4 +64,5 @@ void loader_init_tls()
     sUserThread.defer_signals = 0;
     sUserThread.wait_status = 0;
     sUserThread.pending_signals = 0;
+    loader_hserver_call_register_user_thread(&sUserThread);
 }

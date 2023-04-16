@@ -13,6 +13,7 @@
 #include "server_workers.h"
 #include "system.h"
 #include "thread.h"
+#include "user_thread_defs.h"
 
 #define B_IDLE_PRIORITY              0
 #define B_LOWEST_ACTIVE_PRIORITY     1
@@ -59,6 +60,95 @@ void Thread::WaitForResume()
     {
         _suspended.wait(true);
     });
+}
+
+status_t Thread::Block(std::unique_lock<std::mutex>& lock, uint32 flags, bigtime_t timeout)
+{
+    // check, if already done
+    status_t waitStatus;
+    if (server_read_process_memory(_info.team, &_userThreadAddress->wait_status,
+        &waitStatus, sizeof(waitStatus)) != sizeof(waitStatus))
+    {
+        return B_BAD_ADDRESS;
+    }
+    if (waitStatus <= 0)
+    {
+        return waitStatus;
+    }
+
+    // nope, so wait
+    _blocked = true;
+
+    bool useTimeout = (flags & (B_ABSOLUTE_TIMEOUT | B_RELATIVE_TIMEOUT)) &&
+        timeout != B_INFINITE_TIMEOUT;
+
+    server_worker_run_wait([&]()
+    {
+        if (!useTimeout)
+        {
+            _blockCondition.wait(lock, [&]()
+            {
+                return !_blocked;
+            });
+        }
+        else if (flags & B_RELATIVE_TIMEOUT)
+        {
+            _blockCondition.wait_for(lock, std::chrono::microseconds(timeout), [&]()
+            {
+                return !_blocked;
+            });
+        }
+        else // if (flags & B_ABSOLUTE_TIMEOUT)
+        {
+            if (flags & B_TIMEOUT_REAL_TIME_BASE)
+            {
+                _blockCondition.wait_until(lock,
+                    std::chrono::system_clock::time_point(std::chrono::microseconds(timeout)), [&]()
+                {
+                    return !_blocked;
+                });
+            }
+            else
+            {
+                _blockCondition.wait_until(lock,
+                    std::chrono::steady_clock::time_point(std::chrono::microseconds(timeout)), [&]()
+                {
+                    return !_blocked;
+                });
+            }
+        }
+    });
+
+    if (_blocked)
+    {
+        _blockStatus = B_TIMED_OUT;
+    }
+
+    _blocked = false;
+
+    if (server_write_process_memory(_info.team, &_userThreadAddress->wait_status,
+        &_blockStatus, sizeof(_blockStatus)) != sizeof(_blockStatus))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return _blockStatus;
+}
+
+status_t Thread::Unblock(status_t status)
+{
+    if (server_write_process_memory(_info.team, &_userThreadAddress->wait_status,
+        &status, sizeof(status)) != sizeof(status))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    _blockStatus = status;
+    _blocked = false;
+
+    _blockCondition.notify_all();
+
+    return B_OK;
 }
 
 std::shared_future<intptr_t> Thread::SendRequest(std::shared_ptr<Request> request)
@@ -322,6 +412,40 @@ intptr_t server_hserver_call_wait_for_resume(hserver_context& context)
     context.thread->WaitForResume();
 
     return B_OK;
+}
+
+intptr_t server_hserver_call_register_user_thread(hserver_context& context, void* address)
+{
+    context.thread->SetUserThreadAddress((user_thread*)address);
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_block_thread(hserver_context& context, int flags, unsigned long long timeout)
+{
+    auto lock = context.thread->Lock();
+    return context.thread->Block(lock, flags, timeout);
+}
+
+intptr_t server_hserver_call_unblock_thread(hserver_context& context, int thread_id, int status)
+{
+    std::shared_ptr<Thread> thread;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        thread = system.GetThread(thread_id).lock();
+    }
+
+    if (!thread)
+    {
+        return B_BAD_THREAD_ID;
+    }
+
+    {
+        auto lock = thread->Lock();
+        return thread->Unblock(status);
+    }
 }
 
 intptr_t server_hserver_call_request_ack(hserver_context& context, int pid, int tid)

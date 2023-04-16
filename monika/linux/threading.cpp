@@ -7,8 +7,10 @@
 #include "haiku_errors.h"
 #include "haiku_semaphore.h"
 #include "haiku_thread.h"
+#include "haiku_tls.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
+#include "user_thread_defs.h"
 
 extern "C"
 {
@@ -32,6 +34,16 @@ status_t _moni_suspend_thread(thread_id thread)
 status_t _moni_resume_thread(thread_id thread)
 {
     return GET_SERVERCALLS()->resume_thread(thread);
+}
+
+status_t _moni_block_thread(uint32 flags, bigtime_t timeout)
+{
+    return GET_SERVERCALLS()->block_thread(flags, timeout);
+}
+
+status_t _moni_unblock_thread(thread_id thread, status_t status)
+{
+    return GET_SERVERCALLS()->unblock_thread(thread, status);
 }
 
 status_t _moni_exit_thread(status_t returnValue)

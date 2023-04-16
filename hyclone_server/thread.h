@@ -9,6 +9,8 @@
 
 #include "haiku_thread.h"
 
+struct user_thread;
+
 class Request;
 
 class Thread
@@ -19,7 +21,11 @@ private:
     std::mutex _requestLock;
     std::shared_ptr<Request> _request;
     std::atomic<bool> _suspended = false;
+    std::condition_variable _blockCondition;
+    user_thread* _userThreadAddress = NULL;
     int _tid;
+    status_t _blockStatus;
+    bool _blocked = false;
 public:
     Thread(int pid, int tid);
     ~Thread() = default;
@@ -34,6 +40,12 @@ public:
     void SetSuspended(bool suspended);
     void Resume();
     void WaitForResume();
+
+    status_t Block(std::unique_lock<std::mutex>& lock, uint32 flags, bigtime_t timeout);
+    status_t Unblock(status_t status);
+
+    user_thread* GetUserThreadAddress() const { return _userThreadAddress; }
+    void SetUserThreadAddress(user_thread* address) { _userThreadAddress = address; }
 
     bool IsRequesting() const { return _request != std::shared_ptr<Request>(); }
     std::shared_future<intptr_t> SendRequest(std::shared_ptr<Request> request);
