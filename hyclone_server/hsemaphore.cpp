@@ -28,6 +28,8 @@ int Semaphore::Acquire(int tid, int count)
         return B_OK;
     }
 
+    ++_waitCount;
+
     server_worker_run_wait([&]()
     {
         _countCondVar.wait(lock, [&]()
@@ -35,6 +37,8 @@ int Semaphore::Acquire(int tid, int count)
             return !_registered || _count >= count;
         });
     });
+
+    --_waitCount;
 
     if (!_registered)
     {
@@ -62,6 +66,9 @@ int Semaphore::TryAcquire(int tid, int count)
 int Semaphore::TryAcquireFor(int tid, int count, int64_t timeout)
 {
     std::unique_lock<std::mutex> lock(_countLock);
+
+    ++_waitCount;
+
     server_worker_run_wait([&]()
     {
         _countCondVar.wait_for(lock, std::chrono::microseconds(timeout), [&]()
@@ -69,6 +76,8 @@ int Semaphore::TryAcquireFor(int tid, int count, int64_t timeout)
             return !_registered || _count >= count;
         });
     });
+
+    --_waitCount;
 
     if (!_registered)
     {
@@ -87,6 +96,15 @@ int Semaphore::TryAcquireFor(int tid, int count, int64_t timeout)
 int Semaphore::TryAcquireUntil(int tid, int count, int64_t timestamp)
 {
     std::unique_lock<std::mutex> lock(_countLock);
+
+    if (_count >= count)
+    {
+        _count -= count;
+        return B_OK;
+    }
+
+    ++_waitCount;
+
     server_worker_run_wait([&]()
     {
         _countCondVar.wait_until(lock,
@@ -95,6 +113,8 @@ int Semaphore::TryAcquireUntil(int tid, int count, int64_t timestamp)
             return !_registered || _count >= count;
         });
     });
+
+    --_waitCount;
 
     if (!_registered)
     {
@@ -115,6 +135,18 @@ void Semaphore::Release(int count)
     std::unique_lock<std::mutex> lock(_countLock);
     _count += count;
     _countCondVar.notify_all();
+}
+
+int Semaphore::GetSemCount()
+{
+    std::unique_lock<std::mutex> lock(_countLock);
+
+    if (_count >= 0)
+    {
+        return _count;
+    }
+
+    return -_waitCount;
 }
 
 intptr_t server_hserver_call_create_sem(hserver_context& context, int count, const char* userName, size_t nameLength)
@@ -289,6 +321,32 @@ intptr_t server_hserver_call_release_sem_etc(hserver_context& context, int id, u
     }
 
     sem->Release(count);
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_get_sem_count(hserver_context& context, int id, int* userThreadCount)
+{
+    std::shared_ptr<Semaphore> sem;
+
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+
+        sem = system.GetSemaphore(id).lock();
+    }
+
+    if (!sem)
+    {
+        return B_BAD_SEM_ID;
+    }
+
+    int threadCount = sem->GetSemCount();
+
+    if (context.process->WriteMemory(userThreadCount, &threadCount, sizeof(threadCount)) != sizeof(threadCount))
+    {
+        return B_BAD_ADDRESS;
+    }
 
     return B_OK;
 }

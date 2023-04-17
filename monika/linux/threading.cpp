@@ -152,6 +152,11 @@ status_t _moni_delete_sem(sem_id id)
     return GET_SERVERCALLS()->delete_sem(id);
 }
 
+status_t _moni_get_sem_count(sem_id id, int32* thread_count)
+{
+    return GET_SERVERCALLS()->get_sem_count(id, thread_count);
+}
+
 status_t _moni_realtime_sem_open(const char* name, int openFlagsOrShared,
     haiku_mode_t mode, uint32 semCount, haiku_sem_t* userSem, haiku_sem_t** _usedUserSem)
 {

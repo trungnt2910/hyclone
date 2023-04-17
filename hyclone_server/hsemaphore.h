@@ -19,6 +19,7 @@ private:
     std::mutex _countLock;
     std::atomic<int> _count = 0;
     std::atomic<bool> _registered = false;
+    int _waitCount = 0;
 public:
     Semaphore(int pid, int count, const char* name);
     ~Semaphore() = default;
@@ -33,6 +34,8 @@ public:
     int TryAcquireFor(int tid, int count, int64_t timeout);
     int TryAcquireUntil(int tid, int count, int64_t timestamp);
     void Release(int count);
+
+    int GetSemCount();
 };
 
 #endif // __HYCLONE_SEMAPHORE_H__

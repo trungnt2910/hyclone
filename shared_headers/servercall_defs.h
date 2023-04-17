@@ -49,6 +49,7 @@ HYCLONE_SERVERCALL4(acquire_sem_etc, int, unsigned int, unsigned int, unsigned l
 HYCLONE_SERVERCALL1(release_sem, int)
 HYCLONE_SERVERCALL3(release_sem_etc, int, unsigned int, unsigned int)
 HYCLONE_SERVERCALL1(delete_sem, int)
+HYCLONE_SERVERCALL2(get_sem_count, int, int*)
 HYCLONE_SERVERCALL0(get_system_sem_count)
 HYCLONE_SERVERCALL2(read_fs_info, int, void*)
 HYCLONE_SERVERCALL1(next_device, int*)
