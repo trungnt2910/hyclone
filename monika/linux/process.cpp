@@ -209,6 +209,12 @@ status_t _moni_get_next_team_info(int32 *cookie, haiku_team_info* info)
     return GET_SERVERCALLS()->get_next_team_info(cookie, info);
 }
 
+status_t _moni_get_extended_team_info(team_id teamID, uint32 flags,
+    void* buffer, size_t size, size_t* _sizeNeeded)
+{
+    return GET_SERVERCALLS()->get_extended_team_info(teamID, flags, buffer, size, _sizeNeeded);
+}
+
 haiku_pid_t _moni_process_info(haiku_pid_t process, int32 which)
 {
     long status;

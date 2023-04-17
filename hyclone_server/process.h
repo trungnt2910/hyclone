@@ -22,6 +22,7 @@ class Process
 private:
     haiku_team_info _info;
     int _pid;
+    int _ppid, _pgid, _sid;
     int _uid, _gid, _euid, _egid;
     int _debuggerPid, _debuggerPort, _debuggerWriteLock;
     std::atomic<bool> _forkUnlocked;
@@ -72,6 +73,9 @@ public:
     size_t UnregisterFd(int fd);
 
     int GetPid() const { return _pid; }
+    int GetPpid() const { return _ppid; }
+    int GetPgid() const { return _pgid; }
+    int GetSid() const { return _sid; }
     int GetUid() const { return _uid; }
     int GetGid() const { return _gid; }
     int GetEuid() const { return _euid; }
@@ -80,6 +84,7 @@ public:
     const std::filesystem::path& GetRoot() const { return _root; }
     haiku_team_info& GetInfo() { return _info; }
     const haiku_team_info& GetInfo() const { return _info; }
+    std::string GetName();
 
     void SetCwd(const std::filesystem::path& cwd) { _cwd = cwd; }
     void SetCwd(std::filesystem::path&& cwd) { _cwd = std::move(cwd); }

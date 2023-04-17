@@ -3,8 +3,10 @@
 #include <utility>
 
 #include "area.h"
+#include "extended_system_info_defs.h"
 #include "haiku_errors.h"
 #include "haiku_fcntl.h"
+#include "kmessage.h"
 #include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
@@ -22,6 +24,9 @@ Process::Process(int pid, int uid, int gid, int euid, int egid)
     _info.gid = gid;
     _info.debugger_nub_thread = -1;
     _info.debugger_nub_port = -1;
+
+    // Currently they are not managed by HyClone.
+    _ppid = _pgid = _sid = 0;
 
     _debuggerPort = -1;
     _debuggerPid = -1;
@@ -182,6 +187,47 @@ size_t Process::UnregisterFd(int fd)
 {
     _fds.erase(fd);
     return _fds.size();
+}
+
+std::string Process::GetName()
+{
+    std::string name;
+    bool isEscaped = false;
+
+    for (int i = 0; i < sizeof(_info.args); ++i)
+    {
+        if (_info.args[i] == '\0')
+        {
+            break;
+        }
+        if (isEscaped)
+        {
+            isEscaped = false;
+        }
+        else
+        {
+            if (_info.args[i] == '\\')
+            {
+                isEscaped = true;
+            }
+            if (_info.args[i] == ' ')
+            {
+                break;
+            }
+            if (_info.args[i] == '/')
+            {
+                name.clear();
+            }
+        }
+        name += _info.args[i];
+    }
+
+    if (!name.empty() && name[0] == '/')
+    {
+        name = name.substr(name.find_last_of('/') + 1);
+    }
+
+    return name;
 }
 
 void Process::Fork(Process& child)
@@ -816,6 +862,120 @@ intptr_t server_hserver_call_get_next_team_info(hserver_context& context, int* u
     }
 
     return (cookie == -1) ? B_BAD_VALUE : B_OK;
+}
+
+intptr_t server_hserver_call_get_extended_team_info(hserver_context& context, int teamID, unsigned int flags,
+    void* userBuffer, size_t userBufferSize, size_t* userSizeNeeded)
+{
+    std::shared_ptr<Process> process;
+
+    if (teamID == B_CURRENT_TEAM)
+    {
+        process = context.process;
+    }
+    else
+    {
+        auto& system = System::GetInstance();
+        auto lock = system.Lock();
+        process = system.GetProcess(teamID).lock();
+    }
+
+    if (!process)
+    {
+        return B_BAD_TEAM_ID;
+    }
+
+    KMessage info;
+
+    if (flags & B_TEAM_INFO_BASIC)
+    {
+        team_id id;
+        haiku_pid_t groupId;
+        haiku_pid_t sessionId;
+        haiku_uid_t realUID;
+        haiku_gid_t realGID;
+        haiku_uid_t effectiveUID;
+        haiku_gid_t effectiveGID;
+        std::string name;
+
+        std::filesystem::path cwd;
+
+        {
+            auto lock = process->Lock();
+            id = process->GetPid();
+            groupId = process->GetPgid();
+            sessionId = process->GetSid();
+            realUID = process->GetUid();
+            realGID = process->GetGid();
+            effectiveUID = process->GetEuid();
+            effectiveGID = process->GetEgid();
+            name = process->GetName();
+            cwd = process->GetCwd();
+        }
+
+        server_fill_extended_team_info(id, groupId, sessionId);
+
+        // add the basic data to the info message
+        if (info.AddInt32("id", id) != B_OK
+            || info.AddString("name", name.c_str()) != B_OK
+            || info.AddInt32("process group", groupId) != B_OK
+            || info.AddInt32("session", sessionId) != B_OK
+            || info.AddInt32("uid", realUID) != B_OK
+            || info.AddInt32("gid", realGID) != B_OK
+            || info.AddInt32("euid", effectiveUID) != B_OK
+            || info.AddInt32("egid", effectiveGID) != B_OK)
+        {
+            return B_NO_MEMORY;
+        }
+
+        struct haiku_stat cwdStat;
+
+        {
+            auto& vfsService = System::GetInstance().GetVfsService();
+            auto lock = vfsService.Lock();
+
+            status_t status = vfsService.ReadStat(cwd, cwdStat);
+
+            if (status != B_OK)
+            {
+                return status;
+            }
+
+            vfsService.RegisterEntryRef(EntryRef(cwdStat.st_dev, cwdStat.st_ino), cwd.string());
+        }
+
+        if (info.AddInt32("cwd device", cwdStat.st_dev) != B_OK
+            || info.AddInt64("cwd directory", cwdStat.st_ino) != B_OK)
+        {
+            return B_NO_MEMORY;
+        }
+    }
+
+    // TODO: Support other flags (at least when Haiku supports them first).
+
+    size_t sizeNeeded = info.ContentSize();
+
+    {
+        auto lock = context.process->Lock();
+
+        if (context.process->WriteMemory(userSizeNeeded, &sizeNeeded, sizeof(sizeNeeded))
+            != sizeof(sizeNeeded))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (sizeNeeded > userBufferSize)
+        {
+            return B_BUFFER_OVERFLOW;
+        }
+
+        if (context.process->WriteMemory(userBuffer, info.Buffer(), sizeNeeded) != sizeNeeded)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return B_OK;
 }
 
 intptr_t server_hserver_call_register_team_info(hserver_context& context, void* userTeamInfo)

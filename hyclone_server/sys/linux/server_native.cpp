@@ -156,6 +156,47 @@ void server_fill_team_info(haiku_team_info* info)
     }
 }
 
+void server_fill_extended_team_info(int pid, int& pgid, int& sid)
+{
+    if (pid == 0)
+    {
+        pid = getpid();
+    }
+
+    std::ifstream fin("/proc/" + std::to_string(pid) + "/stat");
+
+    std::string ignore;
+
+    // pid
+    fin >> ignore;
+    // executable filename, in parentheses
+    std::getline(fin, ignore, ')');
+    // state
+    fin >> ignore;
+    // ppid
+    fin >> ignore;
+
+    // pgrp
+    if (pgid == 0)
+    {
+        fin >> pgid;
+    }
+    else
+    {
+        fin >> ignore;
+    }
+
+    // session
+    if (sid == 0)
+    {
+        fin >> sid;
+    }
+    else
+    {
+        fin >> ignore;
+    }
+}
+
 void server_fill_thread_info(haiku_thread_info* info)
 {
     std::ifstream fin(("/proc/" + std::to_string(info->thread)) + "/stat");

@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <string>
 
 #include "haiku_team.h"
 #include "haiku_thread.h"
@@ -19,6 +20,7 @@ void server_kill_process(int pid);
 void server_close_connection(intptr_t conn_id);
 
 void server_fill_team_info(haiku_team_info* info);
+void server_fill_extended_team_info(int pid, int& pgid, int& sid);
 void server_fill_thread_info(haiku_thread_info* info);
 
 void server_fill_fs_info(const std::filesystem::path& path, haiku_fs_info* info);
