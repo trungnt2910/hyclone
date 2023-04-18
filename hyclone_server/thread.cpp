@@ -336,6 +336,11 @@ intptr_t server_hserver_call_get_next_thread_info(hserver_context& context, int 
 
     std::shared_ptr<Process> process;
 
+    if (team == B_CURRENT_TEAM)
+    {
+        process = context.process;
+    }
+    else
     {
         auto lock = system.Lock();
         process = system.GetProcess(team).lock();
