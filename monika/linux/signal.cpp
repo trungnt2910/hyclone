@@ -240,6 +240,20 @@ status_t _moni_sigwait(const haiku_sigset_t* set, haiku_siginfo_t* info, uint32 
     return B_OK;
 }
 
+status_t _moni_sigsuspend(const haiku_sigset_t* mask)
+{
+    linux_sigset_t linuxMask = SigSetBToLinux(*mask);
+
+    long status = LINUX_SYSCALL2(__NR_rt_sigsuspend, &linuxMask, sizeof(linux_sigset_t));
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
+    }
+
+    return B_OK;
+}
+
 status_t _moni_set_signal_stack(const haiku_stack_t *newStack, haiku_stack_t *oldStack)
 {
     stack_t linuxNewStackStorage;
