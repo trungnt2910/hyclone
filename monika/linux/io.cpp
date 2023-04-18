@@ -359,7 +359,84 @@ status_t _moni_write_stat(int fd, const char* path,
 
     memcpy(&fullStat, stat, statSize);
 
-    status_t result = GET_SERVERCALLS()->write_stat(fd, path, path ? strlen(path) : 0, traverseLink, &fullStat, statMask);
+    status_t result;
+
+    if (fd != HAIKU_AT_FDCWD && path == NULL)
+    {
+        if (statMask & B_STAT_MODE)
+        {
+            result = LINUX_SYSCALL3(__NR_fchmod, fd, ModeBToLinux(stat->st_mode), 0);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+        }
+        if (statMask & B_STAT_UID)
+        {
+            result = LINUX_SYSCALL3(__NR_fchown, fd,
+                GET_SERVERCALLS()->hostuid_for(stat->st_uid), -1);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+        }
+        if (statMask & B_STAT_GID)
+        {
+            result = LINUX_SYSCALL3(__NR_fchown, fd,
+                -1, GET_SERVERCALLS()->hostgid_for(stat->st_gid));
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+        }
+        if (statMask & B_STAT_SIZE)
+        {
+            result = LINUX_SYSCALL2(__NR_ftruncate, fd, stat->st_size);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+        }
+        if (statMask & (B_STAT_ACCESS_TIME | B_STAT_MODIFICATION_TIME))
+        {
+            struct timespec linuxTimespecs[2];
+            linuxTimespecs[0].tv_nsec = UTIME_OMIT;
+            linuxTimespecs[1].tv_nsec = UTIME_OMIT;
+            if (statMask & B_STAT_ACCESS_TIME)
+            {
+                if (stat->st_atim.tv_nsec == HAIKU_UTIME_NOW)
+                {
+                    linuxTimespecs[0].tv_nsec = UTIME_NOW;
+                }
+                else
+                {
+                    linuxTimespecs[0].tv_sec = stat->st_atim.tv_sec;
+                    linuxTimespecs[0].tv_nsec = stat->st_atim.tv_nsec;
+                }
+            }
+            if (statMask & B_STAT_MODIFICATION_TIME)
+            {
+                if (stat->st_mtim.tv_nsec == HAIKU_UTIME_NOW)
+                {
+                    linuxTimespecs[1].tv_nsec = UTIME_NOW;
+                }
+                else
+                {
+                    linuxTimespecs[1].tv_sec = stat->st_mtim.tv_sec;
+                    linuxTimespecs[1].tv_nsec = stat->st_mtim.tv_nsec;
+                }
+            }
+            result = LINUX_SYSCALL4(__NR_utimensat, fd, NULL, &linuxTimespecs, traverseLink ? 0 : AT_SYMLINK_NOFOLLOW);
+            if (result < 0)
+            {
+                return LinuxToB(-result);
+            }
+        }
+    }
+    else
+    {
+        result = GET_SERVERCALLS()->write_stat(fd, path, path ? strlen(path) : 0, traverseLink, &fullStat, statMask);
+    }
 
     if (result != B_OK)
     {
