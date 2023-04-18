@@ -538,19 +538,21 @@ intptr_t server_hserver_call_set_memory_protection(hserver_context& context, voi
                 newRanges.insert(newRanges.end(), changedRanges.begin(), changedRanges.end());
                 std::vector<std::shared_ptr<Area>> newAreas = area->Split(newRanges);
 
+                assert(newAreas.size() == unchangedRanges.size() + changedRanges.size() - 1);
+
                 auto& system = System::GetInstance();
                 auto sysLock = system.Lock();
 
                 for (size_t i = 1; i < unchangedRanges.size(); ++i)
                 {
-                    auto areaPtr = system.RegisterArea(newAreas[i]).lock();
+                    auto areaPtr = system.RegisterArea(newAreas[i - 1]).lock();
                     context.process->RegisterArea(areaPtr);
                 }
 
                 for (size_t i = unchangedRanges.size(); i < newAreas.size(); ++i)
                 {
-                    newAreas[i]->GetInfo().protection = protection;
-                    auto areaPtr = system.RegisterArea(newAreas[i]).lock();
+                    newAreas[i - 1]->GetInfo().protection = protection;
+                    auto areaPtr = system.RegisterArea(newAreas[i - 1]).lock();
                     context.process->RegisterArea(areaPtr);
                 }
             }
@@ -644,12 +646,14 @@ intptr_t server_hserver_call_unmap_memory(hserver_context& context, void* addres
             {
                 std::vector<std::shared_ptr<Area>> newAreas = area->Split(survivingRanges);
 
+                assert(newAreas.size() == survivingRanges.size() - 1);
+
                 auto& system = System::GetInstance();
                 auto sysLock = system.Lock();
 
                 for (size_t i = 1; i < survivingRanges.size(); ++i)
                 {
-                    auto areaPtr = system.RegisterArea(newAreas[i]).lock();
+                    auto areaPtr = system.RegisterArea(newAreas[i - 1]).lock();
                     context.process->RegisterArea(areaPtr);
                 }
             }
