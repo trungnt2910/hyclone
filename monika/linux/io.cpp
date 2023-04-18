@@ -339,7 +339,47 @@ int _moni_read_stat(int fd, const char* path, bool traverseLink, haiku_stat* st,
         return B_BAD_VALUE;
     }
 
-    return GET_SERVERCALLS()->read_stat(fd, path, path ? strlen(path) : 0, traverseLink, st, statSize);
+    if (path == NULL)
+    {
+        struct stat linuxStat;
+        haiku_stat haikuStat;
+
+        long status = LINUX_SYSCALL2(__NR_fstat, fd, &linuxStat);
+
+        if (status < 0)
+        {
+            return LinuxToB(-status);
+        }
+
+        haikuStat.st_dev = linuxStat.st_dev;
+        haikuStat.st_ino = linuxStat.st_ino;
+        haikuStat.st_mode = ModeLinuxToB(linuxStat.st_mode);
+        haikuStat.st_nlink = linuxStat.st_nlink;
+        haikuStat.st_uid = GET_SERVERCALLS()->uid_for(linuxStat.st_uid);
+        haikuStat.st_gid = GET_SERVERCALLS()->gid_for(linuxStat.st_gid);
+        haikuStat.st_size = linuxStat.st_size;
+        haikuStat.st_rdev = linuxStat.st_rdev;
+        haikuStat.st_blksize = linuxStat.st_blksize;
+        haikuStat.st_atim.tv_sec = linuxStat.st_atim.tv_sec;
+        haikuStat.st_atim.tv_nsec = linuxStat.st_atim.tv_nsec;
+        haikuStat.st_mtim.tv_sec = linuxStat.st_mtim.tv_sec;
+        haikuStat.st_mtim.tv_nsec = linuxStat.st_mtim.tv_nsec;
+        haikuStat.st_ctim.tv_sec = linuxStat.st_ctim.tv_sec;
+        haikuStat.st_ctim.tv_nsec = linuxStat.st_ctim.tv_nsec;
+        haikuStat.st_blocks = linuxStat.st_blocks;
+        // Unsupported fields.
+        haikuStat.st_crtim.tv_sec = 0;
+        haikuStat.st_crtim.tv_nsec = 0;
+        haikuStat.st_type = 0;
+
+        memcpy(st, &haikuStat, statSize);
+
+        return B_OK;
+    }
+    else
+    {
+        return GET_SERVERCALLS()->read_stat(fd, path, strlen(path), traverseLink, st, statSize);
+    }
 }
 
 status_t _moni_write_stat(int fd, const char* path,

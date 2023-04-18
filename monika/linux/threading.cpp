@@ -7,6 +7,7 @@
 #include "haiku_errors.h"
 #include "haiku_semaphore.h"
 #include "haiku_thread.h"
+#include "haiku_time.h"
 #include "haiku_tls.h"
 #include "linux_debug.h"
 #include "linux_syscall.h"
@@ -173,9 +174,19 @@ status_t _moni_snooze_etc(bigtime_t time, int timebase, int32 flags, bigtime_t* 
     int linuxClockid;
     switch (timebase)
     {
+        static_assert(B_SYSTEM_TIMEBASE == HAIKU_CLOCK_MONOTONIC, "Something in Haiku's ABI has changed.");
+        // case HAIKU_CLOCK_MONOTONIC
         case B_SYSTEM_TIMEBASE:
             linuxClockid = CLOCK_MONOTONIC;
         break;
+        case HAIKU_CLOCK_REALTIME:
+            linuxClockid = CLOCK_REALTIME;
+        break;
+        case HAIKU_CLOCK_PROCESS_CPUTIME_ID:
+            linuxClockid = CLOCK_PROCESS_CPUTIME_ID;
+        break;
+        case HAIKU_CLOCK_THREAD_CPUTIME_ID:
+            linuxClockid = CLOCK_THREAD_CPUTIME_ID;
         default:
             trace("_kern_snooze_etc: unknown timebase.");
             return B_BAD_VALUE;

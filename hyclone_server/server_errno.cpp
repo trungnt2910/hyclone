@@ -11,6 +11,10 @@ int CppToB(const std::error_code& ec)
             return B_PERMISSION_DENIED;
         case std::errc::not_a_directory:
             return B_NOT_A_DIRECTORY;
+        case std::errc::filename_too_long:
+            return B_NAME_TOO_LONG;
+        case std::errc::too_many_symbolic_link_levels:
+            return B_LINK_LIMIT;
         default:
             throw std::system_error(ec);
     }
