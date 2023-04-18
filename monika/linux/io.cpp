@@ -339,12 +339,15 @@ int _moni_read_stat(int fd, const char* path, bool traverseLink, haiku_stat* st,
         return B_BAD_VALUE;
     }
 
-    if (path == NULL)
+    // Prioritize reading from the server as this is the only way to get correct dev and ino values.
+    long status = GET_SERVERCALLS()->read_stat(fd, path, path ? strlen(path) : 0, traverseLink, st, statSize);
+
+    if (status == B_ENTRY_NOT_FOUND && path == NULL)
     {
         struct stat linuxStat;
         haiku_stat haikuStat;
 
-        long status = LINUX_SYSCALL2(__NR_fstat, fd, &linuxStat);
+        status = LINUX_SYSCALL2(__NR_fstat, fd, &linuxStat);
 
         if (status < 0)
         {
@@ -376,10 +379,8 @@ int _moni_read_stat(int fd, const char* path, bool traverseLink, haiku_stat* st,
 
         return B_OK;
     }
-    else
-    {
-        return GET_SERVERCALLS()->read_stat(fd, path, strlen(path), traverseLink, st, statSize);
-    }
+
+    return status;
 }
 
 status_t _moni_write_stat(int fd, const char* path,
