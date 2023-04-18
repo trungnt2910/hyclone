@@ -6,6 +6,7 @@
 
 int SocketFamilyBToLinux(int family);
 int SocketTypeBToLinux(int type);
+int SocketTypeLinuxToB(int type);
 int SocketProtocolBToLinux(int protocol);
 int SocketOptionBToLinux(int option);
 int SocketAddressBToLinux(const struct haiku_sockaddr *addr, haiku_socklen_t addrlen,

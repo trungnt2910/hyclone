@@ -324,8 +324,6 @@ status_t _moni_getsockopt(int socket, int level, int option,
                 case SO_SNDLOWAT:
                 case SO_RCVBUF:
                 case SO_RCVLOWAT:
-                // These two need marshalling.
-                // case SO_TYPE:
                 {
                     long status = LINUX_SYSCALL5(__NR_getsockopt, socket, linuxLevel, linuxOption, value, &linuxLength);
                     if (status < 0)
@@ -379,6 +377,31 @@ status_t _moni_getsockopt(int socket, int level, int option,
                     if (_length != NULL)
                     {
                         *_length = sizeof(haikuTime);
+                    }
+                    return B_OK;
+                }
+                case SO_TYPE:
+                {
+                    if (_length == NULL || *_length < sizeof(int))
+                    {
+                        return B_BAD_VALUE;
+                    }
+
+                    int linuxType;
+                    linuxLength = sizeof(linuxType);
+
+                    long status = LINUX_SYSCALL5(__NR_getsockopt, socket, linuxLevel, linuxOption, &linuxType, &linuxLength);
+                    if (status < 0)
+                    {
+                        return LinuxToB(-status);
+                    }
+
+                    int haikuType = SocketTypeLinuxToB(linuxType);
+                    memcpy(value, &haikuType, sizeof(haikuType));
+
+                    if (_length != NULL)
+                    {
+                        *_length = sizeof(haikuType);
                     }
                     return B_OK;
                 }

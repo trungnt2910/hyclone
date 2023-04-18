@@ -42,6 +42,19 @@ int SocketTypeBToLinux(int type)
     }
 }
 
+int SocketTypeLinuxToB(int type)
+{
+    switch (type)
+    {
+#define SUPPORTED_SOCKET_TYPE(name) case name: return HAIKU_##name;
+#include "socket_values.h"
+#undef SUPPORTED_SOCKET_TYPE
+        default:
+            trace("Unsupported socket type.");
+            return -1;
+    }
+}
+
 int SocketProtocolBToLinux(int protocol)
 {
     if (protocol == 0)
