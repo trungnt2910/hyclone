@@ -23,6 +23,10 @@ const addr_t kMaxRandomize = 0x8000000000ul;
 const addr_t kMaxRandomize = 0x800000ul;
 #endif
 
+#define HAIKU_MS_ASYNC      0x01
+#define HAIKU_MS_SYNC       0x02
+#define HAIKU_MS_INVALIDATE 0x04
+
 static int ProtBToLinux(int protection);
 static int ProcessMmapArgs(void* address, uint32 addressSpec, size_t& size,
     uint32& lock, uint32 protection, uint32 mapping,
@@ -712,9 +716,9 @@ int _moni_unmap_memory(void *address, size_t size)
 }
 
 int _moni_map_file(const char *name, void **address,
-	uint32_t addressSpec, size_t size, uint32_t protection,
-	uint32_t mapping, bool unmapAddressRange, int fd,
-	off_t offset)
+    uint32_t addressSpec, size_t size, uint32_t protection,
+    uint32_t mapping, bool unmapAddressRange, int fd,
+    off_t offset)
 {
     void* baseAddr = *address;
     uint32 lock = 0;
@@ -965,6 +969,33 @@ status_t _moni_mlock(const void* address, size_t size)
     {
         LINUX_SYSCALL2(__NR_munlock, address, size);
         return status;
+    }
+
+    return B_OK;
+}
+
+status_t _moni_sync_memory(void* address, size_t size, int flags)
+{
+    int linuxFlags = 0;
+
+    if (flags & HAIKU_MS_ASYNC)
+    {
+        linuxFlags |= MS_ASYNC;
+    }
+    if (flags & HAIKU_MS_SYNC)
+    {
+        linuxFlags |= MS_SYNC;
+    }
+    if (flags & HAIKU_MS_INVALIDATE)
+    {
+        linuxFlags |= MS_INVALIDATE;
+    }
+
+    long status = LINUX_SYSCALL3(__NR_msync, address, size, flags);
+
+    if (status < 0)
+    {
+        return LinuxToB(-status);
     }
 
     return B_OK;
