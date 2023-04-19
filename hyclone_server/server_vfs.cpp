@@ -192,11 +192,51 @@ status_t VfsService::GetAttrPath(std::filesystem::path& path, const std::string&
 
 status_t VfsService::RealPath(std::filesystem::path& path)
 {
-    return _DoWork(path, true, [&](std::filesystem::path& currentPath,
-        const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+    if (path == path.lexically_normal())
     {
-        return device->RealPath(currentPath, isSymlink);
-    });
+        return _DoWork(path, true, [&](std::filesystem::path& currentPath,
+            const std::shared_ptr<VfsDevice>& device, bool& isSymlink)
+        {
+            return device->RealPath(currentPath, isSymlink);
+        });
+    }
+    else
+    {
+        std::vector<std::filesystem::path> components(path.begin(), path.end());
+
+        std::filesystem::path currentPath;
+
+        status_t status;
+
+        for (int i = 0; i < components.size(); ++i)
+        {
+            const auto& component = components[i];
+            if (component == "..")
+            {
+                status = RealPath(currentPath);
+                if (status != B_OK)
+                {
+                    path = currentPath.parent_path();
+                    for (int j = i + 1; j < components.size(); ++j)
+                    {
+                        path /= components[j];
+                    }
+                    return status;
+                }
+                currentPath = currentPath.parent_path();
+            }
+            else if (!component.empty() && component != ".")
+            {
+                currentPath /= component;
+            }
+        }
+
+        assert(currentPath == currentPath.lexically_normal());
+        status = RealPath(currentPath);
+        path = currentPath;
+
+        return status;
+    }
 }
 
 status_t VfsService::ReadStat(const std::filesystem::path& path, haiku_stat& stat, bool traverseLink)

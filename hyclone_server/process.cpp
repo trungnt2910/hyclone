@@ -365,11 +365,26 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
         output = _root / std::filesystem::path(path).relative_path();
     }
 
-    if (traverseLink)
     {
         auto& vfsService = System::GetInstance().GetVfsService();
         auto lock = vfsService.Lock();
-        vfsService.RealPath(output);
+
+        if (traverseLink)
+        {
+            vfsService.RealPath(output);
+        }
+        else if (output.has_parent_path())
+        {
+            std::filesystem::path parentPath = output.parent_path();
+            vfsService.RealPath(parentPath);
+
+            output = parentPath / output.filename();
+        }
+    }
+
+    if (!output.has_filename())
+    {
+        output = output.parent_path();
     }
 
     if (!jailBroken)
@@ -399,11 +414,6 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
     }
 
     output = output.lexically_normal();
-
-    if (!output.has_filename())
-    {
-        output = output.parent_path();
-    }
 
     return B_OK;
 }
