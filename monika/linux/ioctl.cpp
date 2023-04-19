@@ -110,7 +110,7 @@ status_t _moni_ioctl(int fd, uint32 op, void* buffer, size_t length)
         }
         case HAIKU_TCXONC:
         {
-            int arg = *(int*)buffer;
+            int arg = (int)(intptr_t)buffer;
             int linuxArg;
             switch (arg)
             {
