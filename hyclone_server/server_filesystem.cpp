@@ -54,25 +54,25 @@ bool server_setup_filesystem()
 
 intptr_t server_hserver_call_read_fs_info(hserver_context& context, int deviceId, void* info)
 {
-    auto& system = System::GetInstance();
+    std::shared_ptr<VfsDevice> device;
 
     {
-        auto& vfsService = system.GetVfsService();
+        auto& vfsService = System::GetInstance().GetVfsService();
         auto lock = vfsService.Lock();
 
         auto device = vfsService.GetDevice(deviceId).lock();
+    }
 
-        if (!device)
-        {
-            return B_BAD_VALUE;
-        }
+    if (!device)
+    {
+        return B_BAD_VALUE;
+    }
 
-        auto procLock = context.process->Lock();
+    auto procLock = context.process->Lock();
 
-        if (context.process->WriteMemory(info, &device->GetInfo(), sizeof(haiku_fs_info)) != sizeof(haiku_fs_info))
-        {
-            return B_BAD_ADDRESS;
-        }
+    if (context.process->WriteMemory(info, &device->GetInfo(), sizeof(haiku_fs_info)) != sizeof(haiku_fs_info))
+    {
+        return B_BAD_ADDRESS;
     }
 
     return B_OK;
