@@ -85,7 +85,7 @@ struct hostcalls
 
     // Readdir
     void (*opendir)(int fd);
-    void (*closedir)(int fd);
+    bool (*closedir)(int fd);
     int (*readdir)(int fd, void* buffer, size_t bufferSize, int maxCount);
     void (*rewinddir)(int fd);
     void (*dupdir)(int oldFd, int newFd);

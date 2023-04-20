@@ -9,7 +9,7 @@
 // a directory fd may cause directory entries to be left behind.
 
 void loader_opendir(int fd);
-void loader_closedir(int fd);
+bool loader_closedir(int fd);
 int loader_readdir(int fd, void* buffer, size_t bufferSize, int maxCount);
 void loader_rewinddir(int fd);
 void loader_dupdir(int oldFd, int newFd);

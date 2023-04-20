@@ -548,14 +548,16 @@ int _moni_close(int fd)
         return HAIKU_POSIX_EBADF;
     }
 
-    int result = LINUX_SYSCALL1(__NR_close, fd);
-
-    if (result < 0)
+    if (!GET_HOSTCALLS()->closedir(fd))
     {
-        return LinuxToB(-result);
+        int result = LINUX_SYSCALL1(__NR_close, fd);
+
+        if (result < 0)
+        {
+            return LinuxToB(-result);
+        }
     }
 
-    GET_HOSTCALLS()->closedir(fd);
     GET_SERVERCALLS()->unregister_fd(fd);
 
     return B_OK;

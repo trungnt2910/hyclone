@@ -67,10 +67,10 @@ void loader_opendir(int fd)
     loader_opendir_unlocked(fd);
 }
 
-void loader_closedir(int fd)
+bool loader_closedir(int fd)
 {
     std::unique_lock<std::mutex> lock(sFdMapMutex);
-    sFdMap.erase(fd);
+    return sFdMap.erase(fd);
 }
 
 void loader_dupdir(int oldFd, int newFd)
