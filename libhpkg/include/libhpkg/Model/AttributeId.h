@@ -91,8 +91,8 @@ namespace LibHpkg::Model
         const char* const name;
         const AttributeType attributeType;
         
-        AttributeId(int code, const char* name, AttributeType attributeType)
-            : code(code), name(name), attributeType(attributeType)
+        AttributeId(int code_, const char* name_, AttributeType attributeType_)
+            : code(code_), name(name_), attributeType(attributeType_)
         {
             _values.push_back(*this);
         }

@@ -83,9 +83,9 @@ int loader_spawn_thread(void* arg)
     sched.sched_priority = attributes->priority;
     pthread_attr_setschedparam(&linux_thread_attributes, &sched);
 
-    std::atomic<int> thread_id = 0;
+    std::atomic<int> threadId = 0;
 
-    loader_trampoline_args args = {&thread_id, attributes};
+    loader_trampoline_args args = {&threadId, attributes};
 
     int result = pthread_create(&threadInfo.thread, &linux_thread_attributes, loader_pthread_entry_trampoline, &args);
 
@@ -96,18 +96,16 @@ int loader_spawn_thread(void* arg)
         return -result;
     }
 
-    thread_id.wait(0);
-
-    int thread_id_nonatomic = thread_id.load();
+    threadId.wait(0);
 
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
-        sHostPthreadObjects[thread_id_nonatomic] = threadInfo;
+        sHostPthreadObjects[threadId] = threadInfo;
     }
 
-    loader_debugger_thread_created(thread_id);
+    loader_debugger_thread_created(threadId);
 
-    return thread_id_nonatomic;
+    return threadId;
 }
 
 void loader_exit_thread(int retVal)
@@ -118,12 +116,12 @@ void loader_exit_thread(int retVal)
     pthread_exit((void*)(intptr_t)retVal);
 }
 
-int loader_wait_for_thread(int thread_id, int* retVal)
+int loader_wait_for_thread(int threadId, int* retVal)
 {
     ThreadInfo threadInfo;
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
-        auto it = sHostPthreadObjects.find(thread_id);
+        auto it = sHostPthreadObjects.find(threadId);
         if (it == sHostPthreadObjects.end())
         {
             return -ESRCH;
@@ -146,8 +144,8 @@ int loader_wait_for_thread(int thread_id, int* retVal)
     }
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
-        threadInfo = sHostPthreadObjects[thread_id];
-        sHostPthreadObjects.erase(thread_id);
+        threadInfo = sHostPthreadObjects[threadId];
+        sHostPthreadObjects.erase(threadId);
     }
     if (threadInfo.stack_address != NULL)
     {

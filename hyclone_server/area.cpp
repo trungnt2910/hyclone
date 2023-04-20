@@ -82,7 +82,7 @@ intptr_t server_hserver_call_register_area(hserver_context& context, void* user_
     return area->GetInfo().area;
 }
 
-intptr_t server_hserver_call_share_area(hserver_context& context, int area_id, intptr_t handle, size_t offset, char* path, size_t pathLen)
+intptr_t server_hserver_call_share_area(hserver_context& context, int areaId, intptr_t handle, size_t offset, char* path, size_t pathLen)
 {
     std::shared_ptr<Area> area;
 
@@ -90,9 +90,9 @@ intptr_t server_hserver_call_share_area(hserver_context& context, int area_id, i
 
     {
         auto lock = system.Lock();
-        if (system.IsValidAreaId(area_id))
+        if (system.IsValidAreaId(areaId))
         {
-            area = system.GetArea(area_id).lock();
+            area = system.GetArea(areaId).lock();
         }
     }
 
@@ -146,7 +146,7 @@ intptr_t server_hserver_call_share_area(hserver_context& context, int area_id, i
         size_t writeSize = std::min(pathStr.size() + 1, pathLen);
 
         {
-            auto lock = context.process->Lock();
+            auto procLock = context.process->Lock();
             if (context.process->WriteMemory(path, pathStr.c_str(), writeSize) != writeSize)
             {
                 std::filesystem::remove(pathStr);
@@ -166,16 +166,16 @@ intptr_t server_hserver_call_share_area(hserver_context& context, int area_id, i
     }
 }
 
-intptr_t server_hserver_call_get_shared_area_path(hserver_context& context, int area_id, char* user_path, size_t pathLen)
+intptr_t server_hserver_call_get_shared_area_path(hserver_context& context, int areaId, char* user_path, size_t pathLen)
 {
     std::shared_ptr<Area> area;
 
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
-        if (system.IsValidAreaId(area_id))
+        if (system.IsValidAreaId(areaId))
         {
-            area = system.GetArea(area_id).lock();
+            area = system.GetArea(areaId).lock();
         }
     }
 
@@ -211,16 +211,16 @@ intptr_t server_hserver_call_get_shared_area_path(hserver_context& context, int 
     return B_OK;
 }
 
-intptr_t server_hserver_call_transfer_area(hserver_context& context, int area_id, void** userAddress,
-    unsigned int addressSpec, int base_area_id, int target)
+intptr_t server_hserver_call_transfer_area(hserver_context& context, int areaId, void** userAddress,
+    unsigned int addressSpec, int baseAreaId, int target)
 {
     std::shared_ptr<Area> area;
     std::shared_ptr<Area> baseArea;
 
     {
         auto lock = context.process->Lock();
-        area = context.process->GetArea(area_id).lock();
-        baseArea = context.process->GetArea(base_area_id).lock();
+        area = context.process->GetArea(areaId).lock();
+        baseArea = context.process->GetArea(baseAreaId).lock();
     }
 
     if (!area)
@@ -278,7 +278,7 @@ intptr_t server_hserver_call_transfer_area(hserver_context& context, int area_id
                 std::make_shared<TransferAreaRequest>(
                     TransferAreaRequestArgs({
                         REQUEST_ID_transfer_area,
-                        area_id, base_area_id,
+                        areaId, baseAreaId,
                         addressSpec, address })));
         }
 
@@ -319,16 +319,16 @@ intptr_t server_hserver_call_transfer_area(hserver_context& context, int area_id
     return newArea->GetAreaId();
 }
 
-intptr_t server_hserver_call_get_area_info(hserver_context& context, int area_id, void* user_area_info)
+intptr_t server_hserver_call_get_area_info(hserver_context& context, int areaId, void* user_area_info)
 {
     std::shared_ptr<Area> area;
 
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
-        if (system.IsValidAreaId(area_id))
+        if (system.IsValidAreaId(areaId))
         {
-            area = system.GetArea(area_id).lock();
+            area = system.GetArea(areaId).lock();
         }
     }
 
@@ -418,16 +418,16 @@ intptr_t server_hserver_call_get_next_area_info(hserver_context& context, int ta
     return B_OK;
 }
 
-intptr_t server_hserver_call_unregister_area(hserver_context& context, int area_id)
+intptr_t server_hserver_call_unregister_area(hserver_context& context, int areaId)
 {
     {
         auto lock = context.process->Lock();
-        if (context.process->IsValidAreaId(area_id))
+        if (context.process->IsValidAreaId(areaId))
         {
-            context.process->UnregisterArea(area_id);
+            context.process->UnregisterArea(areaId);
             auto& system = System::GetInstance();
             auto sysLock = system.Lock();
-            system.UnregisterArea(area_id);
+            system.UnregisterArea(areaId);
         }
         else
         {
@@ -438,11 +438,11 @@ intptr_t server_hserver_call_unregister_area(hserver_context& context, int area_
     return B_OK;
 }
 
-intptr_t server_hserver_call_resize_area(hserver_context& context, int area_id, size_t size)
+intptr_t server_hserver_call_resize_area(hserver_context& context, int areaId, size_t size)
 {
     {
         auto lock = context.process->Lock();
-        auto area = context.process->GetArea(area_id).lock();
+        auto area = context.process->GetArea(areaId).lock();
         if (!area)
         {
             return B_BAD_VALUE;
@@ -453,11 +453,11 @@ intptr_t server_hserver_call_resize_area(hserver_context& context, int area_id, 
     return B_OK;
 }
 
-intptr_t server_hserver_call_set_area_protection(hserver_context& context, int area_id, unsigned int protection)
+intptr_t server_hserver_call_set_area_protection(hserver_context& context, int areaId, unsigned int protection)
 {
     {
         auto lock = context.process->Lock();
-        auto area = context.process->GetArea(area_id).lock();
+        auto area = context.process->GetArea(areaId).lock();
         if (!area)
         {
             return B_BAD_VALUE;
@@ -662,10 +662,10 @@ intptr_t server_hserver_call_unmap_memory(hserver_context& context, void* addres
         {
             auto& system = System::GetInstance();
             auto sysLock = system.Lock();
-            for (auto id : idsToUnregister)
+            for (auto unregisterId : idsToUnregister)
             {
-                context.process->UnregisterArea(id);
-                system.UnregisterArea(id);
+                context.process->UnregisterArea(unregisterId);
+                system.UnregisterArea(unregisterId);
             }
         }
     }

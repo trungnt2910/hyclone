@@ -301,7 +301,7 @@ intptr_t server_hserver_call_register_thread_info(hserver_context& context, void
     return B_OK;
 }
 
-intptr_t server_hserver_call_get_thread_info(hserver_context& context, int thread_id, void* userThreadInfo)
+intptr_t server_hserver_call_get_thread_info(hserver_context& context, int threadId, void* userThreadInfo)
 {
     auto& system = System::GetInstance();
 
@@ -309,7 +309,7 @@ intptr_t server_hserver_call_get_thread_info(hserver_context& context, int threa
 
     {
         auto lock = system.Lock();
-        thread = system.GetThread(thread_id).lock();
+        thread = system.GetThread(threadId).lock();
     }
 
     if (!thread)
@@ -412,7 +412,7 @@ intptr_t server_hserver_call_get_next_thread_info(hserver_context& context, int 
     return thread ? B_OK : B_BAD_VALUE;
 }
 
-intptr_t server_hserver_call_rename_thread(hserver_context& context, int thread_id, const char* userNewName, size_t len)
+intptr_t server_hserver_call_rename_thread(hserver_context& context, int threadId, const char* userNewName, size_t len)
 {
     auto& system = System::GetInstance();
 
@@ -420,7 +420,7 @@ intptr_t server_hserver_call_rename_thread(hserver_context& context, int thread_
 
     {
         auto lock = system.Lock();
-        thread = system.GetThread(thread_id).lock();
+        thread = system.GetThread(threadId).lock();
     }
 
     if (!thread)
@@ -444,7 +444,7 @@ intptr_t server_hserver_call_rename_thread(hserver_context& context, int thread_
     return B_OK;
 }
 
-intptr_t server_hserver_call_set_thread_priority(hserver_context& context, int thread_id, int newPriority)
+intptr_t server_hserver_call_set_thread_priority(hserver_context& context, int threadId, int newPriority)
 {
     auto& system = System::GetInstance();
 
@@ -452,7 +452,7 @@ intptr_t server_hserver_call_set_thread_priority(hserver_context& context, int t
 
     {
         auto lock = system.Lock();
-        thread = system.GetThread(thread_id).lock();
+        thread = system.GetThread(threadId).lock();
     }
 
     if (!thread)
@@ -481,7 +481,7 @@ intptr_t server_hserver_call_set_thread_priority(hserver_context& context, int t
         policy = SCHED_RR;
     }
 
-    if (sched_setscheduler(thread_id, policy, &param) == -1)
+    if (sched_setscheduler(threadId, policy, &param) == -1)
     {
         return B_NOT_ALLOWED;
     }
@@ -491,7 +491,7 @@ intptr_t server_hserver_call_set_thread_priority(hserver_context& context, int t
     return B_OK;
 }
 
-intptr_t server_hserver_call_suspend_thread(hserver_context& context, int thread_id)
+intptr_t server_hserver_call_suspend_thread(hserver_context& context, int threadId)
 {
     auto& system = System::GetInstance();
 
@@ -499,7 +499,7 @@ intptr_t server_hserver_call_suspend_thread(hserver_context& context, int thread
 
     {
         auto lock = system.Lock();
-        thread = system.GetThread(thread_id).lock();
+        thread = system.GetThread(threadId).lock();
     }
 
     if (!thread)
@@ -513,9 +513,9 @@ intptr_t server_hserver_call_suspend_thread(hserver_context& context, int thread
     // When we support suspending other threads, this call should issue a "request" to the target
     // thread. In the request handler, that target thread should also call wait_for_resume when it
     // is ready.
-    if (thread_id != context.tid)
+    if (threadId != context.tid)
     {
-        std::cerr << "suspend_thread: " << context.pid << " " << context.tid << " " << thread_id << std::endl;
+        std::cerr << "suspend_thread: " << context.pid << " " << context.tid << " " << threadId << std::endl;
         std::cerr << "Suspending another thread is currently not supported in HyClone." << std::endl;
         return HAIKU_POSIX_ENOSYS;
     }
@@ -525,7 +525,7 @@ intptr_t server_hserver_call_suspend_thread(hserver_context& context, int thread
     return B_OK;
 }
 
-intptr_t server_hserver_call_resume_thread(hserver_context& context, int thread_id)
+intptr_t server_hserver_call_resume_thread(hserver_context& context, int threadId)
 {
     auto& system = System::GetInstance();
 
@@ -533,7 +533,7 @@ intptr_t server_hserver_call_resume_thread(hserver_context& context, int thread_
 
     {
         auto lock = system.Lock();
-        thread = system.GetThread(thread_id).lock();
+        thread = system.GetThread(threadId).lock();
     }
 
     if (!thread)
@@ -567,14 +567,14 @@ intptr_t server_hserver_call_block_thread(hserver_context& context, int flags, u
     return context.thread->Block(lock, flags, timeout);
 }
 
-intptr_t server_hserver_call_unblock_thread(hserver_context& context, int thread_id, int status)
+intptr_t server_hserver_call_unblock_thread(hserver_context& context, int threadId, int status)
 {
     std::shared_ptr<Thread> thread;
 
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
-        thread = system.GetThread(thread_id).lock();
+        thread = system.GetThread(threadId).lock();
     }
 
     if (!thread)
@@ -588,14 +588,14 @@ intptr_t server_hserver_call_unblock_thread(hserver_context& context, int thread
     }
 }
 
-intptr_t server_hserver_call_send_data(hserver_context& context, int thread_id, int code, const void* data, size_t len)
+intptr_t server_hserver_call_send_data(hserver_context& context, int threadId, int code, const void* data, size_t len)
 {
     std::shared_ptr<Thread> thread;
 
     {
         auto& system = System::GetInstance();
         auto lock = system.Lock();
-        thread = system.GetThread(thread_id).lock();
+        thread = system.GetThread(threadId).lock();
     }
 
     if (!thread)

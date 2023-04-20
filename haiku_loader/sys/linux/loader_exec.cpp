@@ -148,19 +148,19 @@ int loader_exec(const char* path, const char* const* flatArgs, size_t flatArgsSi
             argv = (const char **)flatArgs;
         }
 
-        int envc = 0;
-        while (flatArgs[argc + 1 + envc])
+        int hostEnvc = 0;
+        while (flatArgs[argc + 1 + hostEnvc])
         {
-            ++envc;
+            ++hostEnvc;
         }
 
-        const char** envp = new const char*[envc + 1];
-        std::copy(flatArgs + argc + 1, flatArgs + argc + 1 + envc, envp);
-        envp[envc] = NULL;
+        const char** envp = new const char*[hostEnvc + 1];
+        std::copy(flatArgs + argc + 1, flatArgs + argc + 1 + hostEnvc, envp);
+        envp[hostEnvc] = NULL;
 
         std::string hostPathEnv = "PATH=";
 
-        for (int i = 0; i < envc; ++i)
+        for (int i = 0; i < hostEnvc; ++i)
         {
             if (strncmp(envp[i], "PATH=", 5) == 0)
             {

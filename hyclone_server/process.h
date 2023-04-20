@@ -52,19 +52,19 @@ public:
     size_t UnregisterThread(int tid);
 
     int RegisterImage(const haiku_extended_image_info& image);
-    haiku_extended_image_info& GetImage(int image_id);
-    int NextImageId(int image_id);
-    bool IsValidImageId(int image_id);
-    size_t UnregisterImage(int image_id);
+    haiku_extended_image_info& GetImage(int imageId);
+    int NextImageId(int imageId);
+    bool IsValidImageId(int imageId);
+    size_t UnregisterImage(int imageId);
     void ClearImages() { _images.Clear(); }
 
     std::weak_ptr<Area> RegisterArea(const std::shared_ptr<Area>& area);
-    std::weak_ptr<Area> GetArea(int area_id);
+    std::weak_ptr<Area> GetArea(int areaId);
     int GetAreaIdFor(void* address);
     int GetNextAreaIdFor(void* address);
-    int NextAreaId(int area_id);
-    bool IsValidAreaId(int area_id);
-    size_t UnregisterArea(int area_id);
+    int NextAreaId(int areaId);
+    bool IsValidAreaId(int areaId);
+    size_t UnregisterArea(int areaId);
     void ClearAreas() { _areas.clear(); }
 
     size_t RegisterFd(int fd, const std::filesystem::path& path);

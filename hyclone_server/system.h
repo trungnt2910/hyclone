@@ -31,8 +31,8 @@ struct Connection
     int tid;
     bool isPrimary;
 
-    Connection(int pid, int tid, bool isPrimary = true)
-        : pid(pid), tid(tid), isPrimary(isPrimary) { }
+    Connection(int pid_, int tid_, bool isPrimary_ = true)
+        : pid(pid_), tid(tid_), isPrimary(isPrimary_) { }
 };
 
 class System

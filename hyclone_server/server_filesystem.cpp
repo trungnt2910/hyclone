@@ -356,7 +356,7 @@ intptr_t server_hserver_call_transform_dirent(hserver_context& context, int fd, 
     std::vector<char> buffer(userEntrySize);
     haiku_dirent* entry = (haiku_dirent*)buffer.data();
 
-    auto lock = context.process->Lock();
+    auto procLock = context.process->Lock();
 
     if (context.process->ReadMemory(userEntry, entry, userEntrySize) != userEntrySize)
     {
@@ -370,7 +370,7 @@ intptr_t server_hserver_call_transform_dirent(hserver_context& context, int fd, 
 
     const auto& requestPath = context.process->GetFd(fd);
 
-    lock.unlock();
+    procLock.unlock();
 
     status_t status;
 
@@ -385,13 +385,10 @@ intptr_t server_hserver_call_transform_dirent(hserver_context& context, int fd, 
         return status;
     }
 
+    procLock.lock();
+    if (context.process->WriteMemory(userEntry, entry, status) != (size_t)status)
     {
-        auto lock = context.process->Lock();
-
-        if (context.process->WriteMemory(userEntry, entry, status) != (size_t)status)
-        {
-            return B_BAD_ADDRESS;
-        }
+        return B_BAD_ADDRESS;
     }
 
     return status;

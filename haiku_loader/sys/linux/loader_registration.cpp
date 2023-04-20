@@ -83,8 +83,10 @@ bool loader_register_builtin_areas(user_space_program_args* args, void* commpage
 
     areaInfo.protection = B_READ_AREA | B_WRITE_AREA | B_STACK_AREA;
     areaInfo.lock = 0;
-    std::string areaName = std::filesystem::path(*args->args).filename().string() + "_" + std::to_string(getpid()) + "_stack";
-    strncpy(areaInfo.name, areaName.c_str(), sizeof(areaInfo.name));
+    {
+        std::string areaName = std::filesystem::path(*args->args).filename().string() + "_" + std::to_string(getpid()) + "_stack";
+        strncpy(areaInfo.name, areaName.c_str(), sizeof(areaInfo.name));
+    }
     if (loader_hserver_call_register_area(&areaInfo, REGION_PRIVATE_MAP) < 0)
         return false;
 
@@ -176,7 +178,7 @@ bool loader_register_existing_fds()
     if (dirfd < 0)
         return false;
 
-    std::shared_ptr<DIR> dir(fdopendir(dirfd), [](DIR* dir) { closedir(dir); });
+    std::shared_ptr<DIR> dir(fdopendir(dirfd), [](DIR* d) { closedir(d); });
 
     if (!dir)
         return false;

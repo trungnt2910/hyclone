@@ -79,24 +79,24 @@ int Process::RegisterImage(const haiku_extended_image_info& image)
     return id;
 }
 
-haiku_extended_image_info& Process::GetImage(int image_id)
+haiku_extended_image_info& Process::GetImage(int imageId)
 {
-    return _images.Get(image_id);
+    return _images.Get(imageId);
 }
 
-int Process::NextImageId(int image_id)
+int Process::NextImageId(int imageId)
 {
-    return _images.NextId(image_id);
+    return _images.NextId(imageId);
 }
 
-bool Process::IsValidImageId(int image_id)
+bool Process::IsValidImageId(int imageId)
 {
-    return _images.IsValidId(image_id);
+    return _images.IsValidId(imageId);
 }
 
-size_t Process::UnregisterImage(int image_id)
+size_t Process::UnregisterImage(int imageId)
 {
-    _images.Remove(image_id);
+    _images.Remove(imageId);
     _info.image_count = _images.size();
     return _images.Size();
 }
@@ -106,9 +106,9 @@ std::weak_ptr<Area> Process::RegisterArea(const std::shared_ptr<Area>& area)
     return _areas[area->GetAreaId()] = area;
 }
 
-std::weak_ptr<Area> Process::GetArea(int area_id)
+std::weak_ptr<Area> Process::GetArea(int areaId)
 {
-    auto it = _areas.find(area_id);
+    auto it = _areas.find(areaId);
     if (it == _areas.end())
         return std::weak_ptr<Area>();
     return it->second;
@@ -144,22 +144,22 @@ int Process::GetNextAreaIdFor(void* address)
     return id;
 }
 
-int Process::NextAreaId(int area_id)
+int Process::NextAreaId(int areaId)
 {
-    auto it = _areas.upper_bound(area_id);
+    auto it = _areas.upper_bound(areaId);
     if (it == _areas.end())
         return -1;
     return it->first;
 }
 
-bool Process::IsValidAreaId(int area_id)
+bool Process::IsValidAreaId(int areaId)
 {
-    return _areas.contains(area_id);
+    return _areas.contains(areaId);
 }
 
-size_t Process::UnregisterArea(int area_id)
+size_t Process::UnregisterArea(int areaId)
 {
-    _areas.erase(area_id);
+    _areas.erase(areaId);
     _info.area_count = _areas.size();
     return _areas.size();
 }
@@ -754,11 +754,11 @@ intptr_t server_hserver_call_get_root(hserver_context& context, char* userPath, 
     return B_OK;
 }
 
-intptr_t server_hserver_call_get_team_info(hserver_context& context, int team_id, void* userTeamInfo)
+intptr_t server_hserver_call_get_team_info(hserver_context& context, int teamId, void* userTeamInfo)
 {
     haiku_team_info info;
 
-    if (team_id == B_SYSTEM_TEAM)
+    if (teamId == B_SYSTEM_TEAM)
     {
         memset(&info, 0, sizeof(info));
         info.debugger_nub_thread = -1;
@@ -769,7 +769,7 @@ intptr_t server_hserver_call_get_team_info(hserver_context& context, int team_id
     {
         std::shared_ptr<Process> process;
 
-        if (team_id == B_CURRENT_TEAM)
+        if (teamId == B_CURRENT_TEAM)
         {
             process = context.process;
         }
@@ -777,7 +777,7 @@ intptr_t server_hserver_call_get_team_info(hserver_context& context, int team_id
         {
             auto& system = System::GetInstance();
             auto lock = system.Lock();
-            process = system.GetProcess(team_id).lock();
+            process = system.GetProcess(teamId).lock();
         }
 
         if (!process)

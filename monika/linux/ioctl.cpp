@@ -62,22 +62,22 @@ status_t _moni_ioctl(int fd, uint32 op, void* buffer, size_t length)
             // struct termio and struct termios are basically the same.
             // Haiku does not support struct termio but does not support TCGETS.
             // Using TCGETA on WSL1 returns ENOTTY, so we use TCGETS instead.
-            linux_termios linux_termios;
-            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCGETS, &linux_termios);
+            linux_termios linuxTermios;
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCGETS, &linuxTermios);
             if (result < 0)
             {
                 return LinuxToB(-result);
             }
-            struct haiku_termios* haiku_termios = (struct haiku_termios*)buffer;
-            TermiosLinuxToB(linux_termios, *haiku_termios);
+            struct haiku_termios* haikuTermios = (struct haiku_termios*)buffer;
+            TermiosLinuxToB(linuxTermios, *haikuTermios);
             return B_OK;
         }
         case HAIKU_TCSETA:
         {
-            const struct haiku_termios* haiku_termios = (const struct haiku_termios*)buffer;
-            linux_termios linux_termios;
-            TermiosBToLinux(*haiku_termios, linux_termios);
-            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCSETS, &linux_termios);
+            const struct haiku_termios* haikuTermios = (const struct haiku_termios*)buffer;
+            linux_termios linuxTermios;
+            TermiosBToLinux(*haikuTermios, linuxTermios);
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCSETS, &linuxTermios);
             if (result < 0)
             {
                 return LinuxToB(-result);
@@ -86,10 +86,10 @@ status_t _moni_ioctl(int fd, uint32 op, void* buffer, size_t length)
         }
         case HAIKU_TCSETAW:
         {
-            const struct haiku_termios* haiku_termios = (const struct haiku_termios*)buffer;
-            linux_termios linux_termios;
-            TermiosBToLinux(*haiku_termios, linux_termios);
-            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCSETSW, &linux_termios);
+            const struct haiku_termios* haikuTermios = (const struct haiku_termios*)buffer;
+            linux_termios linuxTermios;
+            TermiosBToLinux(*haikuTermios, linuxTermios);
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCSETSW, &linuxTermios);
             if (result < 0)
             {
                 return LinuxToB(-result);
@@ -98,10 +98,10 @@ status_t _moni_ioctl(int fd, uint32 op, void* buffer, size_t length)
         }
         case HAIKU_TCSETAF:
         {
-            const struct haiku_termios* haiku_termios = (const struct haiku_termios*)buffer;
-            linux_termios linux_termios;
-            TermiosBToLinux(*haiku_termios, linux_termios);
-            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCSETSF, &linux_termios);
+            const struct haiku_termios* haikuTermios = (const struct haiku_termios*)buffer;
+            linux_termios linuxTermios;
+            TermiosBToLinux(*haikuTermios, linuxTermios);
+            int result = LINUX_SYSCALL3(__NR_ioctl, fd, TCSETSF, &linuxTermios);
             if (result < 0)
             {
                 return LinuxToB(-result);

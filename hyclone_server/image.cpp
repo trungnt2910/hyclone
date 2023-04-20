@@ -84,14 +84,14 @@ intptr_t server_hserver_call_get_next_image_info(hserver_context& context,
         return B_BAD_VALUE;
     }
 
-    int image_id;
+    int imageId;
 
-    if (context.process->ReadMemory(user_cookie, &image_id, sizeof(image_id)) != sizeof(image_id))
+    if (context.process->ReadMemory(user_cookie, &imageId, sizeof(imageId)) != sizeof(imageId))
     {
         return B_BAD_ADDRESS;
     }
 
-    if (image_id < 0)
+    if (imageId < 0)
     {
         return B_BAD_VALUE;
     }
@@ -100,17 +100,17 @@ intptr_t server_hserver_call_get_next_image_info(hserver_context& context,
 
     {
         auto lock = targetProcess->Lock();
-        if (!targetProcess->IsValidImageId(image_id))
+        if (!targetProcess->IsValidImageId(imageId))
         {
-            image_id = targetProcess->NextImageId(image_id);
+            imageId = targetProcess->NextImageId(imageId);
         }
         // It may pass the end.
-        if (image_id < 0)
+        if (imageId < 0)
         {
             return B_BAD_VALUE;
         }
-        info = targetProcess->GetImage(image_id).basic_info;
-        image_id = targetProcess->NextImageId(image_id);
+        info = targetProcess->GetImage(imageId).basic_info;
+        imageId = targetProcess->NextImageId(imageId);
     }
 
     if (context.process->WriteMemory(user_image_info, &info, sizeof(info)) != sizeof(info))
@@ -118,7 +118,7 @@ intptr_t server_hserver_call_get_next_image_info(hserver_context& context,
         return B_BAD_ADDRESS;
     }
 
-    if (context.process->WriteMemory(user_cookie, &image_id, sizeof(image_id)) != sizeof(image_id))
+    if (context.process->WriteMemory(user_cookie, &imageId, sizeof(imageId)) != sizeof(imageId))
     {
         return B_BAD_ADDRESS;
     }
@@ -127,20 +127,20 @@ intptr_t server_hserver_call_get_next_image_info(hserver_context& context,
     return B_OK;
 }
 
-intptr_t server_hserver_call_unregister_image(hserver_context& context, int image_id)
+intptr_t server_hserver_call_unregister_image(hserver_context& context, int imageId)
 {
     auto lock = context.process->Lock();
-    context.process->UnregisterImage(image_id);
+    context.process->UnregisterImage(imageId);
     return B_OK;
 }
 
-intptr_t server_hserver_call_image_relocated(hserver_context& context, int image_id)
+intptr_t server_hserver_call_image_relocated(hserver_context& context, int imageId)
 {
     const haiku_extended_image_info* imageInfo;
 
     {
         auto lock = context.process->Lock();
-        imageInfo = &context.process->GetImage(image_id);
+        imageInfo = &context.process->GetImage(imageId);
     }
 
     if (imageInfo->basic_info.type == B_APP_IMAGE)

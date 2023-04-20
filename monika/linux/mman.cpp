@@ -124,25 +124,25 @@ int32_t _moni_create_area(const char *name, void **address,
     info.in_count = 0;
     info.out_count = 0;
 
-    int area_id = GET_SERVERCALLS()->register_area(&info, REGION_PRIVATE_MAP);
+    int areaId = GET_SERVERCALLS()->register_area(&info, REGION_PRIVATE_MAP);
 
-    if (area_id < 0)
+    if (areaId < 0)
     {
         LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
         // This is actually an error code returned by the server.
-        return area_id;
+        return areaId;
     }
 
     if (protection & B_CLONEABLE_AREA)
     {
         char hostPath[PATH_MAX];
-        result = ShareArea(mappedAddr, size, area_id,
+        result = ShareArea(mappedAddr, size, areaId,
             -1, 0, hostPath,
             mmap_flags, mmap_prot, open_flags);
 
         if (result != B_OK)
         {
-            GET_SERVERCALLS()->unregister_area(area_id);
+            GET_SERVERCALLS()->unregister_area(areaId);
             LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
             return result;
         }
@@ -152,13 +152,13 @@ int32_t _moni_create_area(const char *name, void **address,
 
     if (result != B_OK)
     {
-        GET_SERVERCALLS()->unregister_area(area_id);
+        GET_SERVERCALLS()->unregister_area(areaId);
         LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
         return result;
     }
 
     *address = mappedAddr;
-    return area_id;
+    return areaId;
 }
 
 area_id MONIKA_EXPORT _moni_clone_area(const char *name, void **address,
@@ -249,25 +249,25 @@ area_id MONIKA_EXPORT _moni_clone_area(const char *name, void **address,
     info.in_count = 0;
     info.out_count = 0;
 
-    int area_id = GET_SERVERCALLS()->register_area(&info, REGION_PRIVATE_MAP);
+    int areaId = GET_SERVERCALLS()->register_area(&info, REGION_PRIVATE_MAP);
 
-    if (area_id < 0)
+    if (areaId < 0)
     {
         LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
         LINUX_SYSCALL1(__NR_close, fd);
         // This is actually an error code returned by the server.
-        return area_id;
+        return areaId;
     }
 
     if (protection & B_CLONEABLE_AREA)
     {
-        status = ShareArea(mappedAddr, size, area_id,
+        status = ShareArea(mappedAddr, size, areaId,
             fd, 0, hostPath,
             mmap_flags, mmap_prot, open_flags);
 
         if (status != B_OK)
         {
-            GET_SERVERCALLS()->unregister_area(area_id);
+            GET_SERVERCALLS()->unregister_area(areaId);
             LINUX_SYSCALL2(__NR_munmap, mappedAddr, info.size);
             LINUX_SYSCALL1(__NR_close, fd);
             return status;
@@ -280,13 +280,13 @@ area_id MONIKA_EXPORT _moni_clone_area(const char *name, void **address,
 
     if (status != B_OK)
     {
-        GET_SERVERCALLS()->unregister_area(area_id);
+        GET_SERVERCALLS()->unregister_area(areaId);
         LINUX_SYSCALL2(__NR_munmap, mappedAddr, info.size);
         return LinuxToB(-status);
     }
 
     *address = mappedAddr;
-    return area_id;
+    return areaId;
 }
 
 int _moni_delete_area(int area)
@@ -823,31 +823,31 @@ int _moni_map_file(const char *name, void **address,
 
     // TODO: What happens when B_EXACT_ADDRESS is specified and
     // the mapped area collides with an existing one?
-    int area_id = GET_SERVERCALLS()->register_area(&info, mapping);
+    int areaId = GET_SERVERCALLS()->register_area(&info, mapping);
 
-    if (area_id < 0)
+    if (areaId < 0)
     {
         LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
-        return area_id;
+        return areaId;
     }
 
     if (protection & B_CLONEABLE_AREA || mapping == REGION_NO_PRIVATE_MAP)
     {
         char hostPath[PATH_MAX];
-        result = ShareArea(mappedAddr, size, area_id,
+        result = ShareArea(mappedAddr, size, areaId,
             fd, offset, hostPath,
             mmap_flags, mmap_prot, open_flags);
 
         if (result != B_OK)
         {
-            GET_SERVERCALLS()->unregister_area(area_id);
+            GET_SERVERCALLS()->unregister_area(areaId);
             LINUX_SYSCALL2(__NR_munmap, mappedAddr, size);
             return result;
         }
     }
 
     *address = mappedAddr;
-    return area_id;
+    return areaId;
 }
 
 int _moni_resize_area(int32_t area, size_t newSize)
@@ -1135,11 +1135,11 @@ int ProcessMmapResult(void* result, uint32 addressSpec, void* hintAddr, void* ba
     return B_OK;
 }
 
-int ShareArea(void* mappedAddr, size_t size, int area_id,
+int ShareArea(void* mappedAddr, size_t size, int areaId,
     int fd, off_t offset, char hostPath[PATH_MAX],
     int mmap_flags, int mmap_prot, int open_flags)
 {
-    long status = GET_SERVERCALLS()->share_area(area_id, fd, offset, hostPath, PATH_MAX);
+    long status = GET_SERVERCALLS()->share_area(areaId, fd, offset, hostPath, PATH_MAX);
 
     if (status != B_OK)
     {

@@ -20,8 +20,8 @@ namespace LibHpkg::Heap
         size_t offset;
         size_t length;
     public:
-        HeapCoordinates(size_t offset, size_t length) 
-            : offset(offset), length(length)
+        HeapCoordinates(size_t offset_, size_t length_) 
+            : offset(offset_), length(length_)
         {
             assert(offset >= 0 && offset < INT_MAX);
             assert(length >= 0 && length < INT_MAX);

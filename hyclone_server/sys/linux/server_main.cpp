@@ -85,10 +85,10 @@ int server_main(int argc, char **argv)
     if (pid == 0)
     {
         std::cerr << "Starting launch_daemon" << std::endl;
-        const char* argv[] = {haikuLoaderPath.c_str(), "/boot/system/servers/launch_daemon", NULL};
+        const char* childArgv[] = {haikuLoaderPath.c_str(), "/boot/system/servers/launch_daemon", NULL};
         close(pipefd[0]);
         fcntl(pipefd[1], F_SETFD, FD_CLOEXEC);
-        execv(haikuLoaderPath.c_str(), (char* const*)argv);
+        execv(haikuLoaderPath.c_str(), (char* const*)childArgv);
         perror("execve");
         return 1;
     }
@@ -165,13 +165,15 @@ int server_main(int argc, char **argv)
                 }
                 // std::cerr << "received servercall: " + std::to_string(buffer[0]) << std::endl;
 
-                const auto dispatch = [](int fd, std::unique_ptr<intptr_t[]> buffer)
+                const auto dispatch = [](int dispatchFd, std::unique_ptr<intptr_t[]> dispatchBuffer)
                 {
                     intptr_t returnValue =
-                        server_dispatch(fd,
-                            buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6]);
+                        server_dispatch(dispatchFd,
+                            dispatchBuffer[0], dispatchBuffer[1], dispatchBuffer[2],
+                            dispatchBuffer[3], dispatchBuffer[4], dispatchBuffer[5],
+                            dispatchBuffer[6]);
 
-                    write(fd, &returnValue, sizeof(returnValue));
+                    write(dispatchFd, &returnValue, sizeof(returnValue));
                 };
 
                 server_worker_run(dispatch, fd, std::move(buffer));

@@ -115,11 +115,11 @@ int System::RegisterPort(std::shared_ptr<Port>&& port)
     return id;
 }
 
-std::weak_ptr<Port> System::GetPort(int port_id)
+std::weak_ptr<Port> System::GetPort(int portId)
 {
-    if (_ports.IsValidId(port_id))
+    if (_ports.IsValidId(portId))
     {
-        return _ports.Get(port_id);
+        return _ports.Get(portId);
     }
     return std::weak_ptr<Port>();
 }
@@ -134,13 +134,13 @@ int System::FindPort(const std::string& portName)
     return -1;
 }
 
-size_t System::UnregisterPort(int port_id)
+size_t System::UnregisterPort(int portId)
 {
-    std::shared_ptr<Port> port = _ports.Get(port_id);
+    std::shared_ptr<Port> port = _ports.Get(portId);
     if (port)
     {
         _portNames.erase(port->GetName());
-        _ports.Remove(port_id);
+        _ports.Remove(portId);
         port->_registered = false;
         port->_readCondVar.notify_all();
         port->_writeCondVar.notify_all();

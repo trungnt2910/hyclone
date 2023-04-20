@@ -54,15 +54,15 @@ size_t loader_system_timezone(int* offset, char* buffer, size_t buffer_size)
     // Method 2: /etc/localtime
     if (timezoneName.empty())
     {
-        char buffer[PATH_MAX];
-        ssize_t count = readlink("/etc/localtime", buffer, PATH_MAX);
+        char linkContents[PATH_MAX];
+        ssize_t count = readlink("/etc/localtime", linkContents, PATH_MAX);
 
         if (count > 0)
         {
-            buffer[count] = '\0';
-            if (count > 1 && buffer[count - 1] == '/')
+            linkContents[count] = '\0';
+            if (count > 1 && linkContents[count - 1] == '/')
             {
-                buffer[count - 1] = '\0';
+                linkContents[count - 1] = '\0';
                 --count;
             }
             size_t begin = count;
@@ -70,13 +70,13 @@ size_t loader_system_timezone(int* offset, char* buffer, size_t buffer_size)
             while (slashCount < 2 && begin >= 0)
             {
                 --begin;
-                if (buffer[begin] == '/')
+                if (linkContents[begin] == '/')
                 {
                     ++slashCount;
                 }
             }
             ++begin;
-            timezoneName = std::string(buffer + begin);
+            timezoneName = std::string(linkContents + begin);
         }
     }
 

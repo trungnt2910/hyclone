@@ -19,8 +19,8 @@ namespace LibHpkg::Model
         const AttributeId attributeId;
         std::vector<std::shared_ptr<Attribute>> childAttributes;
     public:
-        Attribute(const AttributeId& attributeId)
-            : attributeId(attributeId)
+        Attribute(const AttributeId& attributeId_)
+            : attributeId(attributeId_)
         {
         }
 

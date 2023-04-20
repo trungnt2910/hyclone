@@ -49,7 +49,9 @@ target_compile_definitions(monika_obj PRIVATE
     -DHYCLONE_MONIKA)
 
 target_compile_options(monika_obj PRIVATE
-    -Werror -Wall -Wno-multichar -Werror=return-type
+    -Werror -Wall
+    -Wno-multichar
+    -Werror=return-type -Werror=shadow
     -fno-stack-protector
     -fno-exceptions
     -fvisibility=hidden
