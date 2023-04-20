@@ -58,7 +58,7 @@ intptr_t server_hserver_call_read_fs_info(hserver_context& context, int deviceId
         auto& vfsService = System::GetInstance().GetVfsService();
         auto lock = vfsService.Lock();
 
-        auto device = vfsService.GetDevice(deviceId).lock();
+        device = vfsService.GetDevice(deviceId).lock();
     }
 
     if (!device)
