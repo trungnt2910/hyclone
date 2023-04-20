@@ -204,7 +204,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         server_replace_libroot(librootPath);
     }
 
-    std::cerr << "Done extracting packagefs." << std::endl;
+    std::cerr << "Done extracting packagefs at " << _root << std::endl;
 
     _CleanupAttributes();
 
@@ -719,7 +719,7 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                 server_replace_libroot(librootPath);
             }
 
-            std::cerr << "Done updating packagefs." << std::endl;
+            std::cerr << "Done updating packagefs at " << _root << std::endl;
 
             _CleanupAttributes();
 
