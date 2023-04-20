@@ -143,7 +143,7 @@ void server_fill_team_info(haiku_team_info* info)
         memcpy(info->args, args.c_str(), std::min(sizeof(info->args), args.size() + 1));
     }
 
-    if (info->uid == -1)
+    if (info->uid == (haiku_uid_t)-1)
     {
         struct stat st;
         if (stat(("/proc/" + std::to_string(info->team)).c_str(), &st) != -1)

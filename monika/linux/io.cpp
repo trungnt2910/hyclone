@@ -121,7 +121,6 @@ static void FdSetLinuxToB(const fd_set& linuxFdSet, haiku_fd_set& fdSet);
 static int PollEventsBToLinux(int pollEvents);
 static int PollEventsLinuxToB(int pollEvents);
 static int FlockFlagsBToLinux(int flockFlags);
-static bool IsTty(int fd);
 
 extern "C"
 {
@@ -615,7 +614,7 @@ int _moni_access(int fd, const char* path, int mode, bool effectiveUserGroup)
                 return B_OK;
             }
 
-            int euid = LINUX_SYSCALL0(__NR_geteuid);
+            uid_t euid = (uid_t)LINUX_SYSCALL0(__NR_geteuid);
 
             // root can read and write any file, and execute any file that anyone can execute.
             if (euid == 0 && ((linuxMode & X_OK) == 0 || (linuxstat.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))))
@@ -1029,7 +1028,7 @@ ssize_t _moni_poll(struct haiku_pollfd *fds, int numFDs,
         (struct pollfd *)
             LINUX_SYSCALL6(__NR_mmap, NULL, memSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
-    for (size_t i = 0; i < numFDs; ++i)
+    for (int i = 0; i < numFDs; ++i)
     {
         linuxFds[i].fd = fds[i].fd;
         linuxFds[i].events = PollEventsBToLinux(fds[i].events);
@@ -1056,7 +1055,7 @@ ssize_t _moni_poll(struct haiku_pollfd *fds, int numFDs,
         return LinuxToB(-status);
     }
 
-    for (size_t i = 0; i < numFDs; ++i)
+    for (int i = 0; i < numFDs; ++i)
     {
         fds[i].revents = PollEventsLinuxToB(linuxFds[i].revents);
     }
@@ -1497,16 +1496,6 @@ void FdSetLinuxToB(const fd_set& linuxSet, struct haiku_fd_set& set)
             HAIKU_FD_SET(i, &set);
         }
     }
-}
-
-bool IsTty(int fd)
-{
-    termios termios;
-    if (LINUX_SYSCALL3(__NR_ioctl, fd, TCGETS, &termios) < 0)
-    {
-        return false;
-    }
-    return true;
 }
 
 int PollEventsBToLinux(int pollEvents)

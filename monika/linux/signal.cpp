@@ -311,8 +311,11 @@ void SigActionTrampoline(int signal, siginfo_t* siginfo, void* context)
 {
     // This uselss buffer somehow prevents apps like .NET from overwriting
     // the haikuSiginfo variable. WHY?????
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     char buffer[1024];
     buffer[0] = '/';
+#pragma GCC diagnostic pop
 
     const ucontext_t* linuxContext = (const ucontext_t*)context;
     signal = SignalLinuxToB(signal);

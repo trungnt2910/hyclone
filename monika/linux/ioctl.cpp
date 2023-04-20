@@ -251,7 +251,7 @@ status_t _moni_ioctl(int fd, uint32 op, void* buffer, size_t length)
                 return B_BAD_ADDRESS;
             }
             struct haiku_ifconf* haiku_ifconf = (struct haiku_ifconf*)buffer;
-            if (haiku_ifconf->ifc_len < sizeof(int))
+            if (haiku_ifconf->ifc_len < (int)sizeof(int))
             {
                 return B_BAD_VALUE;
             }
@@ -329,14 +329,14 @@ status_t _moni_ioctl(int fd, uint32 op, void* buffer, size_t length)
             long realLength =
                 GET_HOSTCALLS()->vchroot_unexpandat(fd, "", path, length);
 
-            if (realLength > length)
-            {
-                return B_BUFFER_OVERFLOW;
-            }
-
             if (realLength < 0)
             {
                 return B_BAD_VALUE;
+            }
+
+            if ((size_t)realLength > length)
+            {
+                return B_BUFFER_OVERFLOW;
             }
 
             if (realLength > 1 && path[realLength - 1] == '/')

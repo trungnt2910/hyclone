@@ -12,8 +12,6 @@
 #include "servercalls.h"
 #include "thread_defs.h"
 
-static int sDebugSubsystemLock = HYCLONE_SUBSYSTEM_LOCK_UNINITIALIZED;
-
 extern "C"
 {
 

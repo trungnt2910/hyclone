@@ -47,7 +47,7 @@ add_executable(hyclone_server
 
 set_property(TARGET hyclone_server PROPERTY CXX_STANDARD 20)
 target_link_libraries(hyclone_server hpkgvfs)
-target_compile_options(hyclone_server PRIVATE -Wno-multichar)
+target_compile_options(hyclone_server PRIVATE -Werror -Wall -Wno-multichar -Wno-reorder -Werror=return-type)
 
 if(HYCLONE_USE_SANITIZERS)
     target_compile_options(hyclone_server PRIVATE -fsanitize=address)

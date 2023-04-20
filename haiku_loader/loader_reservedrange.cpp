@@ -26,7 +26,9 @@ struct RangeInfo
 static std::mutex sReservedRangeMutex;
 static std::map<RangeInfo, std::set<RangeInfo>> sReservedRanges;
 
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
 static void loader_reserved_range_debug();
+#endif
 
 void loader_lock_reserved_range_data()
 {
@@ -394,9 +396,9 @@ size_t loader_next_reserved_range_mapping(void* address, void** nextAddress)
     return mappingsIt->size;
 }
 
+#ifdef HYCLONE_DEBUG_RESERVED_RANGE
 static void loader_reserved_range_debug()
 {
-#ifdef HYCLONE_DEBUG_RESERVED_RANGE
     for (auto& range : sReservedRanges)
     {
         std::stringstream ss;
@@ -410,5 +412,5 @@ static void loader_reserved_range_debug()
 
         std::cerr << ss.str() << std::flush;
     }
-#endif
 }
+#endif

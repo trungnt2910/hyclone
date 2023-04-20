@@ -185,15 +185,12 @@ int SocketAddressLinuxToB(const struct sockaddr *addr, struct haiku_sockaddr_sto
             haiku_in6->sin6_scope_id = linux_in6->sin6_scope_id;
             return sizeof(struct haiku_sockaddr_in6);
         }
-#define UNIMPLEMENTED_SOCKADDR(name) case ##name: trace("Unimplemented sockaddr: "#name); return -1;
+#define UNIMPLEMENTED_SOCKADDR(name) case name: trace("Unimplemented sockaddr: "#name); return -1;
         //UNIMPLEMENTED_SOCKADDR(AF_INET);
         UNIMPLEMENTED_SOCKADDR(AF_APPLETALK);
         UNIMPLEMENTED_SOCKADDR(AF_ROUTE);
-        UNIMPLEMENTED_SOCKADDR(AF_LINK);
         //UNIMPLEMENTED_SOCKADDR(AF_INET6);
-        UNIMPLEMENTED_SOCKADDR(AF_DLI);
         UNIMPLEMENTED_SOCKADDR(AF_IPX);
-        UNIMPLEMENTED_SOCKADDR(AF_NOTIFY);
         //UNIMPLEMENTED_SOCKADDR(AF_UNIX);
         UNIMPLEMENTED_SOCKADDR(AF_BLUETOOTH);
 #undef UNIMPLEMENTED_SOCKADDR

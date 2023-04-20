@@ -33,9 +33,9 @@ public:
 
     void SetMapping(uint32_t mapping) { _mapping = mapping; }
 
-    bool IsShared() const { return _offset != -1; }
+    bool IsShared() const { return _offset != (size_t)-1; }
     void Share(const EntryRef& entryRef, size_t offset) { _entryRef = entryRef; _offset = offset; }
-    void Unshare() { _entryRef = EntryRef(); _offset = -1; }
+    void Unshare() { _entryRef = EntryRef(); _offset = (size_t)-1; }
 
     bool IsWritable() const { return _info.protection & B_WRITE_AREA; }
 

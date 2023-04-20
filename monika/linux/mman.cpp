@@ -27,7 +27,6 @@ const addr_t kMaxRandomize = 0x800000ul;
 #define HAIKU_MS_SYNC       0x02
 #define HAIKU_MS_INVALIDATE 0x04
 
-static int ProtBToLinux(int protection);
 static int ProcessMmapArgs(void* address, uint32 addressSpec, size_t& size,
     uint32& lock, uint32 protection, uint32 mapping,
     int fd, area_id sourceArea,
@@ -1001,21 +1000,6 @@ status_t _moni_sync_memory(void* address, size_t size, int flags)
     return B_OK;
 }
 
-}
-
-int ProtBToLinux(int protection)
-{
-    int mmap_prot = 0;
-    if (protection & B_READ_AREA)
-        mmap_prot |= PROT_READ;
-    if (protection & B_WRITE_AREA)
-        mmap_prot |= PROT_WRITE;
-    if (protection & B_EXECUTE_AREA)
-        mmap_prot |= PROT_EXEC;
-    if (protection & B_STACK_AREA)
-        mmap_prot |= PROT_READ | PROT_WRITE | PROT_GROWSDOWN;
-
-    return mmap_prot;
 }
 
 int ProcessMmapArgs(void* address, uint32 addressSpec, size_t& size,

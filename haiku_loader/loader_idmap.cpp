@@ -25,7 +25,7 @@ int loader_idmap_add(void* idmap, void* data)
     int id = 0;
     if (map->freeIds.empty())
     {
-        id = map->data.size();
+        id = (int)map->data.size();
         map->data.push_back(data);
     }
     else
@@ -40,7 +40,7 @@ int loader_idmap_add(void* idmap, void* data)
 void* loader_idmap_get(void* idmap, int id)
 {
     loader_idmap* map = static_cast<loader_idmap*>(idmap);
-    if (id < 0 || id >= map->data.size())
+    if (id < 0 || id >= (int)map->data.size())
     {
         return nullptr;
     }
@@ -50,7 +50,7 @@ void* loader_idmap_get(void* idmap, int id)
 void loader_idmap_remove(void* idmap, int id)
 {
     loader_idmap* map = static_cast<loader_idmap*>(idmap);
-    if (id < 0 || id >= map->data.size())
+    if (id < 0 || id >= (int)map->data.size())
     {
         return;
     }
@@ -58,7 +58,7 @@ void loader_idmap_remove(void* idmap, int id)
     {
         return;
     }
-    if (id == map->data.size() - 1)
+    if (id == (int)map->data.size() - 1)
     {
         map->data.pop_back();
     }

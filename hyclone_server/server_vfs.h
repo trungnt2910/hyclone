@@ -54,7 +54,7 @@ public:
     const haiku_fs_info& GetInfo() const { return _info; }
     haiku_fs_info& GetInfo() { return _info; }
     const std::filesystem::path& GetRoot() const { return _root; }
-    int GetId() const { return _info.dev; }
+    haiku_dev_t GetId() const { return _info.dev; }
 };
 
 class VfsService

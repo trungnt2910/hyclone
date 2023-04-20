@@ -146,7 +146,7 @@ int loader_wait_for_thread(int thread_id, int* retVal)
     }
     {
         auto lock = std::unique_lock<std::mutex>(sHostPthreadObjectsLock);
-        auto& threadInfo = sHostPthreadObjects[thread_id];
+        threadInfo = sHostPthreadObjects[thread_id];
         sHostPthreadObjects.erase(thread_id);
     }
     if (threadInfo.stack_address != NULL)

@@ -116,8 +116,6 @@ std::weak_ptr<Area> Process::GetArea(int area_id)
 
 int Process::GetAreaIdFor(void* address)
 {
-    auto& system = System::GetInstance();
-
     for (const auto& [areaId, area] : _areas)
     {
         if ((uint8_t*)area->GetInfo().address <= address &&
@@ -129,7 +127,6 @@ int Process::GetAreaIdFor(void* address)
 
 int Process::GetNextAreaIdFor(void* address)
 {
-    auto& system = System::GetInstance();
     int id = -1;
     uintptr_t min = (uintptr_t)-1;
 
@@ -194,7 +191,7 @@ std::string Process::GetName()
     std::string name;
     bool isEscaped = false;
 
-    for (int i = 0; i < sizeof(_info.args); ++i)
+    for (size_t i = 0; i < sizeof(_info.args); ++i)
     {
         if (_info.args[i] == '\0')
         {
@@ -389,7 +386,7 @@ status_t Process::ReadDirFd(int fd, const void* userBuffer, size_t userBufferSiz
 
     if (!jailBroken)
     {
-        int rootLevel = std::distance(_root.begin(), _root.end());
+        size_t rootLevel = std::distance(_root.begin(), _root.end());
         std::vector<std::filesystem::path> parts;
 
         for (const auto& part : output)

@@ -352,9 +352,9 @@ int main(int argc, char** argv, char** envp)
 	if (cwd.empty())
 	{
 		std::filesystem::path hostCwd = std::filesystem::current_path();
-		char emulatedCwd[PATH_MAX];
-		size_t emulatedCwdLength = loader_vchroot_unexpand(hostCwd.c_str(), emulatedCwd, sizeof(emulatedCwd));
-		cwd = emulatedCwd;
+		size_t emulatedCwdLength = loader_vchroot_unexpand(hostCwd.c_str(), NULL, 0);
+		cwd.resize(emulatedCwdLength);
+		loader_vchroot_unexpand(hostCwd.c_str(), cwd.data(), emulatedCwdLength);
 	}
 
 	loader_hserver_call_setcwd(HAIKU_AT_FDCWD, cwd.c_str(), cwd.size(), false);

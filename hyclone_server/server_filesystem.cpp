@@ -27,8 +27,6 @@ bool server_setup_filesystem()
     auto& vfsService = system.GetVfsService();
     auto lock = system.Lock();
 
-    haiku_fs_info info;
-
     // Create mount points
     std::filesystem::create_directories(gHaikuPrefix);
     std::filesystem::create_directories(std::filesystem::path(gHaikuPrefix) / "dev");
@@ -390,7 +388,7 @@ intptr_t server_hserver_call_transform_dirent(hserver_context& context, int fd, 
     {
         auto lock = context.process->Lock();
 
-        if (context.process->WriteMemory(userEntry, entry, status) != status)
+        if (context.process->WriteMemory(userEntry, entry, status) != (size_t)status)
         {
             return B_BAD_ADDRESS;
         }

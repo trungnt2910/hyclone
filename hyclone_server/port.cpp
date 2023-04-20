@@ -28,7 +28,7 @@ Port::Port(int pid, int capacity, const char* name)
 
 status_t Port::Write(Message&& message, bigtime_t timeout)
 {
-    message.info.size == message.data.size();
+    message.info.size = message.data.size();
 
     std::unique_lock<std::mutex> lock(_messagesLock);
 

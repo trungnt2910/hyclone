@@ -17,12 +17,12 @@ haiku_ino_t HostfsDevice::_Hash(uint64_t hostDev, uint64_t hostIno)
 {
     haiku_ino_t result = 0;
     char* data = (char*)&hostDev;
-    for (int i = 0; i < sizeof(uint64_t); ++i)
+    for (size_t i = 0; i < sizeof(uint64_t); ++i)
     {
         result = *data++ + (result << 6) + (result << 16) - result;
     }
     data = (char*)&hostIno;
-    for (int i = 0; i < sizeof(uint64_t); ++i)
+    for (size_t i = 0; i < sizeof(uint64_t); ++i)
     {
         result = *data++ + (result << 6) + (result << 16) - result;
     }

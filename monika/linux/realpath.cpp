@@ -50,7 +50,7 @@ long realpath(const char *path, char resolved[PATH_MAX], bool resolveSymlinks)
 	char *p, *q, *s;
 	size_t left_len, resolved_len;
 	unsigned symlinks;
-	int serrno, slen;
+	int slen;
 	char left[PATH_MAX], next_token[PATH_MAX], symlink[PATH_MAX];
 	long status;
 
@@ -91,7 +91,7 @@ long realpath(const char *path, char resolved[PATH_MAX], bool resolveSymlinks)
 		 */
 		p = strchr(left, '/');
 		s = p ? p : left + left_len;
-		if (s - left >= sizeof(next_token))
+		if (s - left >= (int)sizeof(next_token))
 		{
 			return -ENAMETOOLONG;
 		}
@@ -183,7 +183,7 @@ long realpath(const char *path, char resolved[PATH_MAX], bool resolveSymlinks)
 			{
 				if (symlink[slen - 1] != '/')
 				{
-					if (slen + 1 >= sizeof(symlink))
+					if (slen + 1 >= (int)sizeof(symlink))
 					{
 						return -ENAMETOOLONG;
 					}

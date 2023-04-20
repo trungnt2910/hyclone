@@ -145,7 +145,7 @@ int get_cpu_topology_info(haiku_cpu_topology_node_info* info, uint32_t* count)
             core_siblings >> std::hex >> core_siblings_set;
 
             bool is_first_core = 
-                std::countr_zero(core_siblings_set) == current_cpu_info.index;
+                (unsigned)std::countr_zero(core_siblings_set) == current_cpu_info.index;
 
             if (is_first_core)
             {
@@ -457,7 +457,7 @@ int get_process_usage(int pid, int who, team_usage_info* info)
                 return B_BAD_VALUE;
         }
 
-        if (getrusage(RUSAGE_SELF, &usage) != 0)
+        if (getrusage(linuxWho, &usage) != 0)
         {
             return B_BAD_VALUE;   
         }

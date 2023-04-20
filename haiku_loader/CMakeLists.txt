@@ -22,6 +22,7 @@ add_executable(haiku_loader
     ${LOADER_SYSTEM_SPECIFIC_SOURCES})
 
 set_property(TARGET haiku_loader PROPERTY CXX_STANDARD 20)
+target_compile_options(haiku_loader PRIVATE -Werror -Wall -Wno-multichar -Werror=return-type)
 
 if(HYCLONE_USE_SANITIZERS)
     target_compile_options(haiku_loader PRIVATE -fsanitize=address)

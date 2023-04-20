@@ -183,7 +183,6 @@ size_t loader_vchroot_unexpandat(int fd, const char* hostPath, char* path, size_
 size_t loader_vchroot_expandlink(const char* path, char* hostPath, size_t size)
 {
     std::string currentPath;
-    const char* oldPath = path;
     while (true)
     {
         std::string currentHostPath(PATH_MAX, '\0');
@@ -200,7 +199,6 @@ size_t loader_vchroot_expandlink(const char* path, char* hostPath, size_t size)
 
         if (!std::filesystem::is_symlink(currentHostPath))
         {
-            //std::cerr << "loader_vchroot_expandlink: expanded from " << oldPath << " to " << currentHostPath << std::endl;
             if (hostPath != NULL)
             {
                 strncpy(hostPath, currentHostPath.c_str(), size);

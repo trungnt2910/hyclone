@@ -60,6 +60,8 @@ status_t _moni_setgroups(int groupCount, haiku_gid_t* groupList)
         }
         return LinuxToB(-result);
     }
+
+    return B_OK;
 }
 
 }

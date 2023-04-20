@@ -45,10 +45,6 @@ public:
 
 static std::unordered_map<int, LoaderDirectoryInfo> sFdMap;
 static std::mutex sFdMapMutex;
-// Currently, 16 bytes for the name is enough as we only
-// need to handle SystemRoot and dev. Increase this value
-// when we need to emulate more complicated paths.
-static char sDirentBuf[sizeof(struct dirent) + 16];
 
 static void loader_opendir_unlocked(int fd)
 {

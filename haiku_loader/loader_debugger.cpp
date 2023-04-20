@@ -311,7 +311,7 @@ void loader_debugger_post_syscall(uint32_t callIndex, void* args, uint64_t retur
             debugPostSyscall = (sThreadFlags[tid] & B_THREAD_DEBUG_POST_SYSCALL);
         }
 
-        if (debugPostSyscall && sSyscallStart != -1)
+        if (debugPostSyscall && sSyscallStart != (bigtime_t)-1)
         {
             debug_debugger_message_data message;
 

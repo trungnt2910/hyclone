@@ -156,7 +156,7 @@ status_t VfsService::Unmount(const std::filesystem::path& path, uint32 flags)
         std::vector<decltype(_entryRefs)::iterator> toRemove;
         for (auto refIt = _entryRefs.begin(); refIt != _entryRefs.end(); ++refIt)
         {
-            if (refIt->first.GetDevice() == it->second->GetId())
+            if ((haiku_dev_t)refIt->first.GetDevice() == it->second->GetId())
             {
                 toRemove.push_back(refIt);
             }
@@ -208,7 +208,7 @@ status_t VfsService::RealPath(std::filesystem::path& path)
 
         status_t status;
 
-        for (int i = 0; i < components.size(); ++i)
+        for (size_t i = 0; i < components.size(); ++i)
         {
             const auto& component = components[i];
             if (component == "..")
@@ -217,7 +217,7 @@ status_t VfsService::RealPath(std::filesystem::path& path)
                 if (status != B_OK)
                 {
                     path = currentPath.parent_path();
-                    for (int j = i + 1; j < components.size(); ++j)
+                    for (size_t j = i + 1; j < components.size(); ++j)
                     {
                         path /= components[j];
                     }

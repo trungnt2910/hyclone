@@ -8,7 +8,7 @@
 #include "system.h"
 
 intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned long long device, unsigned long long inode,
-    const char* userPath, size_t userPathLength)
+    char* userPath, size_t userPathLength)
 {
     auto& vfsService = System::GetInstance().GetVfsService();
     std::string pathStr;
@@ -41,7 +41,7 @@ intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned lo
     }
 
     auto lock = context.process->Lock();
-    if (context.process->WriteMemory((void*)userPath, pathStr.data(), copyLen) != copyLen)
+    if (context.process->WriteMemory(userPath, pathStr.data(), copyLen) != copyLen)
     {
         return B_BAD_ADDRESS;
     }
