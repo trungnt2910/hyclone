@@ -320,6 +320,8 @@ bool server_setup_usermap()
         newGroups.push_back(std::move(group));
     }
 
+    std::filesystem::create_directories(etcPath);
+
     {
         std::ofstream passwdFile(passwdPath);
         if (!passwdFile.is_open())
