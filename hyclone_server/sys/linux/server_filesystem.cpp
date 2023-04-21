@@ -25,10 +25,6 @@ bool server_setup_prefix()
     std::filesystem::create_directories(etcPath);
     std::filesystem::permissions(systemPath, oldSystemPerms);
 
-    std::filesystem::copy_file("/etc/passwd", etcPath / "passwd",
-        std::filesystem::copy_options::overwrite_existing);
-    std::filesystem::copy_file("/etc/group", etcPath / "group",
-        std::filesystem::copy_options::overwrite_existing);
     std::fstream shadow((etcPath / "shadow").c_str(), std::ios::out | std::ios::app);
 
     return true;

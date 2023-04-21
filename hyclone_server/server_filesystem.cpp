@@ -27,19 +27,30 @@ bool server_setup_filesystem()
     auto& vfsService = system.GetVfsService();
     auto lock = system.Lock();
 
+    auto& userMapService = system.GetUserMapService();
+    std::filesystem::path homeDir;
+
+    if (userMapService.GetHomeDir(0, homeDir) != B_OK)
+    {
+        std::cerr << "Failed to get home directory for the root user." << std::endl;
+        return false;
+    }
+
+    homeDir = homeDir.relative_path();
+
     // Create mount points
     std::filesystem::create_directories(gHaikuPrefix);
     std::filesystem::create_directories(std::filesystem::path(gHaikuPrefix) / "dev");
     std::filesystem::create_directories(std::filesystem::path(gHaikuPrefix) / "boot" / "system");
-    std::filesystem::create_directories(std::filesystem::path(gHaikuPrefix) / "boot" / "home" / "config");
+    std::filesystem::create_directories(std::filesystem::path(gHaikuPrefix) / homeDir / "config");
 
     vfsService.RegisterDevice(std::make_shared<RootfsDevice>(gHaikuPrefix));
     vfsService.RegisterDevice(std::make_shared<DevfsDevice>());
     vfsService.RegisterDevice(std::make_shared<SystemfsDevice>("/boot", std::filesystem::path(gHaikuPrefix) / "boot"));
     vfsService.RegisterDevice(std::make_shared<PackagefsDevice>("/boot/system", std::filesystem::path(gHaikuPrefix) / "boot/system",
         PACKAGE_FS_MOUNT_TYPE_SYSTEM));
-    vfsService.RegisterDevice(std::make_shared<PackagefsDevice>("/boot/home/config", std::filesystem::path(gHaikuPrefix) / "boot/home/config",
-        PACKAGE_FS_MOUNT_TYPE_HOME));
+    vfsService.RegisterDevice(std::make_shared<PackagefsDevice>("/" / homeDir / "config",
+        std::filesystem::path(gHaikuPrefix) / homeDir / "config", PACKAGE_FS_MOUNT_TYPE_HOME));
     vfsService.RegisterDevice(std::make_shared<SystemfsDevice>());
 
     vfsService.RegisterBuiltinFilesystem("packagefs", PackagefsDevice::Mount);
