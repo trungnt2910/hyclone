@@ -28,25 +28,12 @@ status_t System::Init()
 {
     status_t status = B_OK;
 
-    _teamNotificationService = std::make_shared<TeamNotificationService>();
-    if (!_teamNotificationService)
-    {
-        return B_NO_MEMORY;
-    }
-
-
-    if ((status = _teamNotificationService->Register()) != B_OK)
+    if ((status = _teamNotificationService.Register()) != B_OK)
     {
         return status;
     }
 
-    _threadNotificationService = std::make_shared<ThreadNotificationService>();
-    if (!_threadNotificationService)
-    {
-        return B_NO_MEMORY;
-    }
-
-    if ((status = _threadNotificationService->Register()) != B_OK)
+    if ((status = _threadNotificationService.Register()) != B_OK)
     {
         return status;
     }

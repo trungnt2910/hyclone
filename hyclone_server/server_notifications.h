@@ -167,12 +167,12 @@ public:
 
 class NotificationManager
 {
-    std::weak_ptr<NotificationService> _ServiceFor(const std::string& name);
+    NotificationService* _ServiceFor(const std::string& name);
 
     static NotificationManager _manager;
 
     std::mutex _lock;
-    std::unordered_map<std::string, std::shared_ptr<NotificationService>> _services;
+    std::unordered_map<std::string, NotificationService*> _services;
 public:
     NotificationManager();
     ~NotificationManager();

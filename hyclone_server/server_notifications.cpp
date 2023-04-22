@@ -431,11 +431,11 @@ NotificationManager::~NotificationManager()
 {
 }
 
-std::weak_ptr<NotificationService> NotificationManager::_ServiceFor(const std::string& name)
+NotificationService* NotificationManager::_ServiceFor(const std::string& name)
 {
     if (!_services.contains(name))
     {
-        return std::weak_ptr<NotificationService>();
+        return NULL;
     }
     return _services[name];
 }
@@ -445,12 +445,12 @@ NotificationManager::RegisterService(NotificationService& service)
 {
     std::unique_lock<std::mutex> _(_lock);
 
-    if (_ServiceFor(service.Name()).lock())
+    if (_ServiceFor(service.Name()))
     {
         return B_NAME_IN_USE;
     }
 
-    _services.emplace(service.Name(), service.shared_from_this());
+    _services.emplace(service.Name(), &service);
 
     return B_OK;
 }
@@ -476,14 +476,14 @@ NotificationManager::AddListener(const std::string& serviceName,
 status_t NotificationManager::AddListener(const std::string& serviceName,
     const KMessage* eventSpecifier, NotificationListener& listener)
 {
-    std::shared_ptr<NotificationService> service;
+    NotificationService* service;
 
     {
         std::unique_lock<std::mutex> locker(_lock);
-        service = _ServiceFor(serviceName).lock();
+        service = _ServiceFor(serviceName);
     }
 
-    if (!service)
+    if (service == NULL)
     {
         return B_NAME_NOT_FOUND;
     }
@@ -505,14 +505,14 @@ status_t NotificationManager::UpdateListener(const std::string& serviceName,
 status_t NotificationManager::UpdateListener(const std::string& serviceName,
     const KMessage* eventSpecifier, NotificationListener& listener)
 {
-    std::shared_ptr<NotificationService> service;
+    NotificationService* service;
 
     {
         std::unique_lock<std::mutex> locker(_lock);
-        service = _ServiceFor(serviceName).lock();
+        service = _ServiceFor(serviceName);
     }
 
-    if (!service)
+    if (service == NULL)
     {
         return B_NAME_NOT_FOUND;
     }
@@ -524,14 +524,14 @@ status_t
 NotificationManager::RemoveListener(const std::string& serviceName,
                                     const KMessage* eventSpecifier, NotificationListener& listener)
 {
-    std::shared_ptr<NotificationService> service;
+    NotificationService* service;
 
     {
         std::unique_lock<std::mutex> locker(_lock);
-        service = _ServiceFor(serviceName).lock();
+        service = _ServiceFor(serviceName);
     }
 
-    if (!service)
+    if (service == NULL)
     {
         return B_NAME_NOT_FOUND;
     }

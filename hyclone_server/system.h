@@ -58,8 +58,8 @@ private:
     MemoryService _memoryService;
     MessagingService _messagingService;
     SystemNotificationService _systemNotificationService;
-    std::shared_ptr<TeamNotificationService> _teamNotificationService;
-    std::shared_ptr<ThreadNotificationService> _threadNotificationService;
+    TeamNotificationService _teamNotificationService;
+    ThreadNotificationService _threadNotificationService;
     UserMapService _userMapService;
     VfsService _vfsService;
     System() = default;
