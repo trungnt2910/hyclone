@@ -24,6 +24,41 @@ System& System::GetInstance()
     return instance;
 }
 
+status_t System::Init()
+{
+    status_t status = B_OK;
+
+    _teamNotificationService = std::make_shared<TeamNotificationService>();
+    if (!_teamNotificationService)
+    {
+        return B_NO_MEMORY;
+    }
+
+
+    if ((status = _teamNotificationService->Register()) != B_OK)
+    {
+        return status;
+    }
+
+    _threadNotificationService = std::make_shared<ThreadNotificationService>();
+    if (!_threadNotificationService)
+    {
+        return B_NO_MEMORY;
+    }
+
+    if ((status = _threadNotificationService->Register()) != B_OK)
+    {
+        return status;
+    }
+
+    if ((status = _systemNotificationService.Init()) != B_OK)
+    {
+        return status;
+    }
+
+    return status;
+}
+
 std::weak_ptr<Process> System::RegisterProcess(int pid, int uid, int gid, int euid, int egid)
 {
     auto ptr = std::make_shared<Process>(pid, uid, gid, euid, egid);
@@ -351,6 +386,8 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
                     std::cerr << "Keeping a reference to process " << context.pid << " because it is executing exec." << std::endl;
                     execUnlockNeeded = true;
                 }
+
+                context.process->PrepareForDeletion();
 
                 for (const auto& s: context.process->GetOwningSemaphores())
                 {

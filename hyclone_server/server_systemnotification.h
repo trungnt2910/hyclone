@@ -4,9 +4,12 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 
+#include "associateddata.h"
 #include "BeDefs.h"
+#include "server_notifications.h"
 
 class KMessage;
 class Port;
@@ -24,7 +27,7 @@ enum
     B_WATCH_SYSTEM_THREAD_DELETION = 0x08,
     B_WATCH_SYSTEM_THREAD_PROPERTIES = 0x10,
 
-    B_WATCH_SYSTEM_ALL 
+    B_WATCH_SYSTEM_ALL
         = B_WATCH_SYSTEM_TEAM_CREATION
         | B_WATCH_SYSTEM_TEAM_DELETION
         | B_WATCH_SYSTEM_THREAD_CREATION
@@ -66,23 +69,48 @@ enum
 #pragma GCC diagnostic pop
 #endif
 
-class SystemNotificationService
+class SystemNotificationService : private NotificationListener
 {
 private:
-    struct Listener
+    struct ListenerList;
+
+    struct Listener : AssociatedData
     {
-        std::weak_ptr<Port> port;
+        std::list<std::shared_ptr<Listener>>::iterator listLink;
+        ListenerList* list;
+        port_id port;
         uint32 flags;
         int32 token;
+
+        virtual void OwnerDeleted(AssociatedDataOwner* owner) override;
     };
 
-    std::mutex _lock;
-    std::unordered_map<int32, std::list<Listener>> _listeners;
+    struct ListenerList
+    {
+        std::list<std::shared_ptr<Listener>> listeners;
+        int32 object;
+    };
 
-    std::list<Listener>::iterator FindListener(int32 object, std::shared_ptr<Port> port, int32 token);
+    static const int32 kMaxMessagingTargetCount = 8;
+
+    std::mutex _lock;
+    std::unordered_map<int32, ListenerList> _teamListeners;
+
+    virtual void EventOccurred(NotificationService& service, const KMessage* event);
+    void _AddTargets(ListenerList* listenerList, uint32_t flags, messaging_target* targets,
+        int32& targetCount, int32 object, uint32 opcode);
+    void _SendMessage(messaging_target* targets, int32 targetCount, int32 object, uint32 opcode);
+    std::shared_ptr<Listener> _FindListener(int32 object, port_id port, int32 token,
+        ListenerList*& listeners);
+    void _RemoveObsoleteListener(const std::shared_ptr<Listener>& listener);
+    void _RemoveListener(const std::shared_ptr<Listener>& listener);
 public:
-    status_t StartListening(int32 object, uint32 flags, std::shared_ptr<Port> port, int32 token);
-    status_t StopListening(int32 object, uint32 flags, std::shared_ptr<Port> port, int32 token);
+    SystemNotificationService() = default;
+    status_t Init();
+
+    status_t StartListening(int32 object, uint32 flags, port_id port, int32 token);
+    status_t StopListening(int32 object, uint32 flags, port_id port, int32 token);
+
     void Notify(const KMessage& event);
     std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(_lock); }
 };

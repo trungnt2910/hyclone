@@ -13,6 +13,7 @@ add_executable(hyclone_server
     main.cpp
 
     area.cpp
+    associateddata.cpp
     debug.cpp
     entry_ref.cpp
     hsemaphore.cpp
@@ -26,6 +27,7 @@ add_executable(hyclone_server
     server_filesystem.cpp
     server_memory.cpp
     server_messaging.cpp
+    server_notificationimpl.cpp
     server_notifications.cpp
     server_prefix.cpp
     server_requests.cpp

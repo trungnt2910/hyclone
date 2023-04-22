@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "associateddata.h"
 #include "haiku_area.h"
 #include "haiku_image.h"
 #include "haiku_team.h"
@@ -17,7 +18,7 @@
 class Area;
 class Thread;
 
-class Process
+class Process : public AssociatedDataOwner
 {
 private:
     haiku_team_info _info;

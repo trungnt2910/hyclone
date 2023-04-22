@@ -13,6 +13,7 @@
 #include "server_apploadnotification.h"
 #include "server_memory.h"
 #include "server_messaging.h"
+#include "server_notificationimpl.h"
 #include "server_notifications.h"
 #include "server_systemnotification.h"
 #include "server_usermap.h"
@@ -57,6 +58,8 @@ private:
     MemoryService _memoryService;
     MessagingService _messagingService;
     SystemNotificationService _systemNotificationService;
+    std::shared_ptr<TeamNotificationService> _teamNotificationService;
+    std::shared_ptr<ThreadNotificationService> _threadNotificationService;
     UserMapService _userMapService;
     VfsService _vfsService;
     System() = default;
@@ -64,6 +67,9 @@ private:
 public:
     System(const System&) = delete;
     System(System&&) = delete;
+
+    status_t Init();
+
     std::weak_ptr<Process> RegisterProcess(int pid, int uid, int gid, int euid, int egid);
     std::weak_ptr<Process> GetProcess(int pid);
     int NextProcessId(int pid) const;
