@@ -32,6 +32,7 @@ private:
     std::filesystem::path _cwd;
     std::filesystem::path _root;
 
+    std::vector<int> _groups;
     std::map<int, std::shared_ptr<Thread>> _threads;
     IdMap<haiku_extended_image_info, int> _images;
     std::map<int, std::shared_ptr<Area>> _areas;
@@ -80,12 +81,16 @@ public:
     int GetGid() const { return _gid; }
     int GetEuid() const { return _euid; }
     int GetEgid() const { return _egid; }
+    const std::vector<int>& GetGroups() const { return _groups; }
+    std::vector<int>& GetGroups() { return _groups; }
     const std::filesystem::path& GetCwd() const { return _cwd; }
     const std::filesystem::path& GetRoot() const { return _root; }
     haiku_team_info& GetInfo() { return _info; }
     const haiku_team_info& GetInfo() const { return _info; }
     std::string GetName();
 
+    void SetGroups(const std::vector<int>& groups) { _groups = groups; }
+    void SetGroups(std::vector<int>&& groups) { _groups = std::move(groups); }
     void SetCwd(const std::filesystem::path& cwd) { _cwd = cwd; }
     void SetCwd(std::filesystem::path&& cwd) { _cwd = std::move(cwd); }
     void SetRoot(const std::filesystem::path& root) { _root = root; }

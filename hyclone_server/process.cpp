@@ -10,6 +10,7 @@
 #include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
+#include "server_usermap.h"
 #include "server_workers.h"
 #include "system.h"
 #include "thread.h"
@@ -268,6 +269,7 @@ void Process::Fork(Process& child)
     child._fds = _fds;
     child._cwd = _cwd;
     child._root = _root;
+    child._groups = _groups;
 
     // No, semaphores don't seem to be inherited.
     // child._owningSemaphores = _owningSemaphores;
@@ -1017,4 +1019,90 @@ intptr_t server_hserver_call_getgid(hserver_context& context, bool effective)
 {
     auto lock = context.process->Lock();
     return effective ? context.process->GetEgid() : context.process->GetGid();
+}
+
+intptr_t server_hserver_call_getgroups(hserver_context& context, size_t groupCount, int* groupList)
+{
+    auto lock = context.process->Lock();
+
+    if (groupCount == 0)
+    {
+        return context.process->GetGroups().size();
+    }
+
+    if (groupCount < context.process->GetGroups().size())
+    {
+        return B_BAD_VALUE;
+    }
+
+    size_t writeCount = std::min(groupCount, context.process->GetGroups().size());
+
+    if (context.process->WriteMemory(groupList, context.process->GetGroups().data(), writeCount * sizeof(int))
+        != writeCount * sizeof(int))
+    {
+        return B_BAD_ADDRESS;
+    }
+
+    return writeCount;
+}
+
+intptr_t server_hserver_call_setgroups(hserver_context& context, size_t groupCount,
+    const int* groupList, intptr_t* hostGroupList)
+{
+    // Actually setting the groups
+    if (hostGroupList == NULL)
+    {
+        std::vector<int> groups(groupCount);
+        auto lock = context.process->Lock();
+        if (groupCount != 0 && context.process
+                ->ReadMemory((void*)groupList, groups.data(), groupCount * sizeof(int))
+            != groupCount * sizeof(int))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        context.process->SetGroups(std::move(groups));
+
+        return B_OK;
+    }
+    // Retreiving the list of groups to set on the host.
+    else
+    {
+        std::vector<int> groups(groupCount);
+        std::vector<intptr_t> hostGroups;
+
+        {
+            auto lock = context.process->Lock();
+            if (context.process->ReadMemory((void*)groupList, groups.data(), groupCount * sizeof(int))
+                != groupCount * sizeof(int))
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
+
+        {
+            auto& userMapService = System::GetInstance().GetUserMapService();
+            auto lock = userMapService.Lock();
+
+            for (auto& group : groups)
+            {
+                if (group < HYCLONE_MIN_HOST_GID)
+                {
+                    continue;
+                }
+                hostGroups.push_back(userMapService.GetHostGid(group));
+            }
+        }
+
+        {
+            auto lock = context.process->Lock();
+            if (context.process->WriteMemory(hostGroupList, hostGroups.data(), hostGroups.size() * sizeof(intptr_t))
+                != hostGroups.size() * sizeof(intptr_t))
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
+
+        return hostGroups.size();
+    }
 }

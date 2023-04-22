@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <unistd.h>
 
 #include "BeDefs.h"
 #include "errno_conversion.h"
@@ -21,47 +22,38 @@ haiku_uid_t _moni_getuid(bool effective)
 
 haiku_ssize_t _moni_getgroups(int groupCount, haiku_gid_t* groupList)
 {
-    long result = LINUX_SYSCALL2(__NR_getgroups, groupCount, groupList);
-    if (result < 0)
-    {
-        return LinuxToB(-result);
-    }
-
-    if (groupList != NULL)
-    {
-        for (int i = 0; i < result; i++)
-        {
-            groupList[i] = GET_SERVERCALLS()->gid_for(groupList[i]);
-        }
-    }
-
-    return result;
+    static_assert(sizeof(haiku_gid_t) == sizeof(int), "gid_t is not 32-bit.");
+    return GET_SERVERCALLS()->getgroups(groupCount, (int*)groupList);
 }
 
 status_t _moni_setgroups(int groupCount, haiku_gid_t* groupList)
 {
-    if (groupList != NULL)
+    static_assert(sizeof(haiku_gid_t) == sizeof(int), "gid_t is not 32-bit.");
+
+    if (groupCount > 0)
     {
-        for (int i = 0; i < groupCount; i++)
+        intptr_t* hostGroupList = (intptr_t*)__builtin_alloca(groupCount * sizeof(intptr_t));
+        long hostGroupCount = GET_SERVERCALLS()->setgroups(groupCount, (int*)groupList, hostGroupList);
+
+        if (hostGroupCount < 0)
         {
-            groupList[i] = GET_SERVERCALLS()->hostgid_for(groupList[i]);
+            return hostGroupCount;
+        }
+
+        gid_t* hostGroupList32 = (gid_t*)__builtin_alloca(hostGroupCount * sizeof(gid_t));
+        for (long i = 0; i < hostGroupCount; i++)
+        {
+            hostGroupList32[i] = hostGroupList[i];
+        }
+
+        long status = LINUX_SYSCALL2(__NR_setgroups, hostGroupCount, hostGroupList32);
+        if (status < 0)
+        {
+            return LinuxToB(-status);
         }
     }
 
-    long result = LINUX_SYSCALL2(__NR_setgroups, groupCount, groupList);
-    if (result < 0)
-    {
-        if (result == -EPERM && GET_SERVERCALLS()->getuid(true) == 0)
-        {
-            // TODO: Store these groups on hyclone_server side.
-            GET_SERVERCALLS()->debug_output("setgroup() failed with EPERM but we're emulating root.",
-                sizeof("setgroup() failed with EPERM but we're emulating root."));
-            return B_OK;
-        }
-        return LinuxToB(-result);
-    }
-
-    return B_OK;
+    return GET_SERVERCALLS()->setgroups(groupCount, (int*)groupList, NULL);
 }
 
 }
