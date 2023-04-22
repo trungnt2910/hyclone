@@ -6,11 +6,15 @@
 #include "system.h"
 #include "thread.h"
 
+thread_local hserver_context* gCurrentContext;
+
 intptr_t server_dispatch(intptr_t conn_id, intptr_t call_id,
     intptr_t a1, intptr_t a2, intptr_t a3, intptr_t a4, intptr_t a5, intptr_t a6)
 {
     hserver_context context;
     context.conn_id = conn_id;
+
+    gCurrentContext = &context;
 
     {
         auto& system = System::GetInstance();

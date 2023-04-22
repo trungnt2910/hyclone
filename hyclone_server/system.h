@@ -13,6 +13,7 @@
 #include "server_apploadnotification.h"
 #include "server_memory.h"
 #include "server_messaging.h"
+#include "server_notifications.h"
 #include "server_systemnotification.h"
 #include "server_usermap.h"
 #include "server_vfs.h"
@@ -51,6 +52,7 @@ private:
     std::map<int, std::shared_ptr<Area>> _areas;
     std::unordered_map<EntryRef, std::string> _entryRefs;
     std::recursive_mutex _lock;
+    NotificationManager _notificationManager;
     AppLoadNotificationService _appLoadNotificationService;
     MemoryService _memoryService;
     MessagingService _messagingService;
@@ -96,6 +98,9 @@ public:
 
     void Shutdown();
     bool IsShuttingDown() const { return _isShuttingDown; }
+
+    NotificationManager& GetNotificationManager() { return _notificationManager; }
+    const NotificationManager& GetNotificationManager() const { return _notificationManager; }
 
     AppLoadNotificationService& GetAppLoadNotificationService() { return _appLoadNotificationService; }
     const AppLoadNotificationService& GetAppLoadNotificationService() const { return _appLoadNotificationService; }

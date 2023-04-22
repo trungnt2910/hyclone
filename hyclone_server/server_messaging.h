@@ -1,6 +1,7 @@
 #ifndef __SERVER_MESSAGE_H__
 #define __SERVER_MESSAGE_H__
 
+#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -68,8 +69,8 @@ private:
 public:
     ~MessagingArea();
 
-    static std::shared_ptr<MessagingArea> Create(const std::shared_ptr<Semaphore>& lockSem,
-        const std::shared_ptr<Semaphore>& counterSem);
+    static std::shared_ptr<MessagingArea> Create(const std::weak_ptr<Semaphore>& lockSem,
+        const std::weak_ptr<Semaphore>& counterSem);
 
     static bool CheckCommandSize(int32 dataSize);
 
@@ -94,7 +95,7 @@ class MessagingService
 {
 private:
     status_t _AllocateCommand(int32 commandWhat, int32 size,
-                              MessagingArea*& area, void*& data, bool& wasEmpty);
+        std::shared_ptr<MessagingArea>& area, void*& data, bool& wasEmpty);
 
     std::mutex _lock;
     std::shared_ptr<MessagingArea> _firstArea;
@@ -115,7 +116,7 @@ public:
     status_t UnregisterService(const std::shared_ptr<Process>& team);
 
     status_t SendMessage(const void* message, int32 messageSize,
-                         const messaging_target* targets, int32 targetCount);
+        const messaging_target* targets, int32 targetCount);
 };
 
 #endif // __SERVER_MESSAGE_H__
