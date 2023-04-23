@@ -1021,6 +1021,163 @@ intptr_t server_hserver_call_getgid(hserver_context& context, bool effective)
     return effective ? context.process->GetEgid() : context.process->GetGid();
 }
 
+intptr_t server_hserver_call_setregid(hserver_context& context, int realGID, int effectiveGID,
+    bool setAllIfPrivileged, intptr_t* userHostRealGID, intptr_t* userHostEffectiveGID)
+{
+    if (realGID == -1 && effectiveGID == -1)
+    {
+        return B_BAD_VALUE;
+    }
+
+    if (setAllIfPrivileged)
+    {
+        if (realGID != -1)
+        {
+            effectiveGID = realGID;
+        }
+        else
+        {
+            realGID = effectiveGID;
+        }
+    }
+
+    if (userHostRealGID != NULL && userHostEffectiveGID != NULL)
+    {
+        auto& userMapService = System::GetInstance().GetUserMapService();
+        auto lock = userMapService.Lock();
+
+        intptr_t hostRealGID = -1;
+        intptr_t hostEffectiveGID = -1;
+
+        if (realGID >= HYCLONE_MIN_HOST_GID)
+        {
+            hostRealGID = userMapService.GetHostGid(realGID);
+        }
+
+        if (effectiveGID >= HYCLONE_MIN_HOST_GID)
+        {
+            hostEffectiveGID = userMapService.GetHostGid(effectiveGID);
+        }
+
+        {
+            auto procLock = context.process->Lock();
+
+            if (context.process->WriteMemory(userHostRealGID, &hostRealGID, sizeof(hostRealGID))
+                != sizeof(hostRealGID))
+            {
+                return B_BAD_ADDRESS;
+            }
+
+
+            if (context.process->WriteMemory(userHostEffectiveGID, &hostEffectiveGID,
+                sizeof(hostEffectiveGID)) != sizeof(hostEffectiveGID))
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
+
+        // Return and wait for the system to set its GIDs with the host first.
+        if (hostRealGID != -1 || hostEffectiveGID != -1)
+        {
+            return B_OK;
+        }
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (realGID != -1)
+        {
+            context.process->SetGid(realGID);
+        }
+
+        if (effectiveGID != -1)
+        {
+            context.process->SetEgid(effectiveGID);
+        }
+    }
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_setreuid(hserver_context& context, int realUID, int effectiveUID,
+    bool setAllIfPrivileged, intptr_t* userHostRealUID, intptr_t* userHostEffectiveUID)
+{
+    if (realUID == -1 && effectiveUID == -1)
+    {
+        return B_BAD_VALUE;
+    }
+
+    if (setAllIfPrivileged)
+    {
+        if (realUID != -1)
+        {
+            effectiveUID = realUID;
+        }
+        else
+        {
+            realUID = effectiveUID;
+        }
+    }
+
+    if (userHostRealUID != NULL && userHostEffectiveUID != NULL)
+    {
+        auto& userMapService = System::GetInstance().GetUserMapService();
+        auto lock = userMapService.Lock();
+
+        intptr_t hostRealUID = -1;
+        intptr_t hostEffectiveUID = -1;
+
+        if (realUID >= HYCLONE_MIN_HOST_UID)
+        {
+            hostRealUID = userMapService.GetHostUid(realUID);
+        }
+
+        if (effectiveUID >= HYCLONE_MIN_HOST_UID)
+        {
+            hostEffectiveUID = userMapService.GetHostUid(effectiveUID);
+        }
+
+        {
+            auto procLock = context.process->Lock();
+
+            if (context.process->WriteMemory(userHostRealUID, &hostRealUID, sizeof(hostRealUID))
+                != sizeof(hostRealUID))
+            {
+                return B_BAD_ADDRESS;
+            }
+
+            if (context.process->WriteMemory(userHostEffectiveUID, &hostEffectiveUID,
+                sizeof(hostEffectiveUID)) != sizeof(hostEffectiveUID))
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
+
+        if (hostRealUID != -1 || hostEffectiveUID != -1)
+        {
+            return B_OK;
+        }
+
+    }
+
+    {
+        auto lock = context.process->Lock();
+
+        if (realUID != -1)
+        {
+            context.process->SetUid(realUID);
+        }
+
+        if (effectiveUID != -1)
+        {
+            context.process->SetEuid(effectiveUID);
+        }
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_getgroups(hserver_context& context, size_t groupCount, int* groupList)
 {
     auto lock = context.process->Lock();

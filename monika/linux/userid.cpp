@@ -20,6 +20,70 @@ haiku_uid_t _moni_getuid(bool effective)
     return GET_SERVERCALLS()->getuid(effective);
 }
 
+status_t _moni_setregid(haiku_gid_t rgid, haiku_gid_t egid,
+    bool setAllIfPrivileged)
+{
+    intptr_t hostrgid = -1;
+    intptr_t hostegid = -1;
+    status_t status = GET_SERVERCALLS()->setregid(rgid, egid, setAllIfPrivileged, &hostrgid, &hostegid);
+
+    if (status < 0)
+    {
+        return status;
+    }
+
+    if (hostrgid != -1 || hostegid != -1)
+    {
+        long result = LINUX_SYSCALL2(__NR_setregid, hostrgid, hostegid);
+        if (result < 0)
+        {
+            return LinuxToB(-result);
+        }
+
+        // Retry
+        status = GET_SERVERCALLS()->setregid(rgid, egid, setAllIfPrivileged, NULL, NULL);
+    }
+
+    if (status < 0)
+    {
+        return status;
+    }
+
+    return B_OK;
+}
+
+status_t _moni_setreuid(haiku_uid_t ruid, haiku_uid_t euid,
+    bool setAllIfPrivileged)
+{
+    intptr_t hostruid = -1;
+    intptr_t hosteuid = -1;
+    status_t status = GET_SERVERCALLS()->setreuid(ruid, euid, setAllIfPrivileged, &hostruid, &hosteuid);
+
+    if (status < 0)
+    {
+        return status;
+    }
+
+    if (hostruid != -1 || hosteuid != -1)
+    {
+        long result = LINUX_SYSCALL2(__NR_setreuid, hostruid, hosteuid);
+        if (result < 0)
+        {
+            return LinuxToB(-result);
+        }
+
+        // Retry
+        status = GET_SERVERCALLS()->setreuid(ruid, euid, setAllIfPrivileged, NULL, NULL);
+    }
+
+    if (status < 0)
+    {
+        return status;
+    }
+
+    return B_OK;
+}
+
 haiku_ssize_t _moni_getgroups(int groupCount, haiku_gid_t* groupList)
 {
     static_assert(sizeof(haiku_gid_t) == sizeof(int), "gid_t is not 32-bit.");

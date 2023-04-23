@@ -90,6 +90,10 @@ public:
     const haiku_team_info& GetInfo() const { return _info; }
     std::string GetName();
 
+    void SetUid(int uid) { _uid = uid; }
+    void SetGid(int gid) { _gid = gid; }
+    void SetEuid(int euid) { _euid = euid; }
+    void SetEgid(int egid) { _egid = egid; }
     void SetGroups(const std::vector<int>& groups) { _groups = groups; }
     void SetGroups(std::vector<int>&& groups) { _groups = std::move(groups); }
     void SetCwd(const std::filesystem::path& cwd) { _cwd = cwd; }
