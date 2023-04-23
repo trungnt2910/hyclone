@@ -11,6 +11,7 @@
 #include "entry_ref.h"
 #include "id_map.h"
 #include "server_apploadnotification.h"
+#include "server_debug.h"
 #include "server_memory.h"
 #include "server_messaging.h"
 #include "server_notificationimpl.h"
@@ -55,6 +56,7 @@ private:
     std::recursive_mutex _lock;
     NotificationManager _notificationManager;
     AppLoadNotificationService _appLoadNotificationService;
+    DebugService _debugService;
     MemoryService _memoryService;
     MessagingService _messagingService;
     SystemNotificationService _systemNotificationService;
@@ -110,6 +112,9 @@ public:
 
     AppLoadNotificationService& GetAppLoadNotificationService() { return _appLoadNotificationService; }
     const AppLoadNotificationService& GetAppLoadNotificationService() const { return _appLoadNotificationService; }
+
+    DebugService& GetDebugService() { return _debugService; }
+    const DebugService& GetDebugService() const { return _debugService; }
 
     MemoryService& GetMemoryService() { return _memoryService; }
     const MemoryService& GetMemoryService() const { return _memoryService; }

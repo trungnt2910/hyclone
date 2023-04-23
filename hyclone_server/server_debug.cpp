@@ -4,6 +4,7 @@
 #include "haiku_errors.h"
 #include "port.h"
 #include "process.h"
+#include "server_debug.h"
 #include "server_requests.h"
 #include "server_servercalls.h"
 #include "server_workers.h"
@@ -24,6 +25,32 @@ intptr_t server_hserver_call_debug_output(hserver_context& context, const char *
 
     // TODO: Make a dedicated log function
     std::cerr << "[" << context.pid << "] [" << context.tid << "] _kern_debug_output: " << message << std::endl;
+
+    return B_OK;
+}
+
+intptr_t server_hserver_call_install_default_debugger(hserver_context& context, int portId)
+{
+    auto& system = System::GetInstance();
+    std::shared_ptr<Port> port;
+
+    {
+        auto lock = system.Lock();
+
+        port = system.GetPort(portId).lock();
+    }
+
+    if (!port)
+    {
+        return B_BAD_PORT_ID;
+    }
+
+    {
+        auto& debugService = system.GetDebugService();
+        auto lock = debugService.Lock();
+
+        debugService.SetDefaultDebuggerPort(port);
+    }
 
     return B_OK;
 }

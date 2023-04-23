@@ -50,8 +50,7 @@ void _moni_register_syslog_daemon(port_id port)
 
 status_t _moni_install_default_debugger(port_id debuggerPort)
 {
-    _moni_debug_output("stub: _kern_start_watching");
-    return HAIKU_POSIX_ENOSYS;
+    return GET_SERVERCALLS()->install_default_debugger(debuggerPort);
 }
 
 port_id _moni_install_team_debugger(team_id team, port_id debuggerPort)

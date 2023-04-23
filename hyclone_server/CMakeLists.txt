@@ -14,7 +14,6 @@ add_executable(hyclone_server
 
     area.cpp
     associateddata.cpp
-    debug.cpp
     entry_ref.cpp
     hsemaphore.cpp
     image.cpp
@@ -22,6 +21,7 @@ add_executable(hyclone_server
     port.cpp
     process.cpp
     server_apploadnotification.cpp
+    server_debug.cpp
     server_dispatch.cpp
     server_errno.cpp
     server_filesystem.cpp
