@@ -230,3 +230,35 @@ bool loader_register_existing_fds()
 
     return true;
 }
+
+bool loader_register_groups()
+{
+    int gidCount = getgroups(0, NULL);
+
+    if (gidCount < 0)
+    {
+        return false;
+    }
+
+    std::vector<gid_t> gids(gidCount);
+
+    if (getgroups(gidCount, gids.data()) < 0)
+    {
+        return false;
+    }
+
+    std::vector<haiku_gid_t> gidsToRegister;
+    gidsToRegister.reserve(gidCount);
+
+    for (const auto& hostGid : gids)
+    {
+        gidsToRegister.push_back(loader_hserver_call_gid_for(hostGid));
+    }
+
+    if (loader_hserver_call_setgroups(gidsToRegister.size(), (int*)gidsToRegister.data(), NULL) < 0)
+    {
+        return false;
+    }
+
+    return true;
+}

@@ -365,6 +365,7 @@ int main(int argc, char** argv, char** envp)
 	loader_register_process(args.arg_count, args.args);
 	loader_register_thread(-1, NULL, false);
 	loader_register_builtin_areas(&args, commpage);
+	loader_register_groups();
 
 	((hostcalls*)(((uint8_t*)commpage) + EXTENDED_COMMPAGE_HOSTCALLS_OFFSET))
 		->at_exit = &loader_at_exit;

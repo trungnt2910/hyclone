@@ -1070,6 +1070,7 @@ intptr_t server_hserver_call_setgroups(hserver_context& context, size_t groupCou
     {
         std::vector<int> groups(groupCount);
         std::vector<intptr_t> hostGroups;
+        std::unordered_set<int> currentGroups;
 
         {
             auto lock = context.process->Lock();
@@ -1078,7 +1079,11 @@ intptr_t server_hserver_call_setgroups(hserver_context& context, size_t groupCou
             {
                 return B_BAD_ADDRESS;
             }
+
+            currentGroups.insert(context.process->GetGroups().begin(), context.process->GetGroups().end());
         }
+
+        bool needsHostSetGroups = false;
 
         {
             auto& userMapService = System::GetInstance().GetUserMapService();
@@ -1090,10 +1095,17 @@ intptr_t server_hserver_call_setgroups(hserver_context& context, size_t groupCou
                 {
                     continue;
                 }
+
                 hostGroups.push_back(userMapService.GetHostGid(group));
+
+                if (!currentGroups.contains(group))
+                {
+                    needsHostSetGroups = true;
+                }
             }
         }
 
+        if (needsHostSetGroups)
         {
             auto lock = context.process->Lock();
             if (context.process->WriteMemory(hostGroupList, hostGroups.data(), hostGroups.size() * sizeof(intptr_t))
@@ -1101,8 +1113,12 @@ intptr_t server_hserver_call_setgroups(hserver_context& context, size_t groupCou
             {
                 return B_BAD_ADDRESS;
             }
-        }
 
-        return hostGroups.size();
+            return hostGroups.size();
+        }
+        else
+        {
+            return 0;
+        }
     }
 }

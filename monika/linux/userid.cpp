@@ -40,16 +40,19 @@ status_t _moni_setgroups(int groupCount, haiku_gid_t* groupList)
             return hostGroupCount;
         }
 
-        gid_t* hostGroupList32 = (gid_t*)__builtin_alloca(hostGroupCount * sizeof(gid_t));
-        for (long i = 0; i < hostGroupCount; i++)
+        if (hostGroupCount > 0)
         {
-            hostGroupList32[i] = hostGroupList[i];
-        }
+            gid_t* hostGroupList32 = (gid_t*)__builtin_alloca(hostGroupCount * sizeof(gid_t));
+            for (long i = 0; i < hostGroupCount; i++)
+            {
+                hostGroupList32[i] = hostGroupList[i];
+            }
 
-        long status = LINUX_SYSCALL2(__NR_setgroups, hostGroupCount, hostGroupList32);
-        if (status < 0)
-        {
-            return LinuxToB(-status);
+            long status = LINUX_SYSCALL2(__NR_setgroups, hostGroupCount, hostGroupList32);
+            if (status < 0)
+            {
+                return LinuxToB(-status);
+            }
         }
     }
 
