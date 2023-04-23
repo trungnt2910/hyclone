@@ -139,7 +139,7 @@ void DefaultNotificationService::NotifyLocked(const KMessage& event, uint32 even
     {
         // The iterator might be invalidated by the listener, so we need to
         // get the next one before calling the listener.
-        auto nextIt = ++it;
+        auto nextIt = std::next(it);
 
         if ((eventMask & (*it)->eventMask) != 0)
         {
@@ -151,7 +151,7 @@ void DefaultNotificationService::NotifyLocked(const KMessage& event, uint32 even
 
     for (auto it = _listeners.begin(); it != _listeners.end();)
     {
-        auto nextIt = ++it;
+        auto nextIt = std::next(it);
 
         if ((eventMask & (*it)->eventMask) != 0)
         {
@@ -203,7 +203,7 @@ status_t DefaultNotificationService::RemoveListener(const KMessage* eventSpecifi
 
     for (auto it = _listeners.begin(); it != _listeners.end();)
     {
-        auto nextIt = ++it;
+        auto nextIt = std::next(it);
 
         if ((*it)->listener == &notificationListener)
         {
@@ -300,7 +300,7 @@ status_t DefaultUserNotificationService::RemoveListener(const KMessage* eventSpe
 
     for (auto it = _listeners.begin(); it != _listeners.end();)
     {
-        auto nextIt = ++it;
+        auto nextIt = std::next(it);
 
         if ((*it)->listener == &notificationListener)
         {
@@ -322,7 +322,7 @@ status_t DefaultUserNotificationService::RemoveUserListeners(port_id port, uint3
 
     for (auto it = _listeners.begin(); it != _listeners.end();)
     {
-        auto nextIt = ++it;
+        auto nextIt = std::next(it);
 
         if (*(*it)->listener == userListener)
         {
@@ -382,7 +382,7 @@ void DefaultUserNotificationService::EventOccurred(NotificationService& service,
 
         for (auto it = _listeners.begin(); it != _listeners.end();)
         {
-            auto nextIt = ++it;
+            auto nextIt = std::next(it);
 
             if ((*it)->team == team)
             {

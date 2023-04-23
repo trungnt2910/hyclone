@@ -14,6 +14,7 @@
 #include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
+#include "server_systemnotification.h"
 #include "server_workers.h"
 #include "system.h"
 #include "thread.h"
@@ -100,6 +101,8 @@ size_t System::UnregisterThread(int tid)
         it->second->_blockCondition.notify_all();
         it->second->_sendDataCondition.notify_all();
         it->second->_receiveDataCondition.notify_all();
+        it->second->_suspended = false;
+        it->second->_suspended.notify_all();
         _threads.erase(it);
     }
     return _threads.size();
@@ -299,6 +302,8 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
 
     std::cerr << "Connection started: " << context.conn_id << " " << pid << " " << tid << std::endl;
 
+    bool processNewlyCreated = false;
+
     {
         auto lock = system.Lock();
         system.RegisterConnection(context.conn_id, Connection(pid, tid));
@@ -317,6 +322,10 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
                 egid = mapService.GetGid(egid);
             }
             process = system.RegisterProcess(pid, uid, gid, euid, egid).lock();
+            if (process)
+            {
+                processNewlyCreated = true;
+            }
             std::cerr << "Registered process: " << context.conn_id << " " << pid << std::endl;
         }
         else
@@ -327,7 +336,14 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
 
     if (process)
     {
-        process->WaitForExec();
+        if (processNewlyCreated)
+        {
+            system.GetTeamNotificationService().Notify(TEAM_ADDED, process);
+        }
+        else
+        {
+            process->WaitForExec();
+        }
         std::shared_ptr<Thread> thread;
         {
             auto lock = system.Lock();
@@ -335,6 +351,7 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
         }
         if (thread)
         {
+            system.GetTeamNotificationService().Notify(THREAD_ADDED, process);
             auto lock = process->Lock();
             process->RegisterThread(thread);
             return B_OK;
@@ -349,6 +366,9 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
     std::shared_ptr<Port> debuggerPort;
     std::shared_ptr<Semaphore> debuggerWriteLock;
     std::vector<Port::Message> debuggerMessages;
+    std::vector<int> teamNotificationEvents;
+    std::vector<int> threadNotificationEvents;
+    bool processEnded = false;
 
     {
         auto& system = System::GetInstance();
@@ -374,6 +394,8 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
                     execUnlockNeeded = true;
                 }
 
+                processEnded = true;
+
                 context.process->PrepareForDeletion();
 
                 for (const auto& s: context.process->GetOwningSemaphores())
@@ -397,14 +419,8 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
 
                 context.process->ClearImages();
 
-                {
-                    auto& msgService = system.GetMessagingService();
-                    auto msgLock = msgService.Lock();
-
-                    // Will silently fail if the process is not the registered
-                    // message server.
-                    msgService.UnregisterService(context.process);
-                }
+                teamNotificationEvents.push_back(context.process->IsExecutingExec() ?
+                    TEAM_EXEC : TEAM_REMOVED);
 
                 if (context.process->GetDebuggerPort() != -1 && !context.process->IsExecutingExec())
                 {
@@ -430,6 +446,9 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
             }
 
             system.UnregisterThread(context.tid);
+
+            threadNotificationEvents.push_back(THREAD_REMOVED);
+
             if (context.tid != context.pid || !context.process->IsExecutingExec())
             {
                 if (context.process->GetDebuggerPort() != -1)
@@ -478,6 +497,26 @@ intptr_t server_hserver_call_disconnect(hserver_context& context)
         debuggerWriteLock->Release(1);
     }
 
+    if (processEnded)
+    {
+        auto& msgService = System::GetInstance().GetMessagingService();
+        auto msgLock = msgService.Lock();
+
+        // Will silently fail if the process is not the registered
+        // message server.
+        msgService.UnregisterService(context.process);
+    }
+
+    for (const auto& event: teamNotificationEvents)
+    {
+        System::GetInstance().GetTeamNotificationService().Notify(event, context.process);
+    }
+
+    for (const auto& event: threadNotificationEvents)
+    {
+        System::GetInstance().GetThreadNotificationService().Notify(event, context.thread);
+    }
+
     return B_OK;
 }
 
@@ -513,6 +552,11 @@ intptr_t server_hserver_call_fork(hserver_context& context, int newPid)
         // Else, calls such as `area_for` may fail before the copy is complete.
         context.process->Fork(*child);
         std::cerr << context.pid << " unlocked fork for " << newPid << "." << std::endl;
+    }
+
+    if (child)
+    {
+        system.GetTeamNotificationService().Notify(TEAM_ADDED, child);
     }
 
     return B_OK;

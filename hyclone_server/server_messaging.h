@@ -86,8 +86,8 @@ public:
     void* AllocateCommand(uint32 commandWhat, int32 dataSize, bool& wasEmpty);
     void CommitCommand();
 
-    void SetNextArea(std::shared_ptr<MessagingArea> area) { _nextArea = area; }
-    std::shared_ptr<MessagingArea> NextArea() const { return _nextArea; }
+    void SetNextArea(const std::shared_ptr<MessagingArea>& area);
+    const std::shared_ptr<MessagingArea>& NextArea() const { return _nextArea; }
 };
 
 // MessagingService

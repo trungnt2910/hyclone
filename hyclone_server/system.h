@@ -117,6 +117,12 @@ public:
     MessagingService& GetMessagingService() { return _messagingService; }
     const MessagingService& GetMessagingService() const { return _messagingService; }
 
+    TeamNotificationService& GetTeamNotificationService() { return _teamNotificationService; }
+    const TeamNotificationService& GetTeamNotificationService() const { return _teamNotificationService; }
+
+    ThreadNotificationService& GetThreadNotificationService() { return _threadNotificationService; }
+    const ThreadNotificationService& GetThreadNotificationService() const { return _threadNotificationService; }
+
     SystemNotificationService& GetSystemNotificationService() { return _systemNotificationService; }
     const SystemNotificationService& GetSystemNotificationService() const { return _systemNotificationService; }
 

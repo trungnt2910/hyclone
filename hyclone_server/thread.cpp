@@ -10,6 +10,7 @@
 #include "server_native.h"
 #include "server_requests.h"
 #include "server_servercalls.h"
+#include "server_systemnotification.h"
 #include "server_workers.h"
 #include "system.h"
 #include "thread.h"
@@ -440,6 +441,8 @@ intptr_t server_hserver_call_rename_thread(hserver_context& context, int threadI
 
         info.name[len] = '\0';
     }
+
+    System::GetInstance().GetThreadNotificationService().Notify(THREAD_NAME_CHANGED, thread);
 
     return B_OK;
 }

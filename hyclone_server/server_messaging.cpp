@@ -234,12 +234,18 @@ void* MessagingArea::AllocateCommand(uint32 commandWhat, int32 dataSize,
 
 void MessagingArea::CommitCommand()
 {
-    auto lockSem = _lockSem.lock();
+    auto counterSem = _counterSem.lock();
 
-    if (lockSem)
+    if (counterSem)
     {
-        lockSem->Release(1);
+        counterSem->Release(1);
     }
+}
+
+void MessagingArea::SetNextArea(const std::shared_ptr<MessagingArea>& area)
+{
+    _nextArea = area;
+    _header->next_kernel_area = (_nextArea) ? _nextArea->GetId() : 0;
 }
 
 messaging_command* MessagingArea::_CheckCommand(int32 offset, int32 &size)
