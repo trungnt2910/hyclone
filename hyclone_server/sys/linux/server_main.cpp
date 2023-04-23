@@ -186,7 +186,10 @@ int server_main(int argc, char **argv)
                 // For process that have already been gracefully disconnected,
                 // the call should silently fail with a B_BAD_VALUE on server_dispatch
                 // before reaching server_hserver_call_disconnect.
-                server_dispatch(fd, SERVERCALL_ID_disconnect, 0, 0, 0, 0, 0, 0);
+                server_worker_run([](int dispatchFd)
+                {
+                    server_dispatch(dispatchFd, SERVERCALL_ID_disconnect, 0, 0, 0, 0, 0, 0);
+                }, fd);
 
                 std::swap(pollfds[i], pollfds.back());
                 pollfds.pop_back();

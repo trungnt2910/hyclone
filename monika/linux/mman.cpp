@@ -182,6 +182,9 @@ area_id MONIKA_EXPORT _moni_clone_area(const char *name, void **address,
         0, sourceArea,
         hintAddr, mmap_flags, mmap_prot, open_flags);
 
+    mmap_flags |= MAP_SHARED;
+    mmap_flags &= ~MAP_PRIVATE;
+
     int fd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
     if (fd < 0)
     {

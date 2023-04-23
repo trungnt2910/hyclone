@@ -6,8 +6,6 @@
 #include "server_systemnotification.h"
 #include "system.h"
 
-#include <iostream>
-
 status_t SystemNotificationService::Init()
 {
     auto& notificationManager = System::GetInstance().GetNotificationManager();
@@ -190,7 +188,9 @@ void SystemNotificationService::EventOccurred(NotificationService& service,
 
     // send the message
     if (targetCount > 0)
+    {
         _SendMessage(targets, targetCount, object, opcode);
+    }
 }
 
 void SystemNotificationService::_AddTargets(ListenerList* listenerList, uint32 flags,
