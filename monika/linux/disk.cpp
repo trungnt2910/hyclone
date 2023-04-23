@@ -18,6 +18,12 @@ partition_id _moni_get_next_disk_device_id(int32* cookie, size_t* neededSize)
     return B_BAD_VALUE;
 }
 
+status_t _moni_start_watching_disks(uint32 eventMask, port_id port, int32 token)
+{
+    _moni_debug_output("stub: _kern_start_watching_disks");
+    return HAIKU_POSIX_ENOSYS;
+}
+
 status_t _moni_start_watching(haiku_dev_t device, haiku_ino_t node, uint32 flags,
     port_id port, uint32 token)
 {

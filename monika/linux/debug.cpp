@@ -43,6 +43,17 @@ void _moni_debugger(const char* userString)
     }
 }
 
+void _moni_register_syslog_daemon(port_id port)
+{
+    _moni_debug_output("stub: _kern_register_syslog_daemon");
+}
+
+status_t _moni_install_default_debugger(port_id debuggerPort)
+{
+    _moni_debug_output("stub: _kern_start_watching");
+    return HAIKU_POSIX_ENOSYS;
+}
+
 port_id _moni_install_team_debugger(team_id team, port_id debuggerPort)
 {
     return GET_SERVERCALLS()->install_team_debugger(team, debuggerPort);

@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     {
         implemented_syscalls.insert(KENREL_SYSCALL_PREFIX + line.substr(STRINGSIZE(MONIKA_SYSCALL_PREFIX)));
     }
-    
+
     for (int i = 0; i < kSyscallCount; i++)
     {
         bool implemented = implemented_syscalls.contains(kExtendedSyscallInfos[i].name);
@@ -90,9 +90,9 @@ int main(int argc, char** argv)
         else
         {
             output << "\n{\n";
-            output << "    GET_HOSTCALLS()->printf(\"stub: " << kExtendedSyscallInfos[i].name << "\\n\");\n";
-            output << "    GET_SERVERCALLS()->debug_output(\"stub: " << kExtendedSyscallInfos[i].name << "\", " << STRINGSIZE("stub: ") + strlen(kExtendedSyscallInfos[i].name) << ");\n";
-            output << "    while (true) { GET_HOSTCALLS()->at_exit(1); }\n"; 
+            output << "    GET_HOSTCALLS()->printf(\"fatal stub: " << kExtendedSyscallInfos[i].name << "\\n\");\n";
+            output << "    GET_SERVERCALLS()->debug_output(\"fatal stub: " << kExtendedSyscallInfos[i].name << "\", " << STRINGSIZE("fatal stub: ") + strlen(kExtendedSyscallInfos[i].name) << ");\n";
+            output << "    while (true) { GET_HOSTCALLS()->at_exit(1); }\n";
             output << "}\n";
         }
     }
@@ -155,7 +155,7 @@ int main(int argc, char** argv)
         }
         for (int j = 0; j < kExtendedSyscallInfos[i].parameter_count; ++j)
         {
-            output << "(" << GetParameterType(kExtendedSyscallInfos[i].parameters[j].size) 
+            output << "(" << GetParameterType(kExtendedSyscallInfos[i].parameters[j].size)
                    << ")*((" << GetParameterType(kExtendedSyscallInfos[i].parameters[j].used_size)
                    << "*)((uint8_t*)args + " << kExtendedSyscallInfos[i].parameters[j].offset << "))";
             if (j < kExtendedSyscallInfos[i].parameter_count - 1)
