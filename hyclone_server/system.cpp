@@ -351,7 +351,7 @@ intptr_t server_hserver_call_connect(hserver_context& context, int pid, int tid,
         }
         if (thread)
         {
-            system.GetTeamNotificationService().Notify(THREAD_ADDED, process);
+            system.GetThreadNotificationService().Notify(THREAD_ADDED, thread);
             auto lock = process->Lock();
             process->RegisterThread(thread);
             return B_OK;
