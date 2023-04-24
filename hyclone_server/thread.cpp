@@ -11,6 +11,7 @@
 #include "server_requests.h"
 #include "server_servercalls.h"
 #include "server_systemnotification.h"
+#include "server_time.h"
 #include "server_workers.h"
 #include "system.h"
 #include "thread.h"
@@ -81,7 +82,7 @@ status_t Thread::Block(std::unique_lock<std::mutex>& lock, uint32 flags, bigtime
     _blocked = true;
 
     bool useTimeout = (flags & (B_ABSOLUTE_TIMEOUT | B_RELATIVE_TIMEOUT)) &&
-        timeout != B_INFINITE_TIMEOUT;
+        !server_is_infinite_timeout(timeout);
 
     server_worker_run_wait([&]()
     {

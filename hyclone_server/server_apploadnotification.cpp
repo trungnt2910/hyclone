@@ -1,6 +1,7 @@
 #include "haiku_errors.h"
 #include "server_apploadnotification.h"
 #include "server_servercalls.h"
+#include "server_time.h"
 #include "server_workers.h"
 #include "system.h"
 
@@ -29,10 +30,25 @@ int AppLoadNotificationService::WaitForAppLoad(int pid, int64_t microsecondsTime
     {
         auto lock = std::unique_lock<std::mutex>(_lock);
 
-        if (cond->wait_for(
-            lock,
-            std::chrono::microseconds(microsecondsTimeout),
-            [&](){return _pendingNotifications.contains(pid);}))
+        bool success = false;
+
+        server_worker_run_wait([&]()
+        {
+            if (!server_is_infinite_timeout(microsecondsTimeout))
+            {
+                success = cond->wait_for(
+                    lock,
+                    std::chrono::microseconds(microsecondsTimeout),
+                    [&](){return _pendingNotifications.contains(pid);});
+            }
+            else
+            {
+                cond->wait(lock, [&](){return _pendingNotifications.contains(pid);});
+                success = true;
+            }
+        });
+
+        if (success)
         {
             status = _pendingNotifications[pid];
             _pendingNotifications.erase(pid);

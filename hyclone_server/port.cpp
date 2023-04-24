@@ -10,6 +10,7 @@
 #include "process.h"
 #include "server_native.h"
 #include "server_servercalls.h"
+#include "server_time.h"
 #include "server_workers.h"
 #include "system.h"
 
@@ -46,7 +47,7 @@ status_t Port::Write(Message&& message, bigtime_t timeout)
                 return !_registered || _closed || _info.queue_count < _info.capacity;
             };
 
-            if (timeout != B_INFINITE_TIMEOUT)
+            if (!server_is_infinite_timeout(timeout))
             {
                 _writeCondVar.wait_for(lock, std::chrono::microseconds(timeout), writableOrDead);
                 return;
@@ -94,7 +95,7 @@ status_t Port::Read(Message& message, bigtime_t timeout)
                 return !_registered || _info.queue_count > 0;
             };
 
-            if (timeout != B_INFINITE_TIMEOUT)
+            if (!server_is_infinite_timeout(timeout))
             {
                 _readCondVar.wait_for(lock, std::chrono::microseconds(timeout), readableOrDead);
                 return;
@@ -145,7 +146,7 @@ status_t Port::GetMessageInfo(haiku_port_message_info& info, bigtime_t timeout)
                 return !_registered || _info.queue_count > 0;
             };
 
-            if (timeout != B_INFINITE_TIMEOUT)
+            if (!server_is_infinite_timeout(timeout))
             {
                 _readCondVar.wait_for(lock, std::chrono::microseconds(timeout), readableOrDead);
                 return;

@@ -5,6 +5,7 @@
 #include "process.h"
 #include "server_servercalls.h"
 #include "server_systemtime.h"
+#include "server_time.h"
 #include "server_workers.h"
 #include "system.h"
 
@@ -263,11 +264,12 @@ intptr_t server_hserver_call_acquire_sem_etc(hserver_context& context, int id, u
         return B_BAD_VALUE;
     }
 
-    if (flags & B_RELATIVE_TIMEOUT && timeout != B_INFINITE_TIMEOUT)
+    // TODO: Handle this in the Semaphore class.
+    if (flags & B_RELATIVE_TIMEOUT && !server_is_infinite_timeout(timeout))
     {
         return sem->TryAcquireFor(context.tid, count, timeout);
     }
-    else if (flags & B_ABSOLUTE_TIMEOUT && timeout != B_INFINITE_TIMEOUT)
+    else if (flags & B_ABSOLUTE_TIMEOUT && !server_is_infinite_timeout(timeout))
     {
         return sem->TryAcquireUntil(context.tid, count, timeout);
     }
