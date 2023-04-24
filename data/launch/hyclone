@@ -1,0 +1,11 @@
+# net_server requires AF_LINK which is not supported on
+# HyClone
+service x-vnd.Haiku-net_server {
+	disabled true
+}
+
+# media_server requires media_addon_server, which for some
+# reason is not started automatically
+service x-vnd.Haiku-media_server {
+	disabled true
+}

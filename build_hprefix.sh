@@ -124,6 +124,8 @@ killall -9 hyclone_server
 echo "Copy additional required files"
 # Required for bash prompt to work like Haiku.
 cp -rfv $HAIKU_BUILD_SOURCE_DIRECTORY/data/etc $HPREFIX/boot/system
+# Disables some faulty services that are enabled by default.
+cp -rfv $SCRIPT_DIR/data/launch $HPREFIX/boot/system/non-packaged/data
 # Some apps require this link to work properly.
 if [ ! -L "$HPREFIX/system" ]; then
     ln -s boot/system $HPREFIX/system
