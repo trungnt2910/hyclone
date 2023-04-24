@@ -265,11 +265,11 @@ intptr_t server_hserver_call_acquire_sem_etc(hserver_context& context, int id, u
     }
 
     // TODO: Handle this in the Semaphore class.
-    if (flags & B_RELATIVE_TIMEOUT && !server_is_infinite_timeout(timeout))
+    if (flags & B_RELATIVE_TIMEOUT && !server_is_infinite_timeout(timeout, flags))
     {
         return sem->TryAcquireFor(context.tid, count, timeout);
     }
-    else if (flags & B_ABSOLUTE_TIMEOUT && !server_is_infinite_timeout(timeout))
+    else if (flags & B_ABSOLUTE_TIMEOUT && !server_is_infinite_timeout(timeout, flags))
     {
         return sem->TryAcquireUntil(context.tid, count, timeout);
     }

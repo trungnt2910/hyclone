@@ -82,7 +82,7 @@ status_t Thread::Block(std::unique_lock<std::mutex>& lock, uint32 flags, bigtime
     _blocked = true;
 
     bool useTimeout = (flags & (B_ABSOLUTE_TIMEOUT | B_RELATIVE_TIMEOUT)) &&
-        !server_is_infinite_timeout(timeout);
+        !server_is_infinite_timeout(timeout, flags);
 
     server_worker_run_wait([&]()
     {
