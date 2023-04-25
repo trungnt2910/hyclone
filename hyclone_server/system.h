@@ -14,6 +14,7 @@
 #include "server_debug.h"
 #include "server_memory.h"
 #include "server_messaging.h"
+#include "server_nodemonitor.h"
 #include "server_notificationimpl.h"
 #include "server_notifications.h"
 #include "server_systemnotification.h"
@@ -59,6 +60,7 @@ private:
     DebugService _debugService;
     MemoryService _memoryService;
     MessagingService _messagingService;
+    NodeMonitorService _nodeMonitorService;
     SystemNotificationService _systemNotificationService;
     TeamNotificationService _teamNotificationService;
     ThreadNotificationService _threadNotificationService;
@@ -121,6 +123,9 @@ public:
 
     MessagingService& GetMessagingService() { return _messagingService; }
     const MessagingService& GetMessagingService() const { return _messagingService; }
+
+    NodeMonitorService& GetNodeMonitorService() { return _nodeMonitorService; }
+    const NodeMonitorService& GetNodeMonitorService() const { return _nodeMonitorService; }
 
     TeamNotificationService& GetTeamNotificationService() { return _teamNotificationService; }
     const TeamNotificationService& GetTeamNotificationService() const { return _teamNotificationService; }

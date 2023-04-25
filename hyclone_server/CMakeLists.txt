@@ -17,6 +17,7 @@ add_executable(hyclone_server
     entry_ref.cpp
     hsemaphore.cpp
     image.cpp
+    io_context.cpp
     kmessage.cpp
     port.cpp
     process.cpp
@@ -27,6 +28,7 @@ add_executable(hyclone_server
     server_filesystem.cpp
     server_memory.cpp
     server_messaging.cpp
+    server_nodemonitor.cpp
     server_notificationimpl.cpp
     server_notifications.cpp
     server_prefix.cpp

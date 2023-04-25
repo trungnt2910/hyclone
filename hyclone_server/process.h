@@ -14,6 +14,7 @@
 #include "haiku_image.h"
 #include "haiku_team.h"
 #include "id_map.h"
+#include "io_context.h"
 
 class Area;
 class Thread;
@@ -28,6 +29,8 @@ private:
     int _debuggerPid, _debuggerPort, _debuggerWriteLock;
     std::atomic<bool> _forkUnlocked;
     std::atomic<bool> _isExecutingExec;
+
+    std::shared_ptr<IoContext> _ioContext;
 
     // Both of these are relative to $HPREFIX.
     std::filesystem::path _cwd;
@@ -68,6 +71,9 @@ public:
     bool IsValidAreaId(int areaId);
     size_t UnregisterArea(int areaId);
     void ClearAreas() { _areas.clear(); }
+
+    const std::shared_ptr<IoContext>& GetIoContext() const { return _ioContext; }
+    void ClearIoContext();
 
     size_t RegisterFd(int fd, const std::filesystem::path& path);
     const std::filesystem::path& GetFd(int fd);

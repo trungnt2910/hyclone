@@ -32,6 +32,8 @@ Process::Process(int pid, int uid, int gid, int euid, int egid)
     _debuggerPort = -1;
     _debuggerPid = -1;
     _debuggerWriteLock = -1;
+
+    _ioContext = std::make_shared<IoContext>();
 }
 
 std::weak_ptr<Thread> Process::RegisterThread(int tid)
@@ -165,6 +167,12 @@ size_t Process::UnregisterArea(int areaId)
     return _areas.size();
 }
 
+void Process::ClearIoContext()
+{
+    auto& nodeMonitorService = System::GetInstance().GetNodeMonitorService();
+    nodeMonitorService.RemoveListeners(_ioContext);
+}
+
 size_t Process::RegisterFd(int fd, const std::filesystem::path& path)
 {
     _fds[fd] = path;
@@ -269,6 +277,8 @@ void Process::Fork(Process& child)
     child._fds = _fds;
     child._cwd = _cwd;
     child._root = _root;
+    *child._ioContext = *_ioContext;
+
     child._groups = _groups;
 
     // No, semaphores don't seem to be inherited.

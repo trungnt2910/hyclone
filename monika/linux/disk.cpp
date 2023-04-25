@@ -27,20 +27,17 @@ status_t _moni_start_watching_disks(uint32 eventMask, port_id port, int32 token)
 status_t _moni_start_watching(haiku_dev_t device, haiku_ino_t node, uint32 flags,
     port_id port, uint32 token)
 {
-    _moni_debug_output("stub: _kern_start_watching");
-    return HAIKU_POSIX_ENOSYS;
+    return GET_SERVERCALLS()->start_watching(device, node, flags, port, token);
 }
 status_t _moni_stop_watching(haiku_dev_t device, haiku_ino_t node, port_id port,
     uint32 token)
 {
-    _moni_debug_output("stub: _kern_stop_watching");
-    return HAIKU_POSIX_ENOSYS;
+    return GET_SERVERCALLS()->stop_watching(device, node, port, token);
 }
 
 status_t _moni_stop_notifying(port_id port, uint32 token)
 {
-    _moni_debug_output("stub: _kern_stop_notifying");
-    return HAIKU_POSIX_ENOSYS;
+    return GET_SERVERCALLS()->stop_notifying(port, token);
 }
 
 haiku_dev_t _moni_next_device(int32* _cookie)
