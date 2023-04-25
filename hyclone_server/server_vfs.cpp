@@ -4,7 +4,9 @@
 #include "haiku_fs_volume.h"
 #include "server_filesystem.h"
 #include "server_native.h"
+#include "server_nodemonitor.h"
 #include "server_vfs.h"
+#include "system.h"
 
 VfsService::VfsService()
 {
@@ -127,12 +129,10 @@ haiku_dev_t VfsService::Mount(const std::filesystem::path& path, const std::file
         return status;
     }
 
-    status = RegisterDevice(volume);
+    RegisterDevice(volume);
 
-    if (status != B_OK)
-    {
-        return status;
-    }
+    System::GetInstance().GetNodeMonitorService()
+        .NotifyMount(volume->GetInfo().dev, st.st_dev, st.st_ino);
 
     return volume->GetInfo().dev;
 }
@@ -151,8 +151,9 @@ status_t VfsService::Unmount(const std::filesystem::path& path, uint32 flags)
     if (it != _deviceMounts.end())
     {
         // TODO: Check if the device is still in use.
-        _devices.Remove(it->second->GetInfo().dev);
-        _deviceReferences.erase(it->second->GetInfo().dev);
+        haiku_dev_t dev = it->second->GetInfo().dev;
+        _devices.Remove(dev);
+        _deviceReferences.erase(dev);
         std::vector<decltype(_entryRefs)::iterator> toRemove;
         for (auto refIt = _entryRefs.begin(); refIt != _entryRefs.end(); ++refIt)
         {
@@ -166,6 +167,10 @@ status_t VfsService::Unmount(const std::filesystem::path& path, uint32 flags)
             _entryRefs.erase(refIt);
         }
         _deviceMounts.erase(it);
+
+        System::GetInstance().GetNodeMonitorService()
+            .NotifyUnmount(dev);
+
         return B_OK;
     }
     return B_DEVICE_NOT_FOUND;

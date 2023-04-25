@@ -19,6 +19,7 @@ struct node_monitor
 struct interested_monitor_listener_list
 {
     MonitorListenerList::iterator iterator;
+    MonitorListenerList::iterator end;
     uint32 flags;
 };
 
@@ -232,7 +233,6 @@ status_t NodeMonitorService::AddListener(const std::shared_ptr<IoContext>& conte
     return _AddMonitorListener(context, monitor, flags, notificationListener);
 }
 
-
 status_t NodeMonitorService::_UpdateListener(
     const std::shared_ptr<IoContext>& context,
     haiku_dev_t device, haiku_ino_t node, uint32 flags,
@@ -259,6 +259,171 @@ status_t NodeMonitorService::_UpdateListener(
     }
 
     return B_BAD_VALUE;
+}
+
+/*! \brief Given device and node ID and a node monitoring event mask, the
+           function checks whether there are listeners interested in any of
+           the events for that node and, if so, adds the respective listener
+           list to a supplied array of listener lists.
+
+    Note, that in general not all of the listeners in an appended list will be
+    interested in the events, but it is guaranteed that
+    interested_monitor_listener_list::first_listener is indeed
+    the first listener in the list, that is interested.
+
+    \param device The ID of the mounted FS, the node lives in.
+    \param node The ID of the node.
+    \param flags The mask specifying the events occurred for the given node
+           (a combination of \c B_WATCH_* constants).
+    \param interestedListeners An array of listener lists. If there are
+           interested listeners for the node, the list will be appended to
+           this array.
+    \param interestedListenerCount The number of elements in the
+           \a interestedListeners array. Will be incremented, if a list is
+           appended.
+*/
+void NodeMonitorService::_GetInterestedMonitorListeners(
+    haiku_dev_t device, haiku_ino_t node,
+    uint32 flags, interested_monitor_listener_list* interestedListeners,
+    int32& interestedListenerCount)
+{
+    // get the monitor for the node
+    std::shared_ptr<node_monitor> monitor = _MonitorFor(device, node, false);
+    if (monitor == NULL)
+        return;
+
+    // iterate through the listeners until we find one with matching flags
+    for (auto& listener : monitor->listeners)
+    {
+        if ((listener->flags & flags) == flags)
+        {
+            interested_monitor_listener_list& list = interestedListeners[interestedListenerCount++];
+            list.iterator = listener->monitor_link;
+            list.end = monitor->listeners.end();
+            list.flags = flags;
+            return;
+        }
+    }
+}
+
+void NodeMonitorService::_GetInterestedVolumeListeners(
+    haiku_dev_t device, uint32 flags,
+    interested_monitor_listener_list* interestedListeners,
+    int32& interestedListenerCount)
+{
+    // get the monitor for the node
+    std::shared_ptr<node_monitor> monitor = _MonitorFor(device, -1, true);
+    if (monitor == NULL)
+        return;
+
+    // iterate through the listeners until we find one with matching flags
+    for (auto& listener : monitor->listeners)
+    {
+        if ((listener->flags & flags) == flags)
+        {
+            interested_monitor_listener_list& list = interestedListeners[interestedListenerCount++];
+            list.iterator = listener->monitor_link;
+            list.end = monitor->listeners.end();
+            list.flags = flags;
+            return;
+        }
+    }
+}
+
+/*! \brief Sends a notifcation message to the given listeners.
+    \param message The message to be sent.
+    \param interestedListeners An array of listener lists.
+    \param interestedListenerCount The number of elements in the
+           \a interestedListeners array.
+    \return
+    - \c B_OK, if everything went fine,
+    - another error code otherwise.
+*/
+status_t NodeMonitorService::_SendNotificationMessage(KMessage& message,
+    interested_monitor_listener_list* interestedListeners,
+    int32 interestedListenerCount)
+{
+    // iterate through the lists
+    interested_monitor_listener_list* list = interestedListeners;
+    for (int32 i = 0; i < interestedListenerCount; ++i, ++list)
+    {
+        // iterate through the listeners
+        MonitorListenerList::iterator iterator = list->iterator;
+        do
+        {
+            std::shared_ptr<monitor_listener>& listener = *iterator;
+            if (listener->flags & list->flags)
+                listener->listener->EventOccurred(*this, &message);
+        }
+        while ((++iterator) != list->end);
+    }
+
+    list = interestedListeners;
+    for (int32 i = 0; i < interestedListenerCount; i++, list++)
+    {
+        // iterate through the listeners
+        do
+        {
+            std::shared_ptr<monitor_listener>& listener = *list->iterator;
+            if (listener->flags & list->flags)
+                listener->listener->AllListenersNotified(*this);
+        }
+        while ((++list->iterator) != list->end);
+    }
+
+    return B_OK;
+}
+
+status_t NodeMonitorService::NotifyUnmount(haiku_dev_t device)
+{
+    std::unique_lock<std::recursive_mutex> locker(_recursiveLock);
+
+    // get the lists of all interested listeners
+    interested_monitor_listener_list interestedListeners[3];
+    int32 interestedListenerCount = 0;
+    _GetInterestedMonitorListeners(-1, -1, B_WATCH_MOUNT,
+        interestedListeners, interestedListenerCount);
+
+    if (interestedListenerCount == 0)
+        return B_OK;
+
+    // there are interested listeners: construct the message and send it
+    char messageBuffer[96];
+    KMessage message;
+    message.SetTo(messageBuffer, sizeof(messageBuffer), B_NODE_MONITOR);
+    message.AddInt32("opcode", B_DEVICE_UNMOUNTED);
+    message.AddInt32("device", device);
+
+    return _SendNotificationMessage(message, interestedListeners,
+        interestedListenerCount);
+}
+
+status_t NodeMonitorService::NotifyMount(
+    haiku_dev_t device, haiku_dev_t parentDevice,
+    haiku_ino_t parentDirectory)
+{
+    std::unique_lock<std::recursive_mutex> locker(_recursiveLock);
+
+    // get the lists of all interested listeners
+    interested_monitor_listener_list interestedListeners[3];
+    int32 interestedListenerCount = 0;
+    _GetInterestedMonitorListeners(-1, -1, B_WATCH_MOUNT,
+        interestedListeners, interestedListenerCount);
+
+    if (interestedListenerCount == 0)
+        return B_OK;
+
+    // there are interested listeners: construct the message and send it
+    char messageBuffer[128];
+    KMessage message;
+    message.SetTo(messageBuffer, sizeof(messageBuffer), B_NODE_MONITOR);
+    message.AddInt32("opcode", B_DEVICE_MOUNTED);
+    message.AddInt32("new device", device);
+    message.AddInt32("device", parentDevice);
+    message.AddInt64("directory", parentDirectory);
+
+    return _SendNotificationMessage(message, interestedListeners,
+        interestedListenerCount);
 }
 
 status_t NodeMonitorService::RemoveListeners(
@@ -327,7 +492,7 @@ status_t NodeMonitorService::RemoveListener(
     return _RemoveListener(context, device, node, notificationListener, true);
 }
 
-inline status_t NodeMonitorService::RemoveUserListeners(
+status_t NodeMonitorService::RemoveUserListeners(
     const std::shared_ptr<IoContext>& context,
     port_id port, uint32 token)
 {
