@@ -488,21 +488,32 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
             auto& vfsService = System::GetInstance().GetVfsService();
 
             haiku_stat st;
-            status_t status = vfsService.ReadStat(_root.parent_path(), st, false);
+            status_t status = B_OK;
+
+            switch (_mountType)
+            {
+                case PACKAGE_FS_MOUNT_TYPE_SYSTEM:
+                    status = vfsService.ReadStat(_root.parent_path(), st, false);
+                break;
+                case PACKAGE_FS_MOUNT_TYPE_HOME:
+                    status = vfsService.ReadStat(_root.parent_path().parent_path(), st, false);
+                break;
+                case PACKAGE_FS_MOUNT_TYPE_CUSTOM:
+                    st.st_dev = -1;
+                    st.st_ino = 0;
+                break;
+                default:
+                    std::cerr << "Unknown mount type: " << _mountType << std::endl;
+                    return B_BAD_VALUE;
+            }
+
             if (status != B_OK)
             {
                 return status;
             }
 
             volumeInfo->rootDeviceID = st.st_dev;
-
-            auto device = vfsService.GetDevice(st.st_dev).lock();
-            if (!device)
-            {
-                return B_BAD_VALUE;
-            }
-
-            volumeInfo->rootDirectoryID = device->GetInfo().root;
+            volumeInfo->rootDirectoryID = st.st_ino;
 
             status = vfsService.ReadStat(_root / _relativePackagesPath, st, false);
             if (status != B_OK)
