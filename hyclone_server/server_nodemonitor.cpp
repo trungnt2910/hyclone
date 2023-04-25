@@ -4,6 +4,8 @@
 #include "server_servercalls.h"
 #include "system.h"
 
+const std::string NodeMonitorService::kNodeMonitorServiceName = "node monitor";
+
 typedef std::list<std::shared_ptr<monitor_listener>> MonitorListenerList;
 
 struct node_monitor

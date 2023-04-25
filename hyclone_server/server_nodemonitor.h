@@ -93,7 +93,7 @@ private:
 
     UserMessagingMessageSender _nodeMonitorSender;
 
-    static constexpr std::string kNodeMonitorServiceName = "node monitor";
+    static const std::string kNodeMonitorServiceName;
 public:
     NodeMonitorService() = default;
     virtual ~NodeMonitorService() override = default;
