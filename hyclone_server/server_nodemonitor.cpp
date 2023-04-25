@@ -504,7 +504,7 @@ status_t NodeMonitorService::RemoveUserListeners(
 
     for (auto it = context->GetMonitors().begin(); it != context->GetMonitors().end();)
     {
-        const std::shared_ptr<monitor_listener>& removeListener = *it;
+        listener = *it;
         auto nextIt = std::next(it);
 
         if (*listener->listener != userListener)
@@ -513,7 +513,7 @@ status_t NodeMonitorService::RemoveUserListeners(
             continue;
         }
 
-        _RemoveListener(context, removeListener);
+        _RemoveListener(context, listener);
         ++count;
 
         it = nextIt;
