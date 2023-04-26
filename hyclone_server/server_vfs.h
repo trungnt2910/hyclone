@@ -8,6 +8,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "BeDefs.h"
 #include "entry_ref.h"
@@ -51,6 +52,9 @@ public:
     virtual status_t Ioctl(const std::filesystem::path& path, unsigned int cmd,
         void* addr, void* buffer, size_t size) { return B_BAD_VALUE; }
 
+    virtual status_t AddMonitor(haiku_ino_t node) { return B_UNSUPPORTED; }
+    virtual status_t RemoveMonitor(haiku_ino_t node) { return B_UNSUPPORTED; }
+
     const haiku_fs_info& GetInfo() const { return _info; }
     haiku_fs_info& GetInfo() { return _info; }
     const std::filesystem::path& GetRoot() const { return _root; }
@@ -75,6 +79,7 @@ private:
     IdMap<std::shared_ptr<VfsDevice>, haiku_dev_t> _devices;
     std::unordered_map<std::filesystem::path, std::shared_ptr<VfsDevice>, PathHash> _deviceMounts;
     std::unordered_map<int, int> _deviceReferences;
+    std::unordered_map<haiku_dev_t, std::unordered_set<haiku_ino_t>> _monitors;
     using mounter_t = status_t(*)(const std::filesystem::path& path, const std::filesystem::path& device,
         uint32 mountFlags, const std::string& args, std::shared_ptr<VfsDevice>& output);
     std::unordered_map<std::string, mounter_t> _mounters;
@@ -146,7 +151,9 @@ public:
 
     size_t RegisterEntryRef(const EntryRef& ref, const std::string& path);
     size_t RegisterEntryRef(const EntryRef& ref, std::string&& path);
+    size_t UnregisterEntryRef(const EntryRef& ref);
     bool GetEntryRef(const EntryRef& ref, std::string& path) const;
+    bool SearchEntryRef(const std::string& path, EntryRef& ref) const;
 
     size_t RegisterDevice(const std::shared_ptr<VfsDevice>& device);
     std::weak_ptr<VfsDevice> GetDevice(int id);
@@ -175,6 +182,9 @@ public:
         size_t pos, const void* buffer, size_t size);
     status_t RemoveAttr(const std::filesystem::path& path, const std::string& name);
     status_t Ioctl(const std::filesystem::path& path, unsigned int cmd, void* addr, void* buffer, size_t size);
+
+    status_t AddMonitor(haiku_dev_t device, haiku_ino_t node);
+    status_t RemoveMonitor(haiku_dev_t device, haiku_ino_t node);
 
     std::unique_lock<std::recursive_mutex> Lock() { return std::unique_lock<std::recursive_mutex>(_lock); }
 };

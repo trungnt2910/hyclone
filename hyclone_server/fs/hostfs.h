@@ -24,6 +24,9 @@ public:
         int statMask, bool& isSymlink) override;
     virtual status_t TransformDirent(const std::filesystem::path& path, haiku_dirent& dirent) override;
 
+    virtual status_t AddMonitor(haiku_ino_t node) override;
+    virtual status_t RemoveMonitor(haiku_ino_t node) override;
+
     // TODO: Override extended attributes functions to read from the host filesystem.
 
     const std::filesystem::path& GetHostRoot() const { return _hostRoot; }

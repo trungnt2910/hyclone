@@ -6,16 +6,6 @@
 
 const std::string NodeMonitorService::kNodeMonitorServiceName = "node monitor";
 
-typedef std::list<std::shared_ptr<monitor_listener>> MonitorListenerList;
-
-struct node_monitor
-{
-    // node_monitor* hash_link;
-    haiku_dev_t device;
-    haiku_ino_t node;
-    MonitorListenerList listeners;
-};
-
 struct interested_monitor_listener_list
 {
     MonitorListenerList::iterator iterator;
@@ -374,6 +364,129 @@ status_t NodeMonitorService::_SendNotificationMessage(KMessage& message,
     return B_OK;
 }
 
+/*!	\brief Notifies all interested listeners that an entry has been created
+           or removed.
+    \param opcode \c B_ENTRY_CREATED or \c B_ENTRY_REMOVED.
+    \param device The ID of the mounted FS, the entry lives/lived in.
+    \param directory The entry's parent directory ID.
+    \param name The entry's name.
+    \param node The ID of the node the entry refers/referred to.
+    \return
+    - \c B_OK, if everything went fine,
+    - another error code otherwise.
+*/
+status_t NodeMonitorService::NotifyEntryCreatedOrRemoved(
+    int32 opcode, haiku_dev_t device,
+    haiku_ino_t directory, const char* name, haiku_ino_t node)
+{
+    if (!name)
+        return B_BAD_VALUE;
+
+    std::unique_lock<std::recursive_mutex> locker(_recursiveLock);
+
+    // get the lists of all interested listeners
+    interested_monitor_listener_list interestedListeners[3];
+    int32 interestedListenerCount = 0;
+    // ... for the volume
+    _GetInterestedVolumeListeners(device, B_WATCH_NAME,
+        interestedListeners, interestedListenerCount);
+    // ... for the node
+    if (opcode != B_ENTRY_CREATED)
+    {
+        _GetInterestedMonitorListeners(device, node, B_WATCH_NAME,
+            interestedListeners, interestedListenerCount);
+    }
+    // ... for the directory
+    _GetInterestedMonitorListeners(device, directory, B_WATCH_DIRECTORY,
+        interestedListeners, interestedListenerCount);
+
+    if (interestedListenerCount == 0)
+        return B_OK;
+
+    // there are interested listeners: construct the message and send it
+    char messageBuffer[1024];
+    KMessage message;
+    message.SetTo(messageBuffer, sizeof(messageBuffer), B_NODE_MONITOR);
+    message.AddInt32("opcode", opcode);
+    message.AddInt32("device", device);
+    message.AddInt64("directory", directory);
+    message.AddInt64("node", node);
+    message.AddString("name", name); // for "removed" Haiku only
+
+    return _SendNotificationMessage(message, interestedListeners,
+                                    interestedListenerCount);
+}
+
+inline status_t
+NodeMonitorService::NotifyEntryMoved(
+    haiku_dev_t device, haiku_ino_t fromDirectory,
+    const char* fromName, haiku_ino_t toDirectory, const char* toName,
+    haiku_ino_t node)
+{
+    if (!fromName || !toName)
+        return B_BAD_VALUE;
+
+    // If node is a mount point, we need to resolve it to the mounted
+    // volume's root node.
+    haiku_dev_t nodeDevice = device;
+    {
+        auto& vfsService = System::GetInstance().GetVfsService();
+        auto lock = vfsService.Lock();
+        std::string path;
+        if (vfsService.GetEntryRef(EntryRef(device, node), path))
+        {
+            auto nodeVfsDevice = vfsService.GetDevice(path).lock();
+
+            if (nodeVfsDevice)
+            {
+                nodeDevice = nodeVfsDevice->GetId();
+                node = nodeVfsDevice->GetInfo().root;
+            }
+        }
+    }
+    // vfs_resolve_vnode_to_covering_vnode(device, node, &nodeDevice, &node);
+
+    std::unique_lock<std::recursive_mutex> locker(_recursiveLock);
+
+    // get the lists of all interested listeners
+    interested_monitor_listener_list interestedListeners[4];
+    int32 interestedListenerCount = 0;
+    // ... for the volume
+    _GetInterestedVolumeListeners(device, B_WATCH_NAME,
+        interestedListeners, interestedListenerCount);
+    // ... for the node
+    _GetInterestedMonitorListeners(nodeDevice, node, B_WATCH_NAME,
+        interestedListeners, interestedListenerCount);
+    // ... for the source directory
+    _GetInterestedMonitorListeners(device, fromDirectory, B_WATCH_DIRECTORY,
+        interestedListeners, interestedListenerCount);
+    // ... for the target directory
+    if (toDirectory != fromDirectory)
+    {
+        _GetInterestedMonitorListeners(device, toDirectory, B_WATCH_DIRECTORY,
+            interestedListeners, interestedListenerCount);
+    }
+
+    if (interestedListenerCount == 0)
+        return B_OK;
+
+    // there are interested listeners: construct the message and send it
+    char messageBuffer[1024];
+    KMessage message;
+    message.SetTo(messageBuffer, sizeof(messageBuffer), B_NODE_MONITOR);
+    message.AddInt32("opcode", B_ENTRY_MOVED);
+    message.AddInt32("device", device);
+    message.AddInt64("from directory", fromDirectory);
+    message.AddInt64("to directory", toDirectory);
+    message.AddInt32("node device", nodeDevice); // Haiku only
+    message.AddInt64("node", node);
+    message.AddString("from name", fromName); // Haiku only
+    message.AddString("name", toName);
+
+    return _SendNotificationMessage(message, interestedListeners,
+                                    interestedListenerCount);
+}
+
 status_t NodeMonitorService::NotifyUnmount(haiku_dev_t device)
 {
     std::unique_lock<std::recursive_mutex> locker(_recursiveLock);
@@ -529,7 +642,7 @@ status_t NodeMonitorService::UpdateUserListener(const std::shared_ptr<IoContext>
 
     std::shared_ptr<node_monitor> monitor;
     status_t status = _GetMonitor(context, device, node, true, &monitor,
-                                  (flags & B_WATCH_VOLUME) != 0);
+        (flags & B_WATCH_VOLUME) != 0);
     if (status < B_OK)
         return status;
 

@@ -15,9 +15,9 @@ private:
     std::list<std::shared_ptr<monitor_listener>> _monitors;
 public:
     IoContext() = default;
-    ~IoContext() = default;
     IoContext(const IoContext& other);
     IoContext& operator=(const IoContext& other);
+    ~IoContext();
 
     unsigned int MaxMonitors() const { return _maxMonitors; }
     unsigned int NumMonitors() const;

@@ -209,3 +209,25 @@ status_t HostfsDevice::TransformDirent(const std::filesystem::path& path, haiku_
 
     return dirent.d_reclen;
 }
+
+status_t HostfsDevice::AddMonitor(haiku_ino_t node)
+{
+    auto& vfsService = System::GetInstance().GetVfsService();
+    std::string pathStr;
+
+    if (!vfsService.GetEntryRef(EntryRef(_info.dev, node), pathStr))
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
+
+    std::filesystem::path path(pathStr);
+    auto relativePath = path.lexically_relative(_root);
+    auto hostPath = _hostRoot / relativePath;
+
+    return server_add_native_monitor(hostPath, _info.dev, node);
+}
+
+status_t HostfsDevice::RemoveMonitor(haiku_ino_t node)
+{
+    return server_remove_native_monitor(_info.dev, node);
+}

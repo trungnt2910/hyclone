@@ -10,7 +10,7 @@
 #include "BeDefs.h"
 #include "server_notifications.h"
 
-struct node_monitor;
+struct monitor_listener;
 struct interested_monitor_listener_list;
 
 class KMessage;
@@ -18,6 +18,15 @@ class KMessage;
 class IoContext;
 
 class UserNodeListener;
+
+typedef std::list<std::shared_ptr<monitor_listener>> MonitorListenerList;
+
+struct node_monitor
+{
+    haiku_dev_t device;
+    haiku_ino_t node;
+    MonitorListenerList listeners;
+};
 
 struct monitor_listener
 {
@@ -101,14 +110,14 @@ public:
     status_t InitCheck();
 
     status_t NotifyEntryCreatedOrRemoved(int32 opcode, haiku_dev_t device,
-        haiku_ino_t directory, const std::string& name, haiku_ino_t node);
+        haiku_ino_t directory, const char* name, haiku_ino_t node);
     status_t NotifyEntryMoved(haiku_dev_t device, haiku_ino_t fromDirectory,
-        const std::string& fromName, haiku_ino_t toDirectory, const std::string& toName,
+        const char* fromName, haiku_ino_t toDirectory, const char* toName,
         haiku_ino_t node);
     status_t NotifyStatChanged(haiku_dev_t device, haiku_ino_t directory, haiku_ino_t node,
         uint32 statFields);
     status_t NotifyAttributeChanged(haiku_dev_t device, haiku_ino_t directory,
-        haiku_ino_t node, const std::string& attribute, int32 cause);
+        haiku_ino_t node, const char* attribute, int32 cause);
     status_t NotifyUnmount(haiku_dev_t device);
     status_t NotifyMount(haiku_dev_t device, haiku_dev_t parentDevice,
         haiku_ino_t parentDirectory);

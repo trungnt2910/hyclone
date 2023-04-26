@@ -28,6 +28,12 @@ size_t VfsService::RegisterEntryRef(const EntryRef& ref, std::string&& path)
     return _entryRefs.size();
 }
 
+size_t VfsService::UnregisterEntryRef(const EntryRef& ref)
+{
+    _entryRefs.erase(ref);
+    return _entryRefs.size();
+}
+
 bool VfsService::GetEntryRef(const EntryRef& ref, std::string& path) const
 {
     auto it = _entryRefs.find(ref);
@@ -36,6 +42,19 @@ bool VfsService::GetEntryRef(const EntryRef& ref, std::string& path) const
         path.resize(it->second.size());
         memcpy(path.data(), it->second.c_str(), it->second.size() + 1);
         return true;
+    }
+    return false;
+}
+
+bool VfsService::SearchEntryRef(const std::string& path, EntryRef& ref) const
+{
+    for (const auto& [entryRef, entryPath] : _entryRefs)
+    {
+        if (entryPath == path)
+        {
+            ref = entryRef;
+            return true;
+        }
     }
     return false;
 }
@@ -154,6 +173,11 @@ status_t VfsService::Unmount(const std::filesystem::path& path, uint32 flags)
         haiku_dev_t dev = it->second->GetInfo().dev;
         _devices.Remove(dev);
         _deviceReferences.erase(dev);
+        for (auto& monitor : _monitors[dev])
+        {
+            it->second->RemoveMonitor(monitor);
+        }
+        _monitors.erase(dev);
         std::vector<decltype(_entryRefs)::iterator> toRemove;
         for (auto refIt = _entryRefs.begin(); refIt != _entryRefs.end(); ++refIt)
         {
@@ -318,4 +342,44 @@ status_t VfsService::Ioctl(const std::filesystem::path& path, unsigned int cmd, 
     {
         return device->Ioctl(path, cmd, addr, buffer, size);
     });
+}
+
+status_t VfsService::AddMonitor(haiku_dev_t device, haiku_ino_t node)
+{
+    auto vfsDevice = _devices.Get(device);
+    if (!vfsDevice)
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
+    if (_monitors[device].contains(node))
+    {
+        return B_OK;
+    }
+    status_t status = vfsDevice->AddMonitor(node);
+    if (status != B_OK)
+    {
+        return status;
+    }
+    _monitors[device].insert(node);
+    return B_OK;
+}
+
+status_t VfsService::RemoveMonitor(haiku_dev_t device, haiku_ino_t node)
+{
+    auto vfsDevice = _devices.Get(device);
+    if (!vfsDevice)
+    {
+        return B_ENTRY_NOT_FOUND;
+    }
+    if (!_monitors[device].contains(node))
+    {
+        return B_OK;
+    }
+    status_t status = vfsDevice->RemoveMonitor(node);
+    if (status != B_OK)
+    {
+        return status;
+    }
+    _monitors[device].erase(node);
+    return B_OK;
 }
