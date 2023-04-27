@@ -21,6 +21,10 @@ do
         HPREFIX="${arg#*=}"
         shift # Remove --prefix from processing
         ;;
+        -P=*|--system-prefix=*)
+        HYCLONE_INSTALL_PREFIX="${arg#*=}"
+        shift # Remove --system-prefix from processing
+        ;;
         -f|--force)
         HPKG_FORCE=1
         shift # Remove --force from processing
@@ -41,6 +45,10 @@ do
         echo "                                          or \$SCRIPT_DIR/../haiku if this environment is not set)"
         echo "  -p, --prefix=DIR                        Haiku prefix directory (default: \$HPREFIX,"
         echo "                                          or ~/.hprefix if this environment is not set)"
+        echo "  -P, --system-prefix=DIR                 The prefix to which HyClone is installed (default: "
+        echo "                                          \$HYCLONE_INSTALL_PREFIX, or "
+        echo "                                          \$(realpath \$(dirname \$(which hyclone_server))/..) if this"
+        echo "                                          environment is not set)"
         echo "  -A, --additional-packages=PACKAGES      Comma-separated list of additional packages to install"
         echo "  -S, --additional-syspackages=PACKAGES   Comma-separated list of additional syspackages to install"
         echo "  -f, --force                             Overwrite existing packages"
@@ -82,6 +90,28 @@ if pidof -q hyclone_server; then
     exit 1
 fi
 
+if [ -z "$HYCLONE_INSTALL_PREFIX" ]; then
+    if [ -z "$(which hyclone_server)" ]; then
+        echo "hyclone_server not found in \$PATH."
+        echo "Make sure you have installed HyClone (sudo make install) and add it to your \$PATH."
+        echo "Alternatively, you can specify the system prefix with the --system-prefix option or the \$HYCLONE_INSTALL_PREFIX environment variable."
+        exit 1
+    fi
+    HYCLONE_INSTALL_PREFIX=${HYCLONE_INSTALL_PREFIX:-"$(realpath $(dirname $(which hyclone_server))/..)"}
+fi
+
+if [ ! -d "$HYCLONE_INSTALL_PREFIX" ]; then
+    echo "System prefix $HYCLONE_INSTALL_PREFIX does not exist."
+    echo "Please check your arguments and the \$HYCLONE_INSTALL_PREFIX environment variable and try again."
+    exit 1
+fi
+
+if [ ! -f "$HYCLONE_INSTALL_PREFIX/bin/hyclone_server" ]; then
+    echo "hyclone_server not found at $HYCLONE_INSTALL_PREFIX/bin/hyclone_server."
+    echo "Have you installed HyClone (sudo make install)?"
+    exit 1
+fi
+
 echo "Downloading Haiku packages"
 read -ra array <<<"$HAIKU_SYSPACKAGES"
 HAIKU_SYSPACKAGES_HREV=$(curl -Ls $HAIKU_HPKG_BASE_URL | sed -n 's/^.*version: "\([^"]*\)".*$/\1/p')
@@ -118,7 +148,7 @@ for package in "${array[@]}"; do
 done
 
 echo "Setup HyClone prefix"
-$SCRIPT_DIR/build/hyclone_server/hyclone_server
+$HYCLONE_INSTALL_PREFIX/bin/hyclone_server
 killall -9 hyclone_server
 
 echo "Copy additional required files"

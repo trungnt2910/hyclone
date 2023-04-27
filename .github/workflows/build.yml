@@ -68,7 +68,8 @@ jobs:
         run: |
           export HAIKU_BUILD_ENVIRONMENT_ROOT=$GITHUB_WORKSPACE/haiku-build
           export HPREFIX=$GITHUB_WORKSPACE/hprefix
-          ./build_hprefix.sh
+          export HYCLONE_INSTALL_PREFIX=build
+          ./build_hprefix.sh --system-prefix=build
           umount -f $HPREFIX/.hyclone.shm || true
           sudo rm -rf $HPREFIX/.hyclone.*
           pushd $HPREFIX; tar cvf ../hprefix.tar *; popd

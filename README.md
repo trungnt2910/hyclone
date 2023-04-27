@@ -85,6 +85,9 @@ The script assumes that a copy of Haiku source code is available at `$HAIKU_BUIL
 ```
 # Set this to the path where you want to store your Haiku root.
 export HPREFIX=~/.hprefix
+# If you have altered the CMAKE_INSTALL_PREFIX option in the configure step, do this.
+# If you set -DCMAKE_INSTALL_PREFIX=., HyClone should be installed in the build directory.
+# export HYCLONE_INSTALL_PREFIX=build
 # Assuming you're at the root of the HyClone source tree
 ./build_hprefix.sh
 ```
