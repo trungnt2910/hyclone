@@ -1196,8 +1196,13 @@ status_t _moni_flock(int fd, int op)
 
 status_t _moni_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char* name)
 {
+    CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(name, B_ENTRY_NOT_FOUND);
+
     char hostPath[PATH_MAX];
-    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, hostPath, sizeof(hostPath));
+    std::pair<const char*, size_t> nameAndSize = std::make_pair(name, name ? strlen(name) : 0);
+    std::pair<char*, size_t> hostPathAndSize = std::make_pair(hostPath, sizeof(hostPath));
+
+    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, &nameAndSize, &hostPathAndSize, true);
     if (status < 0)
     {
         if (status == B_BUFFER_OVERFLOW)
@@ -1207,32 +1212,12 @@ status_t _moni_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const c
         return status;
     }
 
-    if (name)
+    status = GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, hostPath, strlen(hostPath),
+        false, hostPath, sizeof(hostPath));
+    if (status != B_OK)
     {
-        size_t hostPathLen = status;
-        if (hostPath[hostPathLen - 1] != '/')
-        {
-            hostPath[hostPathLen - 1] = '/';
-        }
-        else
-        {
-            --hostPathLen;
-        }
-        if (hostPathLen == sizeof(hostPath))
-        {
-            return B_NAME_TOO_LONG;
-        }
-        size_t nameLen = strlen(name);
-        if (nameLen + hostPathLen >= sizeof(hostPath))
-        {
-            return B_NAME_TOO_LONG;
-        }
-        memcpy(hostPath + hostPathLen, name, nameLen + 1);
+        return status;
     }
-
-    // TODO: Invoke realpath or vchroot or whatever to
-    // get rid of potential symlinks that can break our current vchroot
-    // mechanism.
 
     status = LINUX_SYSCALL2(__NR_open, hostPath, O_DIRECTORY);
     if (status < 0)
@@ -1249,8 +1234,15 @@ status_t _moni_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const c
 status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char* name,
     int openMode, int perms)
 {
+    CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(name, B_ENTRY_NOT_FOUND);
+
+    bool noTraverse = (openMode & (HAIKU_O_NOTRAVERSE | HAIKU_O_NOFOLLOW));
     char hostPath[PATH_MAX];
-    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, hostPath, sizeof(hostPath));
+
+    std::pair<const char*, size_t> nameAndSize = std::make_pair(name, name ? strlen(name) : 0);
+    std::pair<char*, size_t> hostPathAndSize = std::make_pair(hostPath, sizeof(hostPath));
+
+    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, &nameAndSize, &hostPathAndSize, !noTraverse);
     if (status < 0)
     {
         if (status == B_BUFFER_OVERFLOW)
@@ -1260,30 +1252,12 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
         return status;
     }
 
-    if (name)
+    status = GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, hostPath, strlen(hostPath),
+        false, hostPath, sizeof(hostPath));
+    if (status != B_OK)
     {
-        size_t hostPathLen = status;
-        if (hostPath[hostPathLen - 1] != '/')
-        {
-            hostPath[hostPathLen - 1] = '/';
-        }
-        else
-        {
-            --hostPathLen;
-        }
-        if (hostPathLen == sizeof(hostPath))
-        {
-            return B_NAME_TOO_LONG;
-        }
-        size_t nameLen = strlen(name);
-        if (nameLen + hostPathLen >= sizeof(hostPath))
-        {
-            return B_NAME_TOO_LONG;
-        }
-        memcpy(hostPath + hostPathLen, name, nameLen + 1);
+        return status;
     }
-
-    bool noTraverse = (openMode & (HAIKU_O_NOTRAVERSE | HAIKU_O_NOFOLLOW));
 
     openMode &= ~HAIKU_O_NOTRAVERSE;
     int linuxFlags = OFlagsBToLinux(openMode);
@@ -1307,45 +1281,17 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
 }
 
 status_t _moni_entry_ref_to_path(haiku_dev_t device, haiku_ino_t inode,
-    const char *leaf, char *userPath, size_t pathLength)
+    const char* leaf, char* userPath, size_t pathLength)
 {
-    char hostPath[PATH_MAX];
-    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, hostPath, sizeof(hostPath));
+    CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(leaf, B_ENTRY_NOT_FOUND);
+
+    std::pair<const char*, size_t> leafAndSize = std::make_pair(leaf, leaf ? strlen(leaf) : 0);
+    std::pair<char*, size_t> pathAndSize = std::make_pair(userPath, pathLength);
+
+    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, &leafAndSize, &pathAndSize, false);
     if (status < 0)
     {
-        if (status == B_BUFFER_OVERFLOW)
-        {
-            return B_NAME_TOO_LONG;
-        }
         return status;
-    }
-
-    if (leaf)
-    {
-        size_t hostPathLen = status;
-        if (hostPath[hostPathLen - 1] != '/')
-        {
-            hostPath[hostPathLen - 1] = '/';
-        }
-        else
-        {
-            --hostPathLen;
-        }
-        if (hostPathLen == sizeof(hostPath))
-        {
-            return B_NAME_TOO_LONG;
-        }
-        size_t nameLen = strlen(leaf);
-        if (nameLen + hostPathLen >= sizeof(hostPath))
-        {
-            return B_NAME_TOO_LONG;
-        }
-        memcpy(hostPath + hostPathLen, leaf, nameLen + 1);
-    }
-
-    if (GET_HOSTCALLS()->vchroot_unexpand(hostPath, userPath, pathLength) > pathLength)
-    {
-        return B_BUFFER_OVERFLOW;
     }
 
     return B_OK;

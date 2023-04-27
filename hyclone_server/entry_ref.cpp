@@ -8,11 +8,30 @@
 #include "system.h"
 
 intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned long long device, unsigned long long inode,
-    char* userPath, size_t userPathLength)
+    void* userNameAndSize, void* userPathAndSize, bool traverseLinks)
 {
     auto& vfsService = System::GetInstance().GetVfsService();
     std::string pathStr;
     std::filesystem::path path;
+    std::string name;
+
+    {
+        auto lock = context.process->Lock();
+        std::pair<const char*, size_t> nameAndSize;
+        if (context.process->ReadMemory(userNameAndSize, &nameAndSize, sizeof(nameAndSize)) != sizeof(nameAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (nameAndSize.second > 0)
+        {
+            name.resize(nameAndSize.second);
+            if (context.process->ReadMemory((void*)nameAndSize.first, name.data(), nameAndSize.second) != nameAndSize.second)
+            {
+                return B_BAD_ADDRESS;
+            }
+        }
+    }
 
     {
         auto lock = vfsService.Lock();
@@ -22,33 +41,52 @@ intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned lo
             return B_ENTRY_NOT_FOUND;
         }
 
-        path = pathStr;
-        status_t status = vfsService.GetPath(path, false);
-
-        if (status != B_OK)
+        if (!name.empty() && name != ".")
         {
-            return status;
-        }
+            path = pathStr;
+            path /= name;
 
-        pathStr = path.string();
+            if (traverseLinks)
+            {
+                status_t status = vfsService.RealPath(path);
+                if (status != B_OK)
+                {
+                    return status;
+                }
+            }
+
+            path = path.lexically_normal();
+            if (path.filename().empty())
+            {
+                path = path.parent_path();
+            }
+
+            pathStr = path.string();
+        }
     }
 
     size_t copyLen = pathStr.size() + 1;
 
-    if (copyLen > userPathLength)
     {
-        return B_BUFFER_OVERFLOW;
+        auto lock = context.process->Lock();
+        std::pair<char*, size_t> pathAndSize;
+        if (context.process->ReadMemory(userPathAndSize, &pathAndSize, sizeof(pathAndSize)) != sizeof(pathAndSize))
+        {
+            return B_BAD_ADDRESS;
+        }
+
+        if (copyLen > pathAndSize.second)
+        {
+            return B_BUFFER_OVERFLOW;
+        }
+
+        if (context.process->WriteMemory(pathAndSize.first, pathStr.data(), copyLen) != copyLen)
+        {
+            return B_BAD_ADDRESS;
+        }
     }
 
-    auto lock = context.process->Lock();
-    if (context.process->WriteMemory(userPath, pathStr.data(), copyLen) != copyLen)
-    {
-        return B_BAD_ADDRESS;
-    }
-    else
-    {
-        return copyLen;
-    }
+    return copyLen;
 }
 
 intptr_t server_hserver_call_register_entry_ref(hserver_context& context, unsigned long long device, unsigned long long inode,
