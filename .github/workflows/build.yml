@@ -70,7 +70,7 @@ jobs:
           export HPREFIX=$GITHUB_WORKSPACE/hprefix
           export HYCLONE_INSTALL_PREFIX=build
           ./build_hprefix.sh --system-prefix=build
-          umount -f $HPREFIX/.hyclone.shm || true
+          sudo umount -f $HPREFIX/.hyclone.shm || true
           sudo rm -rf $HPREFIX/.hyclone.*
           pushd $HPREFIX; tar cvf ../hprefix.tar *; popd
 
