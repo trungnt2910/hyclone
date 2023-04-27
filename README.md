@@ -47,6 +47,21 @@ environment variables to change where `copy_objects.sh` looks for objects:
 
 ### Building HyClone
 
+Building HyClone requires a modern C++ compiler that supports C++20 library features. For GCC, the minimum version required is **GCC 11**.
+
+If you're building on older Linux distros, you might have to update your compiler. For Ubuntu 20.04, follow these steps:
+
+```
+sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+sudo apt install -y gcc-11 g++-11
+# Overrides the default compiler version
+sudo update-alternatives \
+    --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-11 \
+```
+
+Once a compatible compiler is set up, you can build HyClone using these commands:
+
 ```
 cd hyclone
 sudo apt install -y cmake libgmp-dev libmpfr-dev zlib1g-dev libzstd-dev
