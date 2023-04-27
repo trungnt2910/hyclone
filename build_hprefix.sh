@@ -149,7 +149,7 @@ done
 
 echo "Setup HyClone prefix"
 $HYCLONE_INSTALL_PREFIX/bin/hyclone_server
-killall -9 hyclone_server
+killall -9 hyclone_server haiku_loader
 
 echo "Copy additional required files"
 # Required for bash prompt to work like Haiku.
