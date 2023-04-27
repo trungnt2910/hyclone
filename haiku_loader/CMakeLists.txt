@@ -32,4 +32,8 @@ if(HYCLONE_USE_SANITIZERS)
     target_link_options(haiku_loader PRIVATE -fsanitize=address)
 endif()
 
+if(HYCLONE_HOST_LINUX)
+    target_link_libraries(haiku_loader PRIVATE dl pthread)
+endif()
+
 install(TARGETS haiku_loader DESTINATION bin)

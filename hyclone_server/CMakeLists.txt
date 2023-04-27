@@ -51,7 +51,7 @@ add_executable(hyclone_server
     ${SERVER_SYSTEM_SPECIFIC_SOURCES})
 
 set_property(TARGET hyclone_server PROPERTY CXX_STANDARD 20)
-target_link_libraries(hyclone_server hpkgvfs)
+target_link_libraries(hyclone_server PRIVATE hpkgvfs)
 target_compile_options(hyclone_server PRIVATE
     -Werror -Wall
     -Wno-multichar -Wno-reorder
@@ -60,6 +60,10 @@ target_compile_options(hyclone_server PRIVATE
 if(HYCLONE_USE_SANITIZERS)
     target_compile_options(hyclone_server PRIVATE -fsanitize=address)
     target_link_options(hyclone_server PRIVATE -fsanitize=address)
+endif()
+
+if(HYCLONE_HOST_LINUX)
+    target_link_libraries(hyclone_server PRIVATE pthread)
 endif()
 
 install(TARGETS hyclone_server DESTINATION bin)
