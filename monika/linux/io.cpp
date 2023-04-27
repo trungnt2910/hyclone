@@ -599,7 +599,13 @@ int _moni_access(int fd, const char* path, int mode, bool effectiveUserGroup)
 
     if (effectiveUserGroup)
     {
-        if (!is_linux_version_at_least(5, 8))
+#ifdef __NR_faccessat2
+        if (is_linux_version_at_least(5, 8))
+        {
+            status = LINUX_SYSCALL4(__NR_faccessat2, AT_FDCWD, hostPath, linuxMode, AT_EACCESS);
+        }
+        else
+#endif
         {
             struct stat linuxstat;
             status = LINUX_SYSCALL4(__NR_newfstatat, AT_FDCWD, hostPath, &linuxstat, AT_SYMLINK_NOFOLLOW);
@@ -643,10 +649,6 @@ int _moni_access(int fd, const char* path, int mode, bool effectiveUserGroup)
             }
 
             return HAIKU_POSIX_EACCES;
-        }
-        else
-        {
-            status = LINUX_SYSCALL4(__NR_faccessat2, AT_FDCWD, hostPath, linuxMode, AT_EACCESS);
         }
     }
     else
