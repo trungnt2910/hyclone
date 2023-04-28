@@ -14,11 +14,17 @@ namespace HpkgVfs
     using namespace LibHpkg;
     using namespace LibHpkg::Model;
 
-    Package::Package(const std::string& filePath)
+    Package::Package(const std::string& name)
     {
-        _extractor = std::make_shared<HpkgFileExtractor>(std::filesystem::path(filePath));
+        std::filesystem::path path(name);
+        _fileName = path.filename().string();
+        _dateModified = std::filesystem::last_write_time(path);
+
+        _extractor = std::make_shared<HpkgFileExtractor>(path);
         _attributesContext = _extractor->GetPackageAttributeContext();
         _tocContext = _extractor->GetTocContext();
+
+        _installPath = "../..";
 
         auto packageAttributes = _extractor->GetPackageAttributes();
 
@@ -123,13 +129,15 @@ namespace HpkgVfs
                 }
                 (isDirectory ? _writableDirectories : _writableFiles).push_back(attr->GetValue<std::string>(_attributesContext));
             }
+            else if (attr->GetAttributeId() == AttributeId::PACKAGE_INSTALL_PATH)
+            {
+                _installPath = attr->GetValue<std::string>(_attributesContext);
+            }
         }
     }
 
     std::shared_ptr<Entry> Package::GetRootEntry(bool dropData) const
     {
-        std::string name = GetId();
-
         const std::filesystem::perms defaultPerms =
             std::filesystem::perms::owner_read |
             std::filesystem::perms::owner_exec |
@@ -145,9 +153,9 @@ namespace HpkgVfs
             "",
             "",
             std::chrono::file_clock::now(),
+            _dateModified,
             std::chrono::file_clock::now(),
-            std::chrono::file_clock::now(),
-            name);
+            _fileName);
 
         std::shared_ptr<Entry> cache = std::make_shared<Entry>(
             ".hpkgvfsPackages",
@@ -157,9 +165,9 @@ namespace HpkgVfs
             "",
             "",
             std::chrono::file_clock::now(),
+            _dateModified,
             std::chrono::file_clock::now(),
-            std::chrono::file_clock::now(),
-            name);
+            _fileName);
 
         std::shared_ptr<Entry> package_links = std::make_shared<Entry>(
             "package-links",
@@ -169,9 +177,9 @@ namespace HpkgVfs
             "",
             "",
             std::chrono::file_clock::now(),
+            _dateModified,
             std::chrono::file_clock::now(),
-            std::chrono::file_clock::now(),
-            name);
+            _fileName);
 
         std::shared_ptr<Entry> package_links_current = std::make_shared<Entry>(
             GetInstallFolderId(),
@@ -181,9 +189,9 @@ namespace HpkgVfs
             "",
             "",
             std::chrono::file_clock::now(),
+            _dateModified,
             std::chrono::file_clock::now(),
-            std::chrono::file_clock::now(),
-            name);
+            _fileName);
 
         std::shared_ptr<Entry> package_links_self = std::make_shared<Entry>(
             ".self",
@@ -193,12 +201,12 @@ namespace HpkgVfs
             "",
             "",
             std::chrono::file_clock::now(),
+            _dateModified,
             std::chrono::file_clock::now(),
-            std::chrono::file_clock::now(),
-            name);
+            _fileName);
 
         std::shared_ptr<Entry> package = std::make_shared<Entry>(
-            name + ".hpkg",
+            _fileName,
             std::filesystem::file_type::regular,
             std::filesystem::perms::owner_read |
             std::filesystem::perms::group_read |
@@ -207,9 +215,9 @@ namespace HpkgVfs
             "",
             "",
             std::chrono::file_clock::now(),
+            _dateModified,
             std::chrono::file_clock::now(),
-            std::chrono::file_clock::now(),
-            name);
+            _fileName);
 
         {
             if (!dropData)
@@ -230,7 +238,7 @@ namespace HpkgVfs
             }
         }
 
-        package_links_self->SetTarget("../..");
+        package_links_self->SetTarget(_installPath);
 
         package_links_current->AddChild(package_links_self);
 
@@ -253,9 +261,9 @@ namespace HpkgVfs
                 "",
                 "",
                 std::chrono::file_clock::now(),
+                _dateModified,
                 std::chrono::file_clock::now(),
-                std::chrono::file_clock::now(),
-                name);
+                _fileName);
 
             package_links_required->SetTarget("../..");
 
@@ -271,7 +279,7 @@ namespace HpkgVfs
 
         for (const auto& child : _extractor->GetToc())
         {
-            auto temp = Entry::FromAttribute(name, child, _tocContext, dropData);
+            auto temp = Entry::FromAttribute(_fileName, child, _tocContext, dropData);
             entry->AddChild(temp);
         }
 

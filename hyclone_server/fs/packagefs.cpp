@@ -87,8 +87,6 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         }
     }
 
-    std::vector<std::pair<std::filesystem::path, std::string>> toRename;
-
     for (const auto& file : std::filesystem::directory_iterator(packagesPath))
     {
         auto currentPath = root / _relativePackagesPath / file.path().filename();
@@ -122,11 +120,6 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
             fileName = name + ".hpkg";
         }
 
-        if (originalPath.filename() != fileName)
-        {
-            toRename.emplace_back(originalPath, fileName);
-        }
-
         // Package names might not match the ID.
         // We must read the data from the package.
         struct haiku_stat st;
@@ -135,14 +128,6 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
             continue;
         }
         enabledPackages.emplace(name, st.st_mtim);
-    }
-
-    for (const auto& pair : toRename)
-    {
-        const std::filesystem::path& oldName = pair.first;
-        auto newName = oldName.parent_path() / pair.second;
-        std::cerr << "Renaming " << oldName << " to " << newName << std::endl;
-        std::filesystem::rename(oldName, newName);
     }
 
     PackagefsEntryWriter writer(*this);

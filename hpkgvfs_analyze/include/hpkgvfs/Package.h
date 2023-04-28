@@ -21,6 +21,10 @@ namespace HpkgVfs
         std::string _name;
         std::string _version;
         std::string _architecture;
+        std::string _fileName;
+        std::string _installPath;
+
+        std::chrono::file_clock::time_point _dateModified;
 
         std::vector<std::string> _requries;
         std::vector<std::string> _writableFiles;
@@ -39,7 +43,7 @@ namespace HpkgVfs
         {
             return _name + "-" + _version;
         }
-        
+
         const std::vector<std::string>& GetRequiredPackages() const
         {
             return _requries;
@@ -52,7 +56,7 @@ namespace HpkgVfs
         {
             return _writableDirectories;
         }
-        
+
         std::shared_ptr<Entry> GetRootEntry(bool dropData = false) const;
     };
 }
