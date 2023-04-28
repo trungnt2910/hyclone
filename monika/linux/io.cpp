@@ -1198,11 +1198,11 @@ status_t _moni_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const c
 {
     CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(name, B_ENTRY_NOT_FOUND);
 
-    char hostPath[PATH_MAX];
+    char path[PATH_MAX];
     std::pair<const char*, size_t> nameAndSize = std::make_pair(name, name ? strlen(name) : 0);
-    std::pair<char*, size_t> hostPathAndSize = std::make_pair(hostPath, sizeof(hostPath));
+    std::pair<char*, size_t> pathAndSize = std::make_pair(path, sizeof(path));
 
-    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, &nameAndSize, &hostPathAndSize, true);
+    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, &nameAndSize, &pathAndSize, true);
     if (status < 0)
     {
         if (status == B_BUFFER_OVERFLOW)
@@ -1212,7 +1212,10 @@ status_t _moni_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const c
         return status;
     }
 
-    status = GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, hostPath, strlen(hostPath),
+    pathAndSize.second = strlen(path);
+
+    char hostPath[PATH_MAX];
+    status = GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, path, pathAndSize.second,
         false, hostPath, sizeof(hostPath));
     if (status != B_OK)
     {
@@ -1225,7 +1228,7 @@ status_t _moni_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const c
         return LinuxToB(-status);
     }
 
-    GET_SERVERCALLS()->register_fd1(status, device, inode, name, name ? strlen(name) : 0);
+    GET_SERVERCALLS()->register_fd(status, HAIKU_AT_FDCWD, path, pathAndSize.second, false);
     GET_HOSTCALLS()->opendir(status);
 
     return status;
@@ -1237,12 +1240,12 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
     CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(name, B_ENTRY_NOT_FOUND);
 
     bool noTraverse = (openMode & (HAIKU_O_NOTRAVERSE | HAIKU_O_NOFOLLOW));
-    char hostPath[PATH_MAX];
+    char path[PATH_MAX];
 
     std::pair<const char*, size_t> nameAndSize = std::make_pair(name, name ? strlen(name) : 0);
-    std::pair<char*, size_t> hostPathAndSize = std::make_pair(hostPath, sizeof(hostPath));
+    std::pair<char*, size_t> pathAndSize = std::make_pair(path, sizeof(path));
 
-    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, &nameAndSize, &hostPathAndSize, !noTraverse);
+    long status = GET_SERVERCALLS()->get_entry_ref(device, inode, &nameAndSize, &pathAndSize, !noTraverse);
     if (status < 0)
     {
         if (status == B_BUFFER_OVERFLOW)
@@ -1252,7 +1255,10 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
         return status;
     }
 
-    status = GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, hostPath, strlen(hostPath),
+    pathAndSize.second = strlen(path);
+
+    char hostPath[PATH_MAX];
+    status = GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, path, pathAndSize.second,
         false, hostPath, sizeof(hostPath));
     if (status != B_OK)
     {
@@ -1275,7 +1281,7 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
         return LinuxToB(-status);
     }
 
-    GET_SERVERCALLS()->register_fd1(status, device, inode, name, name ? strlen(name) : 0);
+    GET_SERVERCALLS()->register_fd(status, HAIKU_AT_FDCWD, path, pathAndSize.second, false);
 
     return status;
 }
