@@ -42,12 +42,12 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
     const std::filesystem::path& hostRoot, PackageFSMountType mountType, uint32 mountFlags)
     : HostfsDevice(root, hostRoot, mountFlags), _mountType(mountType)
 {
-    auto permissions = std::filesystem::status(hostRoot).permissions();
-    std::filesystem::permissions(hostRoot, permissions | std::filesystem::perms::owner_write);
+    _originalPermissions = std::filesystem::status(hostRoot).permissions();
+    std::filesystem::permissions(hostRoot, _originalPermissions | std::filesystem::perms::owner_write);
     std::filesystem::create_directories(hostRoot / _relativeAttributesPath);
     std::filesystem::create_directories(hostRoot / _relativeInstalledPackagesPath);
     std::filesystem::create_directories(hostRoot / _relativePackagesPath);
-    std::filesystem::permissions(hostRoot, permissions);
+    std::filesystem::permissions(hostRoot, _originalPermissions);
 
     using namespace HpkgVfs;
 
@@ -803,6 +803,88 @@ haiku_ssize_t PackagefsDevice::RemoveAttr(const std::filesystem::path& path, con
     }
 
     std::filesystem::remove(attrTypeHostPath, ec);
+    return B_OK;
+}
+
+status_t PackagefsDevice::Cleanup()
+{
+    using namespace HpkgVfs;
+
+    std::filesystem::path installedPackagesPath = _hostRoot / _relativeInstalledPackagesPath;
+
+    std::shared_ptr<Entry> system = Entry::CreatePackageFsRootEntry(_root.filename().string());
+
+    std::unordered_map<std::string, haiku_timespec> installedPackages;
+
+    if (std::filesystem::exists(installedPackagesPath))
+    {
+        for (const auto& file : std::filesystem::directory_iterator(installedPackagesPath))
+        {
+            if (file.path().extension() != ".hpkg")
+            {
+                continue;
+            }
+
+            std::ifstream fin(file.path());
+            if (!fin.is_open())
+            {
+                continue;
+            }
+
+            Package package(file.path().string());
+            struct haiku_stat st;
+            if (server_read_stat(file.path(), st) != B_OK)
+            {
+                continue;
+            }
+            installedPackages.emplace(file.path().filename(), st.st_mtim);
+            std::cerr << "Preinstalled package: " << file.path().filename() << std::endl;
+            std::shared_ptr<Entry> entry = package.GetRootEntry(/*dropData*/ true);
+            system->Merge(entry);
+        }
+    }
+
+    PackagefsEntryWriter writer(*this);
+
+    for (const auto& kvp: installedPackages)
+    {
+        std::cerr << "Cleaning up package: " << kvp.first << std::endl;
+        system->RemovePackage(kvp.first);
+        system->WriteToDisk(_hostRoot.parent_path(), writer);
+    }
+
+    auto nuke = [](const std::filesystem::path& path)
+    {
+        std::error_code ec;
+        for (auto& file : std::filesystem::recursive_directory_iterator(path))
+        {
+            std::filesystem::permissions(file.path(),
+                std::filesystem::perms::owner_all,
+                std::filesystem::perm_options::add, ec);
+
+            if (ec)
+            {
+                std::cerr << "Failed to set permissions on " << file.path() << std::endl;
+            }
+
+            ec = {};
+        }
+
+        std::filesystem::remove_all(path, ec);
+        if (ec)
+        {
+            std::cerr << "Failed to remove " << path << std::endl;
+        }
+    };
+
+    std::filesystem::permissions(_hostRoot, std::filesystem::perms::owner_all,
+        std::filesystem::perm_options::add);
+
+    nuke(_hostRoot / _relativeAttributesPath);
+    nuke(_hostRoot / _relativeInstalledPackagesPath);
+
+    std::filesystem::permissions(_hostRoot, _originalPermissions);
+
     return B_OK;
 }
 

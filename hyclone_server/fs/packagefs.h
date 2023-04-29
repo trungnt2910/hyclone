@@ -126,6 +126,7 @@ private:
 
     std::mutex _updateMutex;
     PackageFSMountType _mountType = PACKAGE_FS_MOUNT_TYPE_SYSTEM;
+    std::filesystem::perms _originalPermissions;
 
     void _CleanupAttributes();
     std::shared_ptr<HpkgVfs::Package> _GetPackageInPackagesDirectory(const std::string& name);
@@ -149,6 +150,8 @@ public:
         override;
     virtual status_t Ioctl(const std::filesystem::path& path, unsigned int cmd,
         void* addr, void* buffer, size_t size) override;
+
+    virtual status_t Cleanup() override;
 
     static status_t Mount(const std::filesystem::path& path, const std::filesystem::path& device, uint32 flags,
         const std::string& args, std::shared_ptr<VfsDevice>& output);

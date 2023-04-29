@@ -55,6 +55,8 @@ public:
     virtual status_t AddMonitor(haiku_ino_t node) { return B_UNSUPPORTED; }
     virtual status_t RemoveMonitor(haiku_ino_t node) { return B_UNSUPPORTED; }
 
+    virtual status_t Cleanup() { return B_OK; }
+
     const haiku_fs_info& GetInfo() const { return _info; }
     haiku_fs_info& GetInfo() { return _info; }
     const std::filesystem::path& GetRoot() const { return _root; }

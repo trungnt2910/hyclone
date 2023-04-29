@@ -171,6 +171,13 @@ status_t VfsService::Unmount(const std::filesystem::path& path, uint32 flags)
     {
         // TODO: Check if the device is still in use.
         haiku_dev_t dev = it->second->GetInfo().dev;
+
+        status = it->second->Cleanup();
+        if (status != B_OK)
+        {
+            return status;
+        }
+
         _devices.Remove(dev);
         _deviceReferences.erase(dev);
         for (auto& monitor : _monitors[dev])
