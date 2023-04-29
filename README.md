@@ -57,10 +57,13 @@ sudo apt install -y gcc-11 g++-11
 # Overrides the default compiler version
 sudo update-alternatives \
     --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 \
-    --slave /usr/bin/g++ g++ /usr/bin/g++-11 \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-11
 ```
 
-Once a compatible compiler is set up, you can build HyClone using these commands:
+HyClone also requires a modern version of CMake (CMake 3.24). On older Linux distros, you'll have to install the latest CMake from Kitware
+by following [this guide](https://apt.kitware.com/).
+
+Once a compatible compiler and CMake is set up, you can build HyClone using these commands:
 
 ```
 cd hyclone
@@ -114,7 +117,16 @@ export HPATH=/boot/system/bin:/boot/system/non-packaged/bin
 
 ### Installing applications
 
-HyClone supports Haiku's default package manager, `pkgman`. To install additional packages to a HyClone prefix, simply do what you would do on Haiku:
+HyClone supports Haiku's default package manager, `pkgman`.
+
+First, you'll have to configure Haiku default sources:
+
+```
+pkgman add-repo https://eu.hpkg.haiku-os.org/haiku/master/x86_64/current
+pkgman add-repo https://eu.hpkg.haiku-os.org/haikuports/master/x86_64/current
+```
+
+Then, to install additional packages to a HyClone prefix, simply do what you would do on Haiku:
 
 ```
 pkgman install -y <package name>
@@ -128,7 +140,7 @@ pkgman full-sync
 
 ### Running GUI apps
 
-HyClone can run Haiku's `app_server`. Due to various HyClone missing components, it is currently not launched automatically by `launch_daemon`. To run `app_server`, from a HyClone shell, type:
+HyClone can run Haiku's `app_server`. If for any reason `app_server` is not launched by default, you can launch it by running the following command from a HyClone shell:
 
 ```
 /boot/system/servers/app_server &
