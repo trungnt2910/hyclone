@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cerrno>
 #include <cstdint>
 #include <cstring>
 #include <utility>
@@ -495,6 +496,7 @@ int _moni_open(int fd, const char* path, int openMode, int perms)
         CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(path, HAIKU_POSIX_ENOENT);
     }
     bool noTraverse = (openMode & (HAIKU_O_NOTRAVERSE | HAIKU_O_NOFOLLOW));
+    bool shouldFailWithEloop = (openMode & HAIKU_O_NOFOLLOW);
 
     openMode &= ~HAIKU_O_NOTRAVERSE;
     int linuxFlags = OFlagsBToLinux(openMode);
@@ -523,6 +525,11 @@ int _moni_open(int fd, const char* path, int openMode, int perms)
     }
 
     int result = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags, linuxMode);
+
+    if (result == -ELOOP && !shouldFailWithEloop)
+    {
+        result = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags | O_PATH, linuxMode);
+    }
 
     if (result < 0)
     {
@@ -666,34 +673,21 @@ int _moni_access(int fd, const char* path, int mode, bool effectiveUserGroup)
 
 int _moni_normalize_path(const char* userPath, bool traverseLink, char* buffer)
 {
-    if (!traverseLink)
-    {
-        panic("kern_normalize_path without traverseLink not implemented");
-    }
-
     if (!userPath || !buffer)
     {
         return B_BAD_ADDRESS;
     }
 
-    char hostPath[PATH_MAX];
-    status_t expandStatus = GET_SERVERCALLS()->vchroot_expandat(HAIKU_AT_FDCWD, userPath, strlen(userPath),
-        true, hostPath, sizeof(hostPath));
+    status_t status = GET_SERVERCALLS()->normalize_path(userPath, strlen(userPath), traverseLink, buffer, B_PATH_NAME_LENGTH);
 
-    if (expandStatus != B_OK && expandStatus != B_ENTRY_NOT_FOUND)
+    if (status != B_OK)
     {
-        return expandStatus;
+        if (status == B_BUFFER_OVERFLOW)
+        {
+            return B_NAME_TOO_LONG;
+        }
+        // TODO: What about B_ENTRY_NOT_FOUND? Does Haiku allow non-existent paths?
     }
-
-    char resolvedPath[PATH_MAX];
-    long result = realpath(hostPath, resolvedPath, traverseLink);
-
-    if (result < 0)
-    {
-        return LinuxToB(-result);
-    }
-
-    GET_HOSTCALLS()->vchroot_unexpand(resolvedPath, buffer, B_PATH_NAME_LENGTH);
 
     return B_OK;
 }
@@ -1240,6 +1234,7 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
     CHECK_NON_NULL_EMPTY_STRING_AND_RETURN(name, B_ENTRY_NOT_FOUND);
 
     bool noTraverse = (openMode & (HAIKU_O_NOTRAVERSE | HAIKU_O_NOFOLLOW));
+    bool shouldFailWithEloop = (openMode & HAIKU_O_NOFOLLOW);
     char path[PATH_MAX];
 
     std::pair<const char*, size_t> nameAndSize = std::make_pair(name, name ? strlen(name) : 0);
@@ -1275,6 +1270,11 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
     }
 
     status = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags, linuxMode);
+
+    if (status == -ELOOP && !shouldFailWithEloop)
+    {
+        status = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags | O_PATH, linuxMode);
+    }
 
     if (status < 0)
     {

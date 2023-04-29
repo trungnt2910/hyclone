@@ -80,8 +80,8 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
             {
                 continue;
             }
-            installedPackages.emplace(file.path().stem(), st.st_mtim);
-            std::cerr << "Preinstalled package: " << file.path().stem() << std::endl;
+            installedPackages.emplace(file.path().filename(), st.st_mtim);
+            std::cerr << "Preinstalled package: " << file.path().filename() << std::endl;
             std::shared_ptr<Entry> entry = package.GetRootEntry(/*dropData*/ true);
             system->Merge(entry);
         }
@@ -111,15 +111,6 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
             continue;
         }
 
-        std::string name;
-        std::string fileName;
-
-        {
-            Package package(currentPath.string());
-            name = package.GetId();
-            fileName = name + ".hpkg";
-        }
-
         // Package names might not match the ID.
         // We must read the data from the package.
         struct haiku_stat st;
@@ -127,7 +118,7 @@ PackagefsDevice::PackagefsDevice(const std::filesystem::path& root,
         {
             continue;
         }
-        enabledPackages.emplace(name, st.st_mtim);
+        enabledPackages.emplace(originalPath.filename(), st.st_mtim);
     }
 
     PackagefsEntryWriter writer(*this);
@@ -338,7 +329,7 @@ void PackagefsDevice::_CleanupAttributes()
 
 std::shared_ptr<HpkgVfs::Package> PackagefsDevice::_GetPackageInPackagesDirectory(const std::string& name)
 {
-    auto packagePath = _root / _relativePackagesPath / (name + ".hpkg");
+    auto packagePath = _root / _relativePackagesPath / name;
     status_t status = _ResolvePackagePath(packagePath);
     if (status != B_OK)
     {
@@ -642,8 +633,8 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                 }
 
                 Package package(file.path().string());
-                installedPackages.emplace(file.path().stem());
-                std::cerr << "Preinstalled package: " << file.path().stem() << std::endl;
+                installedPackages.emplace(file.path().filename());
+                std::cerr << "Preinstalled package: " << file.path().filename() << std::endl;
                 std::shared_ptr<Entry> entry = package.GetRootEntry(/*dropData*/ true);
                 system->Merge(entry);
             }
@@ -653,22 +644,21 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
             for (uint32 i = 0; i < itemCount; ++i)
             {
                 PackageFSActivationChangeItem& item = request->items[i];
-                auto name = std::filesystem::path(item.name).stem();
 
-                auto it = installedPackages.find(name);
+                auto it = installedPackages.find(item.name);
 
                 if (it == installedPackages.end())
                 {
                     if (item.type != PACKAGE_FS_ACTIVATE_PACKAGE)
                     {
-                        std::cerr << "Package not found: " << name << std::endl;
+                        std::cerr << "Package not found: " << item.name << std::endl;
                         continue;
                     }
-                    std::cerr << "Installing package: " << name << std::endl;
-                    auto package = _GetPackageInPackagesDirectory(name.string());
+                    std::cerr << "Installing package: " << item.name << std::endl;
+                    auto package = _GetPackageInPackagesDirectory(item.name);
                     if (!package)
                     {
-                        std::cerr << "Package not found: " << name << std::endl;
+                        std::cerr << "Package not found: " << item.name << std::endl;
                         continue;
                     }
                     std::shared_ptr<Entry> entry = package->GetRootEntry();
@@ -686,10 +676,10 @@ status_t PackagefsDevice::Ioctl(const std::filesystem::path& path, unsigned int 
                     }
                     else if (item.type == PACKAGE_FS_REACTIVATE_PACKAGE)
                     {
-                        auto package = _GetPackageInPackagesDirectory(name.string());
+                        auto package = _GetPackageInPackagesDirectory(item.name);
                         if (!package)
                         {
-                            std::cerr << "Package not found: " << name << std::endl;
+                            std::cerr << "Package not found: " << item.name << std::endl;
                             continue;
                         }
                         system->RemovePackage(*it);

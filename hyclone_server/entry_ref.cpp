@@ -13,6 +13,7 @@ intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned lo
     auto& vfsService = System::GetInstance().GetVfsService();
     std::string pathStr;
     std::filesystem::path path;
+    std::filesystem::path rootPath;
     std::string name;
 
     {
@@ -31,6 +32,8 @@ intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned lo
                 return B_BAD_ADDRESS;
             }
         }
+
+        rootPath = context.process->GetRoot();
     }
 
     {
@@ -41,9 +44,10 @@ intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned lo
             return B_ENTRY_NOT_FOUND;
         }
 
+        path = pathStr;
+
         if (!name.empty() && name != ".")
         {
-            path = pathStr;
             path /= name;
 
             if (traverseLinks)
@@ -60,9 +64,15 @@ intptr_t server_hserver_call_get_entry_ref(hserver_context& context, unsigned lo
             {
                 path = path.parent_path();
             }
-
-            pathStr = path.string();
         }
+
+        if (std::mismatch(path.begin(), path.end(),
+            rootPath.begin(), rootPath.end()).second == rootPath.end())
+        {
+            path = "/" / path.lexically_relative(rootPath);
+        }
+
+        pathStr = path.string();
     }
 
     size_t copyLen = pathStr.size() + 1;

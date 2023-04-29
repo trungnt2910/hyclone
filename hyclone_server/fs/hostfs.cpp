@@ -2,8 +2,10 @@
 
 #include "haiku_errors.h"
 #include "hostfs.h"
+#include "process.h"
 #include "server_errno.h"
 #include "server_native.h"
+#include "server_servercalls.h"
 #include "system.h"
 
 HostfsDevice::HostfsDevice(const std::filesystem::path& root,
@@ -96,7 +98,7 @@ status_t HostfsDevice::GetPath(std::filesystem::path& path, bool& isSymlink)
 
                 if (symlinkPath.is_absolute())
                 {
-                    path = symlinkPath;
+                    path = gCurrentContext->process->GetRoot() / symlinkPath.relative_path();
                 }
                 else
                 {

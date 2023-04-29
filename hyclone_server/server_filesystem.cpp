@@ -409,6 +409,46 @@ intptr_t server_hserver_call_transform_dirent(hserver_context& context, int fd, 
     return status;
 }
 
+intptr_t server_hserver_call_normalize_path(hserver_context& context, const char* userPath, size_t userPathSize,
+    bool traverseLink, char* userBuffer, size_t userBufferSize)
+{
+    std::filesystem::path requestPath;
+
+    status_t status;
+
+    {
+        auto lock = context.process->Lock();
+        status = context.process->ReadDirFd(HAIKU_AT_FDCWD, userPath, userPathSize, traverseLink, requestPath);
+        if (status != B_OK)
+        {
+            return status;
+        }
+
+        const std::filesystem::path& root = context.process->GetRoot();
+
+        if (std::mismatch(requestPath.begin(), requestPath.end(),
+            root.begin(), root.end()).second == root.end())
+        {
+            requestPath = "/" / requestPath.lexically_relative(root);
+        }
+
+        std::string resultString = requestPath.string();
+        size_t writeSize = resultString.size() + 1;
+
+        if (writeSize > userBufferSize)
+        {
+            return B_BUFFER_OVERFLOW;
+        }
+
+        if (context.process->WriteMemory(userBuffer, resultString.data(), writeSize) != writeSize)
+        {
+            return B_BAD_ADDRESS;
+        }
+    }
+
+    return B_OK;
+}
+
 intptr_t server_hserver_call_vchroot_expandat(hserver_context& context, int fd, const char* userPath, size_t userPathSize,
     bool traverseSymlink, char* userBuffer, size_t userBufferSize)
 {
