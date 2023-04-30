@@ -29,9 +29,8 @@ struct loader_trampoline_args
 struct ThreadInfo
 {
     pthread_t thread;
-    void* stack_address;
-    size_t stack_size;
-    size_t guard_size;
+    void* stackEnd;
+    size_t guardSize;
 };
 
 static void* loader_pthread_entry_trampoline(void* arg);
@@ -71,13 +70,32 @@ int loader_spawn_thread(void* arg)
         }
 
         attributes->stack_address = (void*)((uintptr_t)stack_end + guard_size);
-        threadInfo.stack_address = stack_end;
-        threadInfo.stack_size = stack_size;
-        threadInfo.guard_size = guard_size;
+        threadInfo.stackEnd = stack_end;
+        threadInfo.guardSize = guard_size;
     }
 
-    pthread_attr_setstack(&linux_thread_attributes, attributes->stack_address, attributes->stack_size);
-    pthread_attr_setguardsize(&linux_thread_attributes, attributes->guard_size);
+    int status = pthread_attr_setstack(&linux_thread_attributes, attributes->stack_address, attributes->stack_size);
+    if (status != 0)
+    {
+        return -status;
+    }
+
+    status = pthread_attr_setguardsize(&linux_thread_attributes, attributes->guard_size);
+    if (status != 0)
+    {
+        return -status;
+    }
+
+    // At this point, according to POSIX:
+    // After a successful call to pthread_attr_setstack(), the storage area specified by the stackaddr parameter
+    // is under the control of the implementation, as described in Use of Application-Managed Thread Stacks.
+    // As for the guard page:
+    // If the stackaddr attribute has been set (that is, the caller is allocating and managing its own thread stacks),
+    // the guardsize attribute shall be ignored and no protection shall be provided by the implementation.
+    // It is the responsibility of the application to manage stack overflow along with stack allocation and
+    // management in this case.
+    //
+    // We therefore store the stack end and the guard page size for deallocation.
 
     sched_param sched;
     sched.sched_priority = attributes->priority;
@@ -147,13 +165,9 @@ int loader_wait_for_thread(int threadId, int* retVal)
         threadInfo = sHostPthreadObjects[threadId];
         sHostPthreadObjects.erase(threadId);
     }
-    if (threadInfo.stack_address != NULL)
+    if (threadInfo.guardSize != 0)
     {
-        munmap(threadInfo.stack_address, threadInfo.stack_size);
-        if (threadInfo.guard_size > 0)
-        {
-            munmap((uint8_t*)threadInfo.stack_address - threadInfo.guard_size, threadInfo.guard_size);
-        }
+        munmap(threadInfo.stackEnd, threadInfo.guardSize);
     }
     return 0;
 }
