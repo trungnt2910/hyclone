@@ -77,11 +77,12 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: hyclone
+          name: hyclone_${{ matrix.os }}
           path: build
 
       - name: Upload HPREFIX
         uses: actions/upload-artifact@v3
+        if: ${{ matrix.os }} == 'ubuntu-latest'
         with:
           name: hprefix.tar
           path: hprefix.tar
