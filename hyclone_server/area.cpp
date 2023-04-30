@@ -198,12 +198,14 @@ intptr_t server_hserver_call_get_shared_area_path(hserver_context& context, int 
         return B_ENTRY_NOT_FOUND;
     }
 
-    if (path.size() > pathLen)
+    size_t writeSize = path.size() + 1;
+
+    if (writeSize > pathLen)
     {
-        return B_NAME_TOO_LONG;
+        return B_BUFFER_OVERFLOW;
     }
 
-    if (context.process->WriteMemory(user_path, path.c_str(), path.size()) != path.size())
+    if (context.process->WriteMemory(user_path, path.c_str(), writeSize) != writeSize)
     {
         return B_BAD_ADDRESS;
     }
