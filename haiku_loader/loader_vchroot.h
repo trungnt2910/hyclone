@@ -2,6 +2,7 @@
 #define __LOADER_VCHROOT_H__
 
 #include <cstddef>
+#include <filesystem>
 #include <string>
 
 // Inspired by (but not copied from) Darling's vchroot_expand.
@@ -23,7 +24,7 @@ size_t loader_vchroot_expandlink(const char* path, char* hostPath, size_t size);
 // Like loader_vchroot_expandat, but traverses symlinks.
 size_t loader_vchroot_expandlinkat(int fd, const char* path, char* hostPath, size_t size);
 
-bool loader_init_vchroot(const char* hprefix);
+bool loader_init_vchroot(const std::filesystem::path& hprefix);
 
 extern std::string gHaikuPrefix;
 

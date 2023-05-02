@@ -5,4 +5,6 @@
 
 extern std::string gHaikuPrefix;
 
+bool server_init_prefix();
+
 #endif // __SERVER_PREFIX_H__

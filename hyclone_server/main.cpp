@@ -15,8 +15,11 @@ int main(int argc, char** argv)
 {
     // Just in case.
     server_remaining_workers = std::thread::hardware_concurrency();
-    gHaikuPrefix = std::filesystem::canonical(getenv("HPREFIX")).string();
-    std::cerr << "Setting up filesystem at " << gHaikuPrefix << "..." << std::endl;
+    if (!server_init_prefix())
+    {
+        std::cerr << "failed to initialize hyclone prefix." << std::endl;
+        return 1;
+    }
     if (!server_setup_usermap())
     {
         std::cerr << "failed to setup hyclone usermap." << std::endl;

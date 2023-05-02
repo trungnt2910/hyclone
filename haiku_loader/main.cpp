@@ -23,7 +23,6 @@
 #include <string>
 
 rld_export **__gRuntimeLoaderPtr;
-const char* hPrefix;
 
 size_t loader_build_path(char* buffer, size_t bufferSize, bool expandPath)
 {
@@ -201,7 +200,7 @@ int main(int argc, char** argv, char** envp)
 	args.error_token = 0;
 
 	std::string debuggerInfo;
-	hPrefix = getenv("HPREFIX");
+	const char* hPrefixPtr = getenv("HPREFIX");
 	std::string cwd, root;
 	bool expandPath = true;
 
@@ -258,7 +257,7 @@ int main(int argc, char** argv, char** envp)
 					std::cout << "Missing value for --prefix flag.";
 					return 1;
 				}
-				hPrefix = argv[0];
+				hPrefixPtr = argv[0];
 				++argv; --argc;
 			}
 			else if (strcmp(currentArg, "--cwd") == 0)
@@ -300,6 +299,28 @@ int main(int argc, char** argv, char** envp)
 			std::cerr << "Error parsing value for " << currentArg << ": " << e.what() << std::endl;
 			return 1;
 		}
+	}
+
+	std::filesystem::path hPrefix;
+
+	if (!hPrefixPtr)
+	{
+		hPrefixPtr = getenv("HOME");
+		if (!hPrefixPtr)
+		{
+			hPrefixPtr = getenv("USERPROFILE");
+		}
+		if (!hPrefixPtr)
+		{
+			std::cerr << "Failed to determine the HyClone prefix." << std::endl;
+			std::cerr << "Ensure that the HPREFIX environment variable is set, or pass the --prefix flag." << std::endl;
+			return 1;
+		}
+		hPrefix = std::filesystem::path(hPrefixPtr) / ".hprefix";
+	}
+	else
+	{
+		hPrefix = std::filesystem::path(hPrefixPtr);
 	}
 
 	if (!loader_init_vchroot(hPrefix))

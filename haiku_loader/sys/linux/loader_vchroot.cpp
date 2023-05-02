@@ -17,12 +17,8 @@ static std::vector<std::string> GetParts(const std::string& path);
 static std::string HaikuPathFromFdAndPath(int fd, const char* path);
 static std::string HostPathFromFd(int fd);
 
-bool loader_init_vchroot(const char* hprefix)
+bool loader_init_vchroot(const std::filesystem::path& hprefix)
 {
-    if (hprefix == NULL)
-    {
-        return false;
-    }
     gHaikuPrefix = std::filesystem::canonical(hprefix).string();
     if (gHaikuPrefix.empty())
     {
