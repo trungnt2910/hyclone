@@ -34,7 +34,7 @@ static int32_t atomic_or(int32_t *a, int32_t b);
 static int32_t atomic_and(int32_t *a, int32_t b);
 static int loader_mutex_lock_locked(int32_t *mutex, const char *name, uint32_t flags, int64_t timeout,
     std::unique_lock<std::mutex> &lock);
-static void loader_mutex_unlock_locked(int32_t *mutex, uint32_t flags);
+static void loader_mutex_unblock_locked(int32_t *mutex, uint32_t flags);
 static int loader_mutex_wait_locked(int32_t *mutex, const char *name, uint32_t flags, int64_t timeout,
     std::unique_lock<std::mutex> &lock, bool &lastWaiter);
 static void add_loader_mutex_info(int32_t *mutex, std::shared_ptr<mutex_info>  info);
@@ -60,7 +60,7 @@ int loader_mutex_lock(int32_t *mutex, const char *name, uint32_t flags, int64_t 
     return error;
 }
 
-int loader_mutex_unlock(int32_t *mutex, uint32 flags)
+int loader_mutex_unblock(int32_t *mutex, uint32 flags)
 {
     if (mutex == NULL || ((intptr_t)mutex) % 4 != 0)
     {
@@ -70,7 +70,7 @@ int loader_mutex_unlock(int32_t *mutex, uint32 flags)
     {
         auto lock = std::unique_lock<std::mutex>(sMutexTableLock);
 
-        loader_mutex_unlock_locked(mutex, flags);
+        loader_mutex_unblock_locked(mutex, flags);
     }
 
     return B_OK;
@@ -94,7 +94,7 @@ int loader_mutex_switch_lock(int32_t *fromMutex, int32_t *toMutex,
     // unlock the first mutex and lock the second one
     {
         auto lock = std::unique_lock<std::mutex>(sMutexTableLock);
-        loader_mutex_unlock_locked(fromMutex, flags);
+        loader_mutex_unblock_locked(fromMutex, flags);
 
         error = loader_mutex_lock_locked(toMutex, name, flags, timeout, lock);
     }
@@ -125,7 +125,7 @@ static int loader_mutex_lock_locked(int32_t *mutex, const char *name, uint32_t f
     return error;
 }
 
-static void loader_mutex_unlock_locked(int32_t *mutex, uint32_t flags)
+static void loader_mutex_unblock_locked(int32_t *mutex, uint32_t flags)
 {
     auto it = sMutexTable.find(mutex);
     if (it == sMutexTable.end() || !it->second || it->second->empty())

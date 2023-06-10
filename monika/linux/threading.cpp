@@ -111,9 +111,9 @@ status_t _moni_mutex_lock(int32* mutex, const char* name,
     return GET_HOSTCALLS()->mutex_lock(mutex, name, flags, timeout);
 }
 
-status_t _moni_mutex_unlock(int32* mutex, uint32 flags)
+status_t _moni_mutex_unblock(int32* mutex, uint32 flags)
 {
-    return GET_HOSTCALLS()->mutex_unlock(mutex, flags);
+    return GET_HOSTCALLS()->mutex_unblock(mutex, flags);
 }
 
 status_t _moni_mutex_switch_lock(int32* fromMutex, int32* toMutex,

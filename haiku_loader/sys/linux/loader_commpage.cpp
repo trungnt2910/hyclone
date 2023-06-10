@@ -103,7 +103,7 @@ void* loader_allocate_commpage()
     hostcalls_ptr->wait_for_thread = loader_wait_for_thread;
 
     hostcalls_ptr->mutex_lock = loader_mutex_lock;
-    hostcalls_ptr->mutex_unlock = loader_mutex_unlock;
+    hostcalls_ptr->mutex_unblock = loader_mutex_unblock;
     hostcalls_ptr->mutex_switch_lock = loader_mutex_switch_lock;
 
     hostcalls_ptr->realtime_sem_open = loader_realtime_sem_open;
