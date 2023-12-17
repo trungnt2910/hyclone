@@ -1,5 +1,6 @@
 # HyClone
 
+[![Discord Invite](https://dcbadge.vercel.app/api/server/ThUzHbEqn9?style=flat)](https://discord.gg/ThUzHbEqn9)&nbsp;
 [![Build](https://github.com/trungnt2910/hyclone/actions/workflows/build.yml/badge.svg)](https://github.com/trungnt2910/hyclone/actions/workflows/build.yml)
 
 HyClone is a runtime environment for [Haiku](https://github.com/haiku/haiku) applications.
@@ -162,3 +163,9 @@ HyClone remote desktop:
 
 - Many apps might not work on HyClone as this project is still in its early stages. You might run into errors or missing syscalls ("stubs"). If you encounter any of these, please let me know by opening an issue.
 - The host's root is mounted on HyClone as `/SystemRoot`. When translating calls from Haiku to the host system, HyClone maps the Haiku root to `$HPREFIX`, and when translating the results, HyClone appends `/SystemRoot` to the host's root.
+
+## Community
+
+This repo is a part of [Project Reality](https://discord.gg/ThUzHbEqn9).
+
+Need help using this project? Join me on [Discord](https://discord.gg/ThUzHbEqn9), and let's find a solution together.
