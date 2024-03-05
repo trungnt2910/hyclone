@@ -185,7 +185,7 @@ area_id MONIKA_EXPORT _moni_clone_area(const char *name, void **address,
     mmap_flags |= MAP_SHARED;
     mmap_flags &= ~MAP_PRIVATE;
 
-    int fd = LINUX_SYSCALL3(__NR_open, hostPath, open_flags, 0);
+    int fd = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, open_flags, 0);
     if (fd < 0)
     {
         return LinuxToB(-fd);
@@ -1152,7 +1152,7 @@ int ShareArea(void* mappedAddr, size_t size, int areaId,
     bool ownsFd = false;
     if (hostPath[0] != '\0')
     {
-        fd = LINUX_SYSCALL2(__NR_open, hostPath, open_flags);
+        fd = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, open_flags, 0);
         offset = 0;
         if (fd < 0)
         {

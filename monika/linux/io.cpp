@@ -260,13 +260,13 @@ int _moni_read_link(int fd, const char* path, char* buffer, size_t *_bufferSize)
     }
 
     struct stat linuxStat;
-    status = LINUX_SYSCALL2(__NR_lstat, hostPath, &linuxStat);
+    status = LINUX_SYSCALL4(__NR_newfstatat, AT_FDCWD, hostPath, &linuxStat, AT_SYMLINK_NOFOLLOW);
     if (status < 0)
     {
         return LinuxToB(-status);
     }
 
-    status = LINUX_SYSCALL3(__NR_readlink, hostPath, buffer, *_bufferSize);
+    status = LINUX_SYSCALL4(__NR_readlinkat, AT_FDCWD, hostPath, buffer, *_bufferSize);
 
     if (status < 0)
     {
@@ -292,7 +292,7 @@ status_t _moni_create_symlink(int fd, const char* path, const char* toPath, int 
         return status;
     }
 
-    status = LINUX_SYSCALL2(__NR_symlink, toPath, hostPath);
+    status = LINUX_SYSCALL3(__NR_symlinkat, toPath, AT_FDCWD, hostPath);
 
     if (status < 0)
     {
@@ -524,11 +524,11 @@ int _moni_open(int fd, const char* path, int openMode, int perms)
         linuxFlags |= O_NOFOLLOW;
     }
 
-    int result = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags, linuxMode);
+    int result = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, linuxFlags, linuxMode);
 
     if (result == -ELOOP && !shouldFailWithEloop)
     {
-        result = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags | O_PATH, linuxMode);
+        result = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, linuxFlags | O_PATH, linuxMode);
     }
 
     if (result < 0)
@@ -694,7 +694,7 @@ int _moni_normalize_path(const char* userPath, bool traverseLink, char* buffer)
 
 int _moni_create_pipe(int *fds)
 {
-    long result = LINUX_SYSCALL1(__NR_pipe, fds);
+    long result = LINUX_SYSCALL2(__NR_pipe2, fds, 0);
 
     if (result < 0)
     {
@@ -728,7 +728,7 @@ status_t _moni_create_fifo(int fd, const char* path, mode_t perms)
         return status;
     }
 
-    status = LINUX_SYSCALL3(__NR_mknod, hostPath, perms | S_IFIFO, 0);
+    status = LINUX_SYSCALL4(__NR_mknodat, AT_FDCWD, hostPath, perms | S_IFIFO, 0);
     if (status < 0)
     {
         return LinuxToB(-status);
@@ -759,7 +759,7 @@ int _moni_rename(int oldDir, const char* oldpath, int newDir, const char* newpat
         return status;
     }
 
-    status = LINUX_SYSCALL2(__NR_rename, oldHostPath, newHostPath);
+    status = LINUX_SYSCALL4(__NR_renameat, AT_FDCWD, oldHostPath, AT_FDCWD, newHostPath);
 
     if (status < 0)
     {
@@ -809,7 +809,7 @@ int _moni_open_dir(int fd, const char* path)
         return expandStatus;
     }
 
-    int result = LINUX_SYSCALL2(__NR_open, hostPath, O_DIRECTORY);
+    int result = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, O_DIRECTORY, 0);
 
     if (result < 0)
     {
@@ -828,7 +828,7 @@ int _moni_open_dir(int fd, const char* path)
 
 status_t _moni_open_parent_dir(int fd, char* name, size_t nameLength)
 {
-    long result = LINUX_SYSCALL3(__NR_openat, fd, "..", O_DIRECTORY);
+    long result = LINUX_SYSCALL4(__NR_openat, fd, "..", O_DIRECTORY, 0);
 
     if (result < 0)
     {
@@ -906,7 +906,7 @@ int _moni_dup2(int ofd, int nfd)
         return HAIKU_POSIX_EBADF;
     }
 
-    int result = LINUX_SYSCALL2(__NR_dup2, ofd, nfd);
+    int result = LINUX_SYSCALL3(__NR_dup3, ofd, nfd, 0);
 
     if (result < 0)
     {
@@ -1133,7 +1133,7 @@ status_t _moni_create_dir(int fd, const char* path, int perms)
         return status;
     }
 
-    status = LINUX_SYSCALL2(__NR_mkdir, hostPath, ModeBToLinux(perms));
+    status = LINUX_SYSCALL3(__NR_mkdirat, AT_FDCWD, hostPath, ModeBToLinux(perms));
 
     if (status < 0)
     {
@@ -1151,7 +1151,11 @@ status_t _moni_remove_dir(int fd, const char* path)
     long status = GET_SERVERCALLS()->vchroot_expandat(fd, path, strlen(path),
         false, hostPath, sizeof(hostPath));
 
+#ifdef __NR_rmdir
     status = LINUX_SYSCALL1(__NR_rmdir, hostPath);
+#else
+    status = LINUX_SYSCALL3(__NR_unlinkat, AT_FDCWD, hostPath, AT_REMOVEDIR);
+#endif
 
     if (status < 0)
     {
@@ -1216,7 +1220,7 @@ status_t _moni_open_dir_entry_ref(haiku_dev_t device, haiku_ino_t inode, const c
         return status;
     }
 
-    status = LINUX_SYSCALL2(__NR_open, hostPath, O_DIRECTORY);
+    status = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, O_DIRECTORY, 0);
     if (status < 0)
     {
         return LinuxToB(-status);
@@ -1269,11 +1273,11 @@ status_t _moni_open_entry_ref(haiku_dev_t device, haiku_ino_t inode, const char*
         linuxFlags |= O_NOFOLLOW;
     }
 
-    status = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags, linuxMode);
+    status = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, linuxFlags, linuxMode);
 
     if (status == -ELOOP && !shouldFailWithEloop)
     {
-        status = LINUX_SYSCALL3(__NR_open, hostPath, linuxFlags | O_PATH, linuxMode);
+        status = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, linuxFlags | O_PATH, linuxMode);
     }
 
     if (status < 0)
@@ -1346,7 +1350,7 @@ int _moni_open_attr(int fd, const char* path, const char *name,
     int linuxMode = OFlagsBToLinux(openMode & ~HAIKU_O_NOTRAVERSE);
     int linuxPerms = 0777;
 
-    status = LINUX_SYSCALL3(__NR_open, hostPath, linuxMode, linuxPerms);
+    status = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, linuxMode, linuxPerms);
 
     if (status < 0)
     {
@@ -1375,7 +1379,7 @@ int _moni_open_attr_dir(int fd, const char* path, bool traverseLeafLink)
         return status;
     }
 
-    status = LINUX_SYSCALL2(__NR_open, hostPath, O_DIRECTORY);
+    status = LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, O_DIRECTORY, 0);
 
     if (status < 0)
     {

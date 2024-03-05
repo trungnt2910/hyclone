@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -139,7 +140,7 @@ long realpath(const char *path, char resolved[PATH_MAX], bool resolveSymlinks)
 		{
 			return -ENAMETOOLONG;
 		}
-		status = LINUX_SYSCALL2(__NR_lstat, resolved, &sb);
+		status = LINUX_SYSCALL4(__NR_newfstatat, AT_FDCWD, resolved, &sb, AT_SYMLINK_NOFOLLOW);
 		if (status < 0)
 		{
 			if (status == -ENOENT && p == NULL)
@@ -154,7 +155,11 @@ long realpath(const char *path, char resolved[PATH_MAX], bool resolveSymlinks)
 			{
 				return -ELOOP;
 			}
+#ifdef __NR_readlink
 			slen = LINUX_SYSCALL3(__NR_readlink, resolved, symlink, sizeof(symlink) - 1);
+#else
+			slen = LINUX_SYSCALL4(__NR_readlinkat, AT_FDCWD, resolved, symlink, sizeof(symlink) - 1);
+#endif
 			if (slen < 0)
 			{
 				return slen;
