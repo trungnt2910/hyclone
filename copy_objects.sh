@@ -1,7 +1,17 @@
 #!/bin/bash
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-HAIKU_ARCH=${HAIKU_ARCH:-"x86_64"}
+HAIKU_UNIX_ARCH=${HAIKU_UNIX_ARCH:-"$(uname -m)"}
+
+case $HAIKU_UNIX_ARCH in
+    "aarch64")
+        HAIKU_ARCH="arm64"
+        ;;
+    *)
+        HAIKU_ARCH=$HAIKU_UNIX_ARCH
+        ;;
+esac
+
 # TODO: This is personalized for my local environment, but making this a subdirectory of the HyClone
 # tree (such as "haiku-build") seems to be a better idea.
 HAIKU_BUILD_ENVIRONMENT_ROOT=${HAIKU_BUILD_ENVIRONMENT_ROOT:-"$SCRIPT_DIR/.."}
@@ -17,9 +27,9 @@ HAIKU_GLUE="$HAIKU_BUILD_OUTPUT_ROOT/objects/haiku/$HAIKU_ARCH/release/system/gl
 HAIKU_GLUE_ARCH="$HAIKU_GLUE/arch/$HAIKU_ARCH"
 
 # Some distros store the GCC glue objects in lib64, others in lib.
-HAIKU_GLUE_GCC=$(echo $HAIKU_BUILD_OUTPUT_ROOT/cross-tools-$HAIKU_ARCH/lib64/gcc/$HAIKU_ARCH-unknown-haiku/**)
+HAIKU_GLUE_GCC=$(echo $HAIKU_BUILD_OUTPUT_ROOT/cross-tools-$HAIKU_ARCH/lib64/gcc/$HAIKU_UNIX_ARCH-unknown-haiku/**)
 if [ ! -f "$HAIKU_GLUE_GCC/crtbeginS.o" ]; then
-    HAIKU_GLUE_GCC=$(echo $HAIKU_BUILD_OUTPUT_ROOT/cross-tools-$HAIKU_ARCH/lib/gcc/$HAIKU_ARCH-unknown-haiku/**)
+    HAIKU_GLUE_GCC=$(echo $HAIKU_BUILD_OUTPUT_ROOT/cross-tools-$HAIKU_ARCH/lib/gcc/$HAIKU_UNIX_ARCH-unknown-haiku/**)
 fi
 
 # If Haiku is not built, build it!

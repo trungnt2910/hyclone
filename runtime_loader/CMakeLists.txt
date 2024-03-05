@@ -27,7 +27,7 @@ add_custom_target(RemoveHaikuSyscalls
     COMMAND ar d ${CMAKE_CURRENT_SOURCE_DIR}/libruntime_loader_nosyscalls.a syscalls.o tls.o)
 
 add_library(runtime_loader SHARED blank.c)
-target_link_options(runtime_loader PRIVATE 
+target_link_options(runtime_loader PRIVATE
     -nodefaultlibs
     -nostartfiles
     -Wl,--no-undefined,-shared,-Bsymbolic,-soname=runtime_loader,-entry=runtime_loader
@@ -42,7 +42,7 @@ target_link_libraries(runtime_loader PRIVATE monika)
 target_link_libraries(runtime_loader PRIVATE root_os_tls)
 target_link_libraries(runtime_loader PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libgcc_eh-kernel.a)
 target_link_libraries(runtime_loader PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libgcc-kernel.a)
-target_link_libraries(runtime_loader PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libruntime_loader_x86_64.a)
+target_link_libraries(runtime_loader PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libruntime_loader_${HYCLONE_ARCH}.a)
 target_link_libraries(runtime_loader PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libruntime_loader_nosyscalls.a)
 
 install(TARGETS runtime_loader DESTINATION bin)

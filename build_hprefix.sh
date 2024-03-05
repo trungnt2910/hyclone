@@ -65,7 +65,17 @@ done
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-HAIKU_ARCH=${HAIKU_ARCH:-"x86_64"}
+HAIKU_UNIX_ARCH=${HAIKU_UNIX_ARCH:-"$(uname -m)"}
+
+case $HAIKU_UNIX_ARCH in
+    "aarch64")
+        HAIKU_ARCH="arm64"
+        ;;
+    *)
+        HAIKU_ARCH=$HAIKU_UNIX_ARCH
+        ;;
+esac
+
 HAIKU_BUILD_ENVIRONMENT_ROOT=${HAIKU_BUILD_ENVIRONMENT_ROOT:-"$SCRIPT_DIR/.."}
 HAIKU_BUILD_SOURCE_DIRECTORY=${HAIKU_BUILD_SOURCE_DIRECTORY:-"$HAIKU_BUILD_ENVIRONMENT_ROOT/haiku"}
 HPREFIX=${HPREFIX:-"$HOME/.hprefix"}

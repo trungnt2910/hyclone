@@ -6,7 +6,10 @@ add_custom_target(CopyHaikuObjects
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/copy_objects.sh)
 
 if(NOT DEFINED HYCLONE_ARCH)
-    set(HYCLONE_ARCH "x86_64")
+    set(HYCLONE_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+    if(HYCLONE_ARCH MATCHES "aarch64")
+        set(HYCLONE_ARCH "arm64")
+    endif()
 endif()
 
 add_compile_definitions(HYCLONE_ARCH=${HYCLONE_ARCH})
