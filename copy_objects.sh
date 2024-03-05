@@ -73,6 +73,4 @@ cp -fpv $HAIKU_GLUE_GCC/crtbeginS.o $SCRIPT_DIR/libroot
 cp -fpv $HAIKU_GLUE_GCC/crtendS.o $SCRIPT_DIR/libroot
 cp -fpv $HAIKU_BUILD_SOURCE_DIRECTORY/src/tools/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/fs_shell
 cp -fpv $HAIKU_BUILD_SOURCE_DIRECTORY/headers/private/fs_shell/*.h $SCRIPT_DIR/libhyclonefs/haiku_include/private/fs_shell
-cp -fpv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/tools/fs_shell/*.o $SCRIPT_DIR/libhyclonefs/fs_shell
-cp -fpv $HAIKU_BUILD_OUTPUT_ROOT/objects/$(uname | tr '[:upper:]' '[:lower:]')/$(uname -m)/release/build/libroot/*.o $SCRIPT_DIR/libhyclonefs/libroot_host
 cp -fpv $HAIKU_BUILD_OUTPUT_ROOT/objects/haiku/$HAIKU_ARCH/release/system/kernel/syscalls.o $SCRIPT_DIR/monika/dispatcher/syscalls.o
