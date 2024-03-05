@@ -14,5 +14,5 @@
 build/**
 **/*.o
 **/*.a
-**/*.so
+**/*.so*
 **/haiku_include/**

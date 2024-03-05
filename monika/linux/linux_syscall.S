@@ -35,6 +35,12 @@ linux_syscall:
 	pop		%ebx
 	ret
 
+#elif defined(__aarch64__)
+
+	mov x8, x6
+	svc 0
+	ret
+
 #else
 
 #	error Missing assembly!

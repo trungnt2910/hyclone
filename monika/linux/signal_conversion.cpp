@@ -384,6 +384,21 @@ void ContextLinuxToB(const ucontext_t& linuxContext, haiku_ucontext_t& context)
 
     // TODO: floating point registers.
     memset(&context.uc_mcontext.fpu, 0, sizeof(context.uc_mcontext.fpu));
+#elif defined(__aarch64__)
+    for (int i = 0; i < 29; ++i)
+    {
+        context.uc_mcontext.x[i] = linuxContext.uc_mcontext.regs[i];
+    }
+    context.uc_mcontext.lr = linuxContext.uc_mcontext.regs[30];
+    context.uc_mcontext.sp = linuxContext.uc_mcontext.sp;
+
+    // TODO: additional rocessor state
+    // https://elixir.bootlin.com/linux/latest/source/arch/arm64/include/uapi/asm/sigcontext.h
+    context.uc_mcontext.elr = 0;
+    context.uc_mcontext.spsr = 0;
+    memset(&context.uc_mcontext.fp_q, 0, sizeof(context.uc_mcontext.fp_q));
+    context.uc_mcontext.fpsr = 0;
+    context.uc_mcontext.fpcr = 0;
 #else
 # error Implement mcontext_t marshalling on this platform!
 #endif

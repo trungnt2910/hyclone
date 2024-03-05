@@ -2,9 +2,9 @@
 #include "haiku_signal.h"
 
 #include <cstddef>
-#include <linux/resource.h>
 #include <memory.h>
 #include <signal.h>
+#include <sys/resource.h>
 #include <wait.h>
 
 #include "BeDefs.h"

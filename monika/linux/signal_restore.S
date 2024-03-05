@@ -22,6 +22,13 @@ __restore_rt:
 	movl $173, %eax
 	int $0x80
 
+#elif defined(__aarch64__)
+
+__restore:
+__restore_rt:
+	mov x8,#139 // SYS_rt_sigreturn
+	svc 0
+
 #else
 
 #	error Missing assembly!
