@@ -50,6 +50,12 @@ void* loader_allocate_commpage()
     // Stubbed.
     realTimeData->arch_data.system_time_conversion_factor = 0;
     realTimeData->arch_data.system_time_offset = 0;
+#elif defined(__aarch64__)
+    // Stubbed.
+    realTimeData->arch_data.data[0].system_time_offset = 0;
+    realTimeData->arch_data.data[1].system_time_offset = 0;
+    realTimeData->arch_data.system_time_conversion_factor = 0;
+    realTimeData->arch_data.version = 0;
 #else
 #warning commpage time data not set up for this architecture.
 #endif

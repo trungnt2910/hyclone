@@ -11,6 +11,9 @@ typedef unsigned int        uint32;
 typedef int64_t             int64;
 typedef uint64_t            uint64;
 
+typedef volatile int32      vint32;
+typedef volatile int64      vint64;
+
 typedef unsigned char       uchar;
 
 typedef int32 status_t;
@@ -63,6 +66,9 @@ typedef long signed int     haiku_ssize_t;
 #define B_INFINITE_TIMEOUT  (9223372036854775807LL)
 
 #ifdef __x86_64__
+#define B_PAGE_SIZE         4096
+#define B_HAIKU_64_BIT      1
+#elif defined(__aarch64__)
 #define B_PAGE_SIZE         4096
 #define B_HAIKU_64_BIT      1
 #endif
