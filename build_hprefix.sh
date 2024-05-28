@@ -83,7 +83,7 @@ HPREFIX_PACKAGES=$"$HPREFIX/boot/system/packages"
 HAIKU_DEPOT_BASE_URL="https://depot.haiku-os.org/__api/v2/pkg/get-pkg"
 HAIKU_HPKG_BASE_URL="https://eu.hpkg.haiku-os.org/haiku/master/$HAIKU_ARCH/current"
 HAIKU_SYSPACKAGES="haiku"
-HAIKU_PACKAGES="bash bzip2 ca_root_certificates coreutils expat fontconfig freetype gawk gcc_syslibs gettext_libintl graphite2 gzip harfbuzz icu66 intel_wifi_firmwares libedit libiconv libpng16 libsolv libxml2 ncurses6 noto noto_sans_cjk_jp openssl ralink_wifi_firmwares readline realtek_wifi_firmwares tar unzip zlib zstd"
+HAIKU_PACKAGES="bash bzip2 ca_root_certificates coreutils expat fontconfig freetype gawk gcc_syslibs gettext_libintl graphite2 gzip harfbuzz icu74 intel_wifi_firmwares libedit libiconv libpng16 libsolv libxml2 ncurses6 noto noto_sans_cjk_jp openssl ralink_wifi_firmwares readline realtek_wifi_firmwares tar unzip zlib zstd"
 HPKG_FORCE=${HPKG_FORCE:-"0"}
 
 HAIKU_ADDITIONAL_SYSPACKAGES=${HAIKU_ADDITIONAL_SYSPACKAGES//,/ }
