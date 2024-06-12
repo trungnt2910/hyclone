@@ -92,6 +92,8 @@ HAIKU_ADDITIONAL_PACKAGES=${HAIKU_ADDITIONAL_PACKAGES//,/ }
 HAIKU_SYSPACKAGES+=" $HAIKU_ADDITIONAL_SYSPACKAGES"
 HAIKU_PACKAGES+=" $HAIKU_ADDITIONAL_PACKAGES"
 
+CURL_RETRY_COUNT=${CURL_RETRY_COUNT:-"16"}
+
 mkdir -p $HPREFIX_PACKAGES
 
 if pidof -q hyclone_server; then
@@ -124,7 +126,7 @@ fi
 
 echo "Downloading Haiku packages"
 read -ra array <<<"$HAIKU_SYSPACKAGES"
-HAIKU_SYSPACKAGES_HREV=$(curl -Ls $HAIKU_HPKG_BASE_URL | sed -n 's/^.*version: "\([^"]*\)".*$/\1/p')
+HAIKU_SYSPACKAGES_HREV=$(curl --retry $CURL_RETRY_COUNT --retry-all-errors -Ls $HAIKU_HPKG_BASE_URL | sed -n 's/^.*version: "\([^"]*\)".*$/\1/p')
 for package in "${array[@]}"; do
     # Check if package already exists
     if [ "$HPKG_FORCE" == "0" ] && [ -f "$HPREFIX_PACKAGES/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg" ]; then
@@ -135,14 +137,17 @@ for package in "${array[@]}"; do
             rm -fv $HPREFIX_PACKAGES/$package-*-$HAIKU_ARCH.hpkg
         fi
         echo "Downloading $package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg"
-        curl -Lo "$HPREFIX_PACKAGES/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg" "$HAIKU_HPKG_BASE_URL/packages/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg"
+        curl --retry $CURL_RETRY_COUNT --retry-all-errors \
+            -Lo "$HPREFIX_PACKAGES/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg" \
+            "$HAIKU_HPKG_BASE_URL/packages/$package-$HAIKU_SYSPACKAGES_HREV-1-$HAIKU_ARCH.hpkg"
     fi
 done
 read -ra array <<<"$HAIKU_PACKAGES"
 for package in "${array[@]}"; do
     # API documented here: https://github.com/haiku/haikudepotserver/blob/master/haikudepotserver-api2/src/main/resources/api2/pkg.yaml#L60
     # The schema here: https://github.com/haiku/haikudepotserver/blob/master/haikudepotserver-api2/src/main/resources/api2/pkg.yaml#L598
-    hpkgDownloadUrl="$(curl -Ls --request POST --data '{"name":"'"$package"'","repositorySourceCode":"haikuports_'$HAIKU_ARCH'","versionType":"LATEST","naturalLanguageCode":"en"}' \
+    hpkgDownloadUrl="$(curl --retry $CURL_RETRY_COUNT --retry-all-errors -Ls --request POST \
+        --data '{"name":"'"$package"'","repositorySourceCode":"haikuports_'$HAIKU_ARCH'","versionType":"LATEST","naturalLanguageCode":"en"}' \
         --header 'Content-Type:application/json' "$HAIKU_DEPOT_BASE_URL" | sed -n 's/^.*hpkgDownloadURL":"\([^"]*\)".*$/\1/p')"
     hpkgVersion="$(echo "$hpkgDownloadUrl" | sed -n 's/^.*\/[^\/]*-\([^-]*\-[^-]*\)-[^-]*\.hpkg$/\1/p')"
     if [ "$HPKG_FORCE" == "0" ] && [ -f "$HPREFIX_PACKAGES/$package-$hpkgVersion-$HAIKU_ARCH.hpkg" ]; then
@@ -153,7 +158,8 @@ for package in "${array[@]}"; do
             rm -fv $HPREFIX_PACKAGES/$package-*-$HAIKU_ARCH.hpkg
         fi
         echo "Downloading $package-$hpkgVersion-$HAIKU_ARCH.hpkg"
-        curl -Lo "$HPREFIX_PACKAGES/$package-$hpkgVersion-$HAIKU_ARCH.hpkg" "$hpkgDownloadUrl"
+        curl --retry $CURL_RETRY_COUNT --retry-all-errors \
+            -Lo "$HPREFIX_PACKAGES/$package-$hpkgVersion-$HAIKU_ARCH.hpkg" "$hpkgDownloadUrl"
     fi
 done
 
