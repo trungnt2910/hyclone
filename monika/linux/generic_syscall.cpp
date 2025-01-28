@@ -1,0 +1,58 @@
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include "debugbreak.h"
+#include <string.h>
+#include <haiku_errors.h>
+#include <BeDefs.h>
+#include "linux_syscall.h"
+
+#define RANDOM_SYSCALLS "random"
+#define RANDOM_GET_ENTROPY 1
+struct random_get_entropy_args {
+	void *buffer;
+	size_t length;
+};
+static inline int _open(const char *hostPath, int mode) {
+	return LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, 0, mode);
+}
+static inline ssize_t _read(int fd, void *buffer, size_t bufferSize) {
+	return LINUX_SYSCALL3(__NR_read, fd, buffer, bufferSize);
+}
+static inline int _close(int fd) {
+        return LINUX_SYSCALL1(__NR_close, fd);
+}
+extern "C" {
+int32_t _moni_generic_syscall(const char *userSubsystem, uint32_t function, void *buffer, uint64_t bufferSize) {
+	char subsystem[B_FILE_NAME_LENGTH];
+	if (!strcmp(userSubsystem, RANDOM_SYSCALLS)) {
+		switch (function) {
+			case RANDOM_GET_ENTROPY: {
+				random_get_entropy_args args;
+				if (bufferSize != sizeof(args)) {
+					return B_BAD_VALUE;
+				}
+				memcpy(&args, buffer, sizeof(args));
+				int random_fd = _open("/dev/random", O_RDONLY);
+				if (random_fd < 0) {
+					random_fd = _open("/dev/urandom", O_RDONLY);
+					if (random_fd < 0) {
+						return B_NAME_NOT_FOUND;
+					}
+				}
+				if (_read(random_fd, args.buffer, args.length) < 0) {
+					return B_IO_ERROR;
+				}	
+				_close(random_fd);
+				memcpy(buffer, &args, sizeof(args));
+				return B_OK;
+			} break;
+		}
+	}
+	printf("stub: _kern_generic_syscall(subsystem: \"%s\", function: 0x%04x (%0d), ..., len: 0x%08lx (%0ld))\n", subsystem, function, function, bufferSize, bufferSize);
+	return B_BAD_HANDLER;
+}
+}
