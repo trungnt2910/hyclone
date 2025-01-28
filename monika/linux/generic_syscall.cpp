@@ -1,13 +1,15 @@
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <cstddef>
+#include <cstring>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+
 #include <fcntl.h>
-#include <stdlib.h>
-#include "debugbreak.h"
-#include <string.h>
-#include <haiku_errors.h>
+#include <unistd.h>
+
 #include <BeDefs.h>
+#include "debugbreak.h"
+#include <haiku_errors.h>
 #include "linux_syscall.h"
 
 #define RANDOM_SYSCALLS "random"
