@@ -16,14 +16,8 @@ struct random_get_entropy_args {
 	void *buffer;
 	size_t length;
 };
-static inline int _open(const char *hostPath, int mode) {
-	return LINUX_SYSCALL4(__NR_openat, AT_FDCWD, hostPath, 0, mode);
-}
-static inline ssize_t _read(int fd, void *buffer, size_t bufferSize) {
-	return LINUX_SYSCALL3(__NR_read, fd, buffer, bufferSize);
-}
-static inline int _close(int fd) {
-        return LINUX_SYSCALL1(__NR_close, fd);
+static inline ssize_t _getrandom(void *buf, size_t len, int flags) {
+	return LINUX_SYSCALL3(__NR_getrandom, buf, len, flags);
 }
 extern "C" {
 int32_t _moni_generic_syscall(const char *userSubsystem, uint32_t function, void *buffer, uint64_t bufferSize) {
@@ -36,17 +30,9 @@ int32_t _moni_generic_syscall(const char *userSubsystem, uint32_t function, void
 					return B_BAD_VALUE;
 				}
 				memcpy(&args, buffer, sizeof(args));
-				int random_fd = _open("/dev/random", O_RDONLY);
-				if (random_fd < 0) {
-					random_fd = _open("/dev/urandom", O_RDONLY);
-					if (random_fd < 0) {
-						return B_NAME_NOT_FOUND;
-					}
-				}
-				if (_read(random_fd, args.buffer, args.length) < 0) {
+				if (_getrandom(args.buffer, args.length, 0) < 0) {
 					return B_IO_ERROR;
 				}	
-				_close(random_fd);
 				memcpy(buffer, &args, sizeof(args));
 				return B_OK;
 			} break;
