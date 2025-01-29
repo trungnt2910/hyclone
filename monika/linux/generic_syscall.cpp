@@ -40,8 +40,8 @@ int32_t _moni_generic_syscall(const char *userSubsystem, uint32_t function, void
 			} break;
 		}
 	}
-    	GET_HOSTCALLS()->printf("fatal stub: _kern_generic_syscall(subsystem: \"%s\". function: %0d, len: %0ld)\n", subsystem, function, bufferSize);
-        GET_SERVERCALLS()->debug_output("fatal stub: _kern_generic_syscall", 33);
+    	GET_HOSTCALLS()->printf("stub: _kern_generic_syscall(subsystem: \"%s\". function: %0d, len: %0ld)\n", subsystem, function, bufferSize);
+        GET_SERVERCALLS()->debug_output("stub: _kern_generic_syscall", 33);
 	return B_BAD_HANDLER;
 }
 }
