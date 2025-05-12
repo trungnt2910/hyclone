@@ -68,9 +68,10 @@ void _moni_thread_yield(void)
     LINUX_SYSCALL0(__NR_sched_yield);
 }
 
-status_t _moni_wait_for_thread(thread_id thread, status_t* _returnCode)
+status_t _moni_wait_for_thread_etc(thread_id thread, uint32 flags, bigtime_t timeout,
+    status_t* _returnCode)
 {
-    long status = GET_HOSTCALLS()->wait_for_thread(thread, _returnCode);
+    long status = GET_HOSTCALLS()->wait_for_thread(thread, flags, timeout, _returnCode);
     if (status < 0)
     {
         return LinuxToB(-status);

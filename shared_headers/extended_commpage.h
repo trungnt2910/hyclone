@@ -64,7 +64,7 @@ struct hostcalls
     // Thread
     int (*spawn_thread)(void* thread_creation_attributes);
     void (*exit_thread)(int status);
-    int (*wait_for_thread)(int thread, int* status);
+    int (*wait_for_thread)(int thread, uint32_t flags, int64_t timeout, int* status);
 
     // Mutex
     int (*mutex_lock)(int32_t* mutex, const char* name, uint32_t flags, int64_t timeout);

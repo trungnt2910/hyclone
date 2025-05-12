@@ -134,7 +134,7 @@ void loader_exit_thread(int retVal)
     pthread_exit((void*)(intptr_t)retVal);
 }
 
-int loader_wait_for_thread(int threadId, int* retVal)
+int loader_wait_for_thread(int threadId, uint32_t flags, int64_t timeout, int* retVal)
 {
     ThreadInfo threadInfo;
     {
@@ -146,12 +146,44 @@ int loader_wait_for_thread(int threadId, int* retVal)
         }
         threadInfo = it->second;
     }
+
     // A temporary pointer.
     // Attempting to cast retVal (a int*) to a void** on 64-bit
     // platforms may corrupt data during assignment.
     void* retPtr;
     // Zero if succeeds, positive error code on error.
-    int error = pthread_join(threadInfo.thread, &retPtr);
+    int error = EINVAL;
+
+    bool absolute = flags & B_ABSOLUTE_TIMEOUT;
+    bool relative = flags & B_RELATIVE_TIMEOUT;
+
+    // TODO: This is getting messy, maybe we should send this to hyclone_server.
+    if (timeout == B_INFINITE_TIMEOUT || (!absolute && !relative))
+    {
+        error = pthread_join(threadInfo.thread, &retPtr);
+    }
+    else
+    {
+        if (absolute)
+        {
+            struct timespec tp;
+            clock_gettime(CLOCK_MONOTONIC, &tp);
+
+            timeout -= tp.tv_nsec / 1000;
+            timeout -= tp.tv_sec * 1'000'000;
+        }
+
+        struct timespec abs;
+        clock_gettime(CLOCK_REALTIME, &abs);
+
+        abs.tv_sec += timeout / 1'000'000;
+        abs.tv_nsec += (timeout % 1'000'000) * 1000;
+        abs.tv_sec += abs.tv_nsec / 1'000'000'000;
+        abs.tv_nsec %= 1'000'000'000;
+
+        error = pthread_timedjoin_np(threadInfo.thread, &retPtr, &abs);
+    }
+
     if (error != 0)
     {
         return -error;

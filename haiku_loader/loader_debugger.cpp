@@ -372,7 +372,7 @@ int loader_remove_team_debugger()
 
     if (sNubThread >= 0)
     {
-        loader_wait_for_thread(sNubThread, NULL);
+        loader_wait_for_thread(sNubThread, 0, 0, NULL);
     }
 
     sDebuggerInstalled = false;
