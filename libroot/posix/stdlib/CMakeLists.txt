@@ -21,14 +21,12 @@ set(root_posix_stdlib_objects
     ${CMAKE_CURRENT_SOURCE_DIR}/mktemp.o
     #${CMAKE_CURRENT_SOURCE_DIR}/pty.o
     ${CMAKE_CURRENT_SOURCE_DIR}/qsort.o
+    ${CMAKE_CURRENT_SOURCE_DIR}/qsort_r.o
     ${CMAKE_CURRENT_SOURCE_DIR}/radixsort.o
     ${CMAKE_CURRENT_SOURCE_DIR}/random.o
+    ${CMAKE_CURRENT_SOURCE_DIR}/reallocarray.o
     ${CMAKE_CURRENT_SOURCE_DIR}/realpath.o
     ${CMAKE_CURRENT_SOURCE_DIR}/strfmon.o
-    ${CMAKE_CURRENT_SOURCE_DIR}/strtol.o
-    ${CMAKE_CURRENT_SOURCE_DIR}/strtoll.o
-    ${CMAKE_CURRENT_SOURCE_DIR}/strtoul.o
-    ${CMAKE_CURRENT_SOURCE_DIR}/strtoull.o
 
     $<TARGET_OBJECTS:root_posix_stdlib_pty>
 

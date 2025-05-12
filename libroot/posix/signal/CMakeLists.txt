@@ -30,7 +30,6 @@ set(root_posix_signal_objects
         ${CMAKE_CURRENT_SOURCE_DIR}/sigset.o
         ${CMAKE_CURRENT_SOURCE_DIR}/sigset_accessors.o
         ${CMAKE_CURRENT_SOURCE_DIR}/sigsuspend.o
-        ${CMAKE_CURRENT_SOURCE_DIR}/sigtimedwait.o
         ${CMAKE_CURRENT_SOURCE_DIR}/sigwait.o
         ${CMAKE_CURRENT_SOURCE_DIR}/sigwaitinfo.o
         ${CMAKE_CURRENT_SOURCE_DIR}/strsignal.o

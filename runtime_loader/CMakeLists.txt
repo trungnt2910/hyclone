@@ -6,6 +6,7 @@ add_library(HaikuRuntimeLoaderObjects OBJECT IMPORTED)
 set_property(TARGET HaikuRuntimeLoaderObjects PROPERTY
     IMPORTED_OBJECTS
         ${CMAKE_CURRENT_SOURCE_DIR}/add_ons.o
+        ${CMAKE_CURRENT_SOURCE_DIR}/commpage.o
         ${CMAKE_CURRENT_SOURCE_DIR}/elf.o
         ${CMAKE_CURRENT_SOURCE_DIR}/elf_haiku_version.o
         ${CMAKE_CURRENT_SOURCE_DIR}/elf_load_image.o

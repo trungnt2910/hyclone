@@ -14,13 +14,9 @@ set(root_posix_objects
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_stdio.o
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_musl.o
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_arch_${HYCLONE_ARCH}.o
-        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_ctype.o
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_ext.o
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_iconv.o
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_libio.o
-        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_locale.o
-        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_math.o
-        ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_misc.o
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_regex.o
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_stdio.o
         ${CMAKE_CURRENT_SOURCE_DIR}/posix_gnu_stdlib.o
