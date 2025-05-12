@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Haiku build dependencies
         run: |
@@ -39,7 +39,7 @@ jobs:
 
       - name: Fetch cached Haiku build
         id: cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: 'haiku-build'
           key: 'haiku-${{ steps.get_hrev.outputs.hrev }}-build'
@@ -75,14 +75,14 @@ jobs:
           pushd $HPREFIX; tar cvf ../hprefix.tar *; popd
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: hyclone_${{ matrix.os }}
           path: build
 
       - name: Upload HPREFIX
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: hprefix.tar
           path: hprefix.tar
