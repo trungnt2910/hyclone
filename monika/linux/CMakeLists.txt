@@ -22,6 +22,7 @@ set(monika_sources
     debug.cpp
     disk.cpp
     fcntl.cpp
+    generic.cpp
     image.cpp
     io.cpp
     ioctl.cpp
