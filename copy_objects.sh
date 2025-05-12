@@ -60,6 +60,8 @@ mkdir -p $SCRIPT_DIR/libhyclonefs/haiku_include/private/fs_shell
 mkdir -p $SCRIPT_DIR/libhyclonefs/fs_shell
 mkdir -p $SCRIPT_DIR/libhyclonefs/libroot_host
 
+shopt -s globstar
+
 cp -fpv $HAIKU_RUNTIME_LOADER_ARCH/*.a $SCRIPT_DIR/runtime_loader
 cp -fpv $HAIKU_RUNTIME_LOADER/*.a $SCRIPT_DIR/runtime_loader
 cp -fpv $HAIKU_RUNTIME_LOADER/*.o $SCRIPT_DIR/runtime_loader
