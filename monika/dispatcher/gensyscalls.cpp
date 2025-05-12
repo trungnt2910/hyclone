@@ -174,4 +174,8 @@ int main(int argc, char** argv)
     output << "}\n";
 
     output << "\n}\n";
+
+    // The foreign syscalls.o object seems to register weird atexit hooks.
+    output.flush();
+    _Exit(0);
 }
