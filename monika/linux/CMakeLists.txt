@@ -37,7 +37,8 @@ set(monika_sources
     threading.cpp
     time.cpp
     timer.cpp
-    userid.cpp)
+    userid.cpp
+    generic_syscall.cpp)
 
 add_library(monika_static STATIC ${monika_sources})
 
