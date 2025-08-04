@@ -1,6 +1,7 @@
 #ifndef __SERVER_SYSTEMNOTIFICATION_H__
 #define __SERVER_SYSTEMNOTIFICATION_H__
 
+#include <algorithm>
 #include <list>
 #include <memory>
 #include <mutex>
