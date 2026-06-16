@@ -1188,6 +1188,36 @@ intptr_t server_hserver_call_setreuid(hserver_context& context, int realUID, int
     return B_OK;
 }
 
+intptr_t server_hserver_call_getresuid(hserver_context& context, int *ruid, int *euid, int *suid)
+{
+    auto lock = context.process->Lock();
+    int r = context.process->GetUid();
+    int e = context.process->GetEuid();
+    int s = context.process->GetEuid(); // no saved UID tracking
+    if (ruid && context.process->WriteMemory(ruid, &r, sizeof(r)) != sizeof(r))
+        return B_BAD_ADDRESS;
+    if (euid && context.process->WriteMemory(euid, &e, sizeof(e)) != sizeof(e))
+        return B_BAD_ADDRESS;
+    if (suid && context.process->WriteMemory(suid, &s, sizeof(s)) != sizeof(s))
+        return B_BAD_ADDRESS;
+    return B_OK;
+}
+
+intptr_t server_hserver_call_getresgid(hserver_context& context, int *rgid, int *egid, int *sgid)
+{
+    auto lock = context.process->Lock();
+    int r = context.process->GetGid();
+    int e = context.process->GetEgid();
+    int s = context.process->GetGid(); // no saved GID tracking
+    if (rgid && context.process->WriteMemory(rgid, &r, sizeof(r)) != sizeof(r))
+        return B_BAD_ADDRESS;
+    if (egid && context.process->WriteMemory(egid, &e, sizeof(e)) != sizeof(e))
+        return B_BAD_ADDRESS;
+    if (sgid && context.process->WriteMemory(sgid, &s, sizeof(s)) != sizeof(s))
+        return B_BAD_ADDRESS;
+    return B_OK;
+}
+
 intptr_t server_hserver_call_getgroups(hserver_context& context, size_t groupCount, int* groupList)
 {
     auto lock = context.process->Lock();
