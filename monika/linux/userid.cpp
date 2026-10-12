@@ -84,6 +84,50 @@ status_t _moni_setreuid(haiku_uid_t ruid, haiku_uid_t euid,
     return B_OK;
 }
 
+status_t _moni_getresuid(haiku_uid_t* ruid, haiku_uid_t* euid, haiku_uid_t* suid)
+{
+    int r, e, s;
+    status_t status = GET_SERVERCALLS()->getresuid(&r, &e, &s);
+    if (status < 0)
+        return status;
+    if (ruid)
+        *ruid = r;
+    if (euid)
+        *euid = e;
+    if (suid)
+        *suid = s;
+    return B_OK;
+}
+
+status_t _moni_getresgid(haiku_gid_t* rgid, haiku_gid_t* egid, haiku_gid_t* sgid)
+{
+    int r, e, s;
+    status_t status = GET_SERVERCALLS()->getresgid(&r, &e, &s);
+    if (status < 0)
+        return status;
+    if (rgid)
+        *rgid = r;
+    if (egid)
+        *egid = e;
+    if (sgid)
+        *sgid = s;
+    return B_OK;
+}
+
+status_t _moni_setresgid(haiku_gid_t rgid, haiku_gid_t egid, haiku_gid_t sgid,
+    bool setAllIfPrivileged)
+{
+    (void)sgid;
+    return _moni_setregid(rgid, egid, setAllIfPrivileged);
+}
+
+status_t _moni_setresuid(haiku_uid_t ruid, haiku_uid_t euid, haiku_uid_t suid,
+    bool setAllIfPrivileged)
+{
+    (void)suid;
+    return _moni_setreuid(ruid, euid, setAllIfPrivileged);
+}
+
 haiku_ssize_t _moni_getgroups(int groupCount, haiku_gid_t* groupList)
 {
     static_assert(sizeof(haiku_gid_t) == sizeof(int), "gid_t is not 32-bit.");

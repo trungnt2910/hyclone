@@ -41,13 +41,13 @@ struct thread_creation_attributes
 {
     int32           (*entry)(void *, void *);
     const char      *name;
-    int32           priority;
     void            *args1;
     void            *args2;
     void            *stack_address;
     size_t          stack_size;
     size_t          guard_size;
     haiku_pthread_t pthread;
+    int32           priority;
     uint32          flags;
 };
 
